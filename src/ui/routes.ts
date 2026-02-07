@@ -1,88 +1,42 @@
 import type { ComponentType } from "react";
-import { RecoverRouteKey } from "@/phaseEngine";
 import type { ScreenProps } from "@/ui/types";
-import { TeamSummaryScreen } from "@/ui/screens/TeamSummaryScreen";
+import { StartScreen, ChooseFranchiseScreen, CareerContextScreen } from "@/ui/screens/StartFlowScreens";
+import { HubScreen } from "@/ui/screens/HubScreen";
 import { StaffTreeScreen } from "@/ui/screens/StaffTreeScreen";
+import { HireMarketScreen } from "@/ui/screens/HireMarketScreen";
+import { CandidateDetailScreen } from "@/ui/screens/CandidateDetailScreen";
+import { PhoneInboxScreen, PhoneThreadScreen } from "@/ui/screens/PhoneScreens";
 
 export type RouteKey =
+  | "Start"
+  | "ChooseFranchise"
+  | "CareerContext"
   | "Hub"
-  | "League"
-  | "TeamSummary"
-  | "TeamRoster"
-  | "DepthChart"
-  | "DraftBoard"
-  | "DraftRecap"
+  | "StaffTree"
   | "HireMarket"
   | "CandidateDetail"
-  | "Contracts"
-  | "PlayerContract"
-  | "MetricsDictionary"
-  | "Reference"
-  | "RelocationHub"
-  | "OwnerDashboard"
-  | "ScoutingHub"
   | "PhoneInbox"
-  | "PhoneThread"
-  | "TradeHub"
-  | "TradeThread"
-  | "SeasonHub"
-  | "GameDay"
-  | "StaffTree"
-  | "HallOfFame"
-  | "Error"
-  | `Recover/${RecoverRouteKey}`;
+  | "PhoneThread";
 
 export type Route =
+  | { key: "Start" }
+  | { key: "ChooseFranchise" }
+  | { key: "CareerContext" }
   | { key: "Hub" }
-  | { key: "League" }
-  | { key: "TeamSummary"; teamId: string }
-  | { key: "TeamRoster"; teamId: string }
-  | { key: "DepthChart"; teamId: string }
-  | { key: "DraftBoard" | "DraftRecap" }
-  | { key: "HireMarket" }
-  | { key: "CandidateDetail"; personId: string }
-  | { key: "Contracts"; teamId: string }
-  | { key: "PlayerContract"; personId: string }
-  | { key: "MetricsDictionary" }
-  | { key: "Reference" | "RelocationHub" | "OwnerDashboard" | "ScoutingHub" }
-  | { key: "PhoneInbox" }
-  | { key: "PhoneThread"; threadId: string }
-  | { key: "TradeHub" }
-  | { key: "TradeThread"; threadId: string }
-  | { key: "SeasonHub" }
-  | { key: "GameDay" }
   | { key: "StaffTree" }
-  | { key: "HallOfFame" }
-  | { key: "Error"; message: string; context?: unknown }
-  | { key: `Recover/${RecoverRouteKey}` };
-
-const UnavailableScreen: ComponentType<ScreenProps> = TeamSummaryScreen;
+  | { key: "HireMarket"; role: "hc" | "oc" | "dc" | "qb" | "asst" }
+  | { key: "CandidateDetail"; role: "hc" | "oc" | "dc" | "qb" | "asst"; candidateId: string }
+  | { key: "PhoneInbox" }
+  | { key: "PhoneThread"; threadId: string };
 
 export const RouteMap: Record<RouteKey, ComponentType<ScreenProps>> = {
-  Hub: TeamSummaryScreen,
-  League: TeamSummaryScreen,
-  TeamSummary: TeamSummaryScreen,
-  TeamRoster: UnavailableScreen,
-  DepthChart: UnavailableScreen,
-  DraftBoard: UnavailableScreen,
-  DraftRecap: UnavailableScreen,
-  HireMarket: UnavailableScreen,
-  CandidateDetail: UnavailableScreen,
-  Contracts: UnavailableScreen,
-  PlayerContract: UnavailableScreen,
-  MetricsDictionary: UnavailableScreen,
-  Reference: UnavailableScreen,
-  RelocationHub: UnavailableScreen,
-  OwnerDashboard: UnavailableScreen,
-  ScoutingHub: UnavailableScreen,
-  PhoneInbox: UnavailableScreen,
-  PhoneThread: UnavailableScreen,
-  TradeHub: UnavailableScreen,
-  TradeThread: UnavailableScreen,
-  SeasonHub: UnavailableScreen,
-  GameDay: UnavailableScreen,
+  Start: StartScreen,
+  ChooseFranchise: ChooseFranchiseScreen,
+  CareerContext: CareerContextScreen,
+  Hub: HubScreen,
   StaffTree: StaffTreeScreen,
-  HallOfFame: UnavailableScreen,
-  Error: UnavailableScreen,
-  ...Object.fromEntries(Object.values(RecoverRouteKey).map((k) => [`Recover/${k}`, UnavailableScreen])),
-} as Record<RouteKey, ComponentType<ScreenProps>>;
+  HireMarket: HireMarketScreen,
+  CandidateDetail: CandidateDetailScreen,
+  PhoneInbox: PhoneInboxScreen,
+  PhoneThread: PhoneThreadScreen,
+};

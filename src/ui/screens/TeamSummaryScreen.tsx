@@ -6,7 +6,7 @@ import { MeterBar } from "@/ui/components/MeterBar";
 
 export function TeamSummaryScreen({ ui }: ScreenProps) {
   const state = ui.getState();
-  const teamId = state.route.key === "TeamSummary" ? state.route.teamId : ui.selectors.franchiseTeamId();
+  const teamId = state.save?.teamId ?? ui.selectors.franchiseTeamId();
   const rows = ui.selectors.table("Team Summary").filter((r) => String(r.Team ?? "").trim() === teamId);
   const first = (rows[0] ?? {}) as Record<string, unknown>;
 
@@ -17,6 +17,8 @@ export function TeamSummaryScreen({ ui }: ScreenProps) {
 
   const ovr = Number(first.OVR ?? first.Overall ?? 70);
   const ovr01 = Math.max(0, Math.min(1, ovr / 100));
+
+  const activeTab = state.route.key === "TeamRoster" ? "roster" : state.route.key === "Contracts" ? "contracts" : state.route.key === "StaffTree" ? "staff" : "summary";
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
@@ -29,7 +31,7 @@ export function TeamSummaryScreen({ ui }: ScreenProps) {
         </div>
         <div className="ugf-card__body" style={{ display: "grid", gap: 12 }}>
           <SegmentedTabs
-            value="summary"
+            value={activeTab}
             tabs={[
               { key: "summary", label: "Summary" },
               { key: "roster", label: "Roster" },
@@ -37,6 +39,7 @@ export function TeamSummaryScreen({ ui }: ScreenProps) {
               { key: "staff", label: "Staff" },
             ]}
             onChange={(k) => {
+              if (k === "summary") ui.dispatch({ type: "NAVIGATE", route: { key: "TeamSummary", teamId } });
               if (k === "roster") ui.dispatch({ type: "OPEN_TEAM_ROSTER", teamId });
               if (k === "contracts") ui.dispatch({ type: "OPEN_CONTRACTS", teamId });
               if (k === "staff") ui.dispatch({ type: "OPEN_STAFF_TREE" });
