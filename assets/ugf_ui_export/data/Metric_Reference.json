@@ -1,0 +1,138 @@
+{
+  "sheet": "Metric Reference",
+  "headers": [
+    "Category",
+    "Metric",
+    "Description",
+    "Observable_Via",
+    "Variance"
+  ],
+  "rows": [
+    {
+      "Category": "Personality",
+      "Metric": "Awareness",
+      "Description": "Pre-snap reads, situational football IQ, recognition speed",
+      "Observable_Via": "Film Study, Interview",
+      "Variance": 15
+    },
+    {
+      "Category": "Personality",
+      "Metric": "Poise",
+      "Description": "Composure under pressure, handles adversity, big moment performance",
+      "Observable_Via": "Film Study (clutch situations), Interview",
+      "Variance": 12
+    },
+    {
+      "Category": "Personality",
+      "Metric": "Focus",
+      "Description": "Concentration, attention to detail, assignment discipline",
+      "Observable_Via": "Film Study, Coach References",
+      "Variance": 13
+    },
+    {
+      "Category": "Personality",
+      "Metric": "Leadership",
+      "Description": "Commands respect, vocal/lead by example, elevates teammates",
+      "Observable_Via": "Interview, Team References, Captain status",
+      "Variance": 14
+    },
+    {
+      "Category": "Personality",
+      "Metric": "Competitiveness",
+      "Description": "Competitive fire, hates losing, plays through pain, alpha mentality",
+      "Observable_Via": "Film Study (motor), Interview, Background Check",
+      "Variance": 13
+    },
+    {
+      "Category": "Personality",
+      "Metric": "Confidence",
+      "Description": "Self-belief, swagger, not easily rattled, takes criticism constructively",
+      "Observable_Via": "Interview, Workout performance",
+      "Variance": 12
+    },
+    {
+      "Category": "Personality",
+      "Metric": "Work_Ethic",
+      "Description": "Film study habits, gym rat, extra work, improvement trajectory",
+      "Observable_Via": "Coach References (partially hidden)",
+      "Variance": 16
+    },
+    {
+      "Category": "Personality",
+      "Metric": "Coachability",
+      "Description": "Takes coaching, adapts technique, ego in check, learns system",
+      "Observable_Via": "Coach References, Interview",
+      "Variance": 11
+    },
+    {
+      "Category": "Personality",
+      "Metric": "Football_IQ",
+      "Description": "Understand schemes, adjustments, chess not checkers, study film",
+      "Observable_Via": "Film Study, Interview (whiteboard test), Wonderlic proxy",
+      "Variance": 15
+    },
+    {
+      "Category": "Personality",
+      "Metric": "Instincts",
+      "Description": "Natural feel, anticipation, see play develop, sixth sense",
+      "Observable_Via": "Film Study (harder to quantify)",
+      "Variance": 14
+    },
+    {
+      "Category": "Personality",
+      "Metric": "Maturity",
+      "Description": "Handles success/failure, off-field choices, NFL-ready mindset",
+      "Observable_Via": "Background Check, Interview",
+      "Variance": 13
+    },
+    {
+      "Category": "Personality",
+      "Metric": "Motor",
+      "Description": "Relentless effort, plays through whistle, hustle, doesn't take plays off",
+      "Observable_Via": "Film Study (very visible)",
+      "Variance": 12
+    },
+    {
+      "Category": "Physical",
+      "Metric": "Speed",
+      "Description": "Straight-line speed, top-end velocity (correlates with 40 time)",
+      "Observable_Via": "Combine (40 yard dash)",
+      "Variance": 8
+    },
+    {
+      "Category": "Physical",
+      "Metric": "Acceleration",
+      "Description": "First step quickness, 0-10 yards, explosion off line",
+      "Observable_Via": "Combine (10-yard split), Film",
+      "Variance": 10
+    },
+    {
+      "Category": "Physical",
+      "Metric": "Agility",
+      "Description": "Change of direction, short-area quickness, lateral movement",
+      "Observable_Via": "Combine (3-cone, shuttle), Film",
+      "Variance": 11
+    },
+    {
+      "Category": "Physical",
+      "Metric": "Strength",
+      "Description": "Functional strength, power at point of attack (not just bench)",
+      "Observable_Via": "Combine (bench press proxy), Film",
+      "Variance": 12
+    },
+    {
+      "Category": "Physical",
+      "Metric": "Jumping",
+      "Description": "Explosiveness, lower body power, high-point ability",
+      "Observable_Via": "Combine (vertical, broad)",
+      "Variance": 9
+    },
+    {
+      "Category": "Physical",
+      "Metric": "Stamina",
+      "Description": "Conditioning, 4th quarter performance, snap count capacity",
+      "Observable_Via": "Film (late game), Coach References",
+      "Variance": 10
+    }
+  ]
+}

@@ -1,0 +1,605 @@
+{
+  "sheet": "Team Personnel",
+  "headers": [
+    "Team",
+    "Owner (Traits)",
+    "GM (Philosophy / Bias)",
+    "Head Coach (Archetype)",
+    "Offensive Coordinator (Scheme)",
+    "Defensive Coordinator (Scheme)"
+  ],
+  "rows": [
+    {
+      "Team": "New York Gothic Guardians",
+      "Owner (Traits)": "Leonard Weiss (impatient, media-sensitive)",
+      "GM (Philosophy / Bias)": "Mark Ellison (aggressive, star-driven)",
+      "Head Coach (Archetype)": "Victor Hale (CEO manager)",
+      "Offensive Coordinator (Scheme)": "Paul Denton (vertical WC)",
+      "Defensive Coordinator (Scheme)": "Sam Rourke (press-man blitz)"
+    },
+    {
+      "Team": "Boston Harbormen",
+      "Owner (Traits)": "Charles Whitlock (patient, institutional)",
+      "GM (Philosophy / Bias)": "Peter Langford (efficiency, defense)",
+      "Head Coach (Archetype)": "Andrew Collins (culture builder)",
+      "Offensive Coordinator (Scheme)": "Eric Hammond (balanced WC)",
+      "Defensive Coordinator (Scheme)": "Nolan Price (split-safety)"
+    },
+    {
+      "Team": "Philadelphia Founders",
+      "Owner (Traits)": "Edward Monroe (traditional)",
+      "GM (Philosophy / Bias)": "Jonathan Pierce (stability, trenches)",
+      "Head Coach (Archetype)": "Michael Dunn (teacher)",
+      "Offensive Coordinator (Scheme)": "Brian Walsh (ball control)",
+      "Defensive Coordinator (Scheme)": "Kevin Rawls (4-3 base)"
+    },
+    {
+      "Team": "Baltimore Admirals",
+      "Owner (Traits)": "Thomas Radcliffe (disciplined)",
+      "GM (Philosophy / Bias)": "Steven Pollard (defense-first)",
+      "Head Coach (Archetype)": "Alan Shepherd (hard-nosed)",
+      "Offensive Coordinator (Scheme)": "Mark Jensen (power PA)",
+      "Defensive Coordinator (Scheme)": "Luther King (3-4 pressure)"
+    },
+    {
+      "Team": "Miami Tide",
+      "Owner (Traits)": "Carlos Mendoza (volatile, media-aware)",
+      "GM (Philosophy / Bias)": "Luis Navarro (athleticism)",
+      "Head Coach (Archetype)": "Tony Alvarez (player-first)",
+      "Offensive Coordinator (Scheme)": "Marco Diaz (spread option)",
+      "Defensive Coordinator (Scheme)": "Ron Felton (attack nickel)"
+    },
+    {
+      "Team": "Orlando Kingdom",
+      "Owner (Traits)": "Patricia Greene (measured)",
+      "GM (Philosophy / Bias)": "Scott Meyers (balanced)",
+      "Head Coach (Archetype)": "Dan Whitaker (stabilizer)",
+      "Offensive Coordinator (Scheme)": "Kyle Benton (multiple spread)",
+      "Defensive Coordinator (Scheme)": "Jeff Nolan (hybrid 4-2-5)"
+    },
+    {
+      "Team": "St. Petersburg Pelicans",
+      "Owner (Traits)": "Ivan Petrov (new owner, assertive)",
+      "GM (Philosophy / Bias)": "Alexei Morozov (reset-driven)",
+      "Head Coach (Archetype)": "Sergei Volkov (disciplinarian)",
+      "Offensive Coordinator (Scheme)": "Tim Brooks (ball control)",
+      "Defensive Coordinator (Scheme)": "Hank Rawlins (4-3 base)"
+    },
+    {
+      "Team": "Jacksonville Fleet",
+      "Owner (Traits)": "William Carter (hands-on)",
+      "GM (Philosophy / Bias)": "Brian Knox (aggressive reload)",
+      "Head Coach (Archetype)": "Chris Palmer (motivator)",
+      "Offensive Coordinator (Scheme)": "Seth Lang (vertical spread)",
+      "Defensive Coordinator (Scheme)": "Damon Pierce (press-man)"
+    },
+    {
+      "Team": "Pittsburgh Ironclads",
+      "Owner (Traits)": "Ronald Becker (demanding)",
+      "GM (Philosophy / Bias)": "Frank Molinaro (physical defense)",
+      "Head Coach (Archetype)": "Doug Kessler (hard-nosed)",
+      "Offensive Coordinator (Scheme)": "Sean Walsh (ball control)",
+      "Defensive Coordinator (Scheme)": "Tony Grimaldi (3-4 pressure)"
+    },
+    {
+      "Team": "Cleveland Forge",
+      "Owner (Traits)": "Martin O\u2019Neill (process-oriented)",
+      "GM (Philosophy / Bias)": "Eric Halvorsen (analytics)",
+      "Head Coach (Archetype)": "Jeff Morrison (tactician)",
+      "Offensive Coordinator (Scheme)": "Aaron Price (west coast)",
+      "Defensive Coordinator (Scheme)": "Luke Brennan (hybrid front)"
+    },
+    {
+      "Team": "Detroit Assembly",
+      "Owner (Traits)": "Harold Simmons (patient)",
+      "GM (Philosophy / Bias)": "Dan Kowalczyk (roster balance)",
+      "Head Coach (Archetype)": "Mike Rutledge (stabilizer)",
+      "Offensive Coordinator (Scheme)": "Tom Avery (balanced spread)",
+      "Defensive Coordinator (Scheme)": "Paul Dent (quarters match)"
+    },
+    {
+      "Team": "Buffalo Northwind",
+      "Owner (Traits)": "Samuel Price (conservative)",
+      "GM (Philosophy / Bias)": "Andrew Locke (defense/trenches)",
+      "Head Coach (Archetype)": "Rick Donnelly (grinder)",
+      "Offensive Coordinator (Scheme)": "Nate Cross (power run)",
+      "Defensive Coordinator (Scheme)": "Bill Harmon (cover-3)"
+    },
+    {
+      "Team": "Houston Launch",
+      "Owner (Traits)": "Victor Alvarez (ambitious)",
+      "GM (Philosophy / Bias)": "Marco Ruiz (speed/space)",
+      "Head Coach (Archetype)": "Julian Fox (modern CEO)",
+      "Offensive Coordinator (Scheme)": "Ethan Cole (spread motion)",
+      "Defensive Coordinator (Scheme)": "Ray Tolbert (hybrid 4-3)"
+    },
+    {
+      "Team": "Dallas Imperials",
+      "Owner (Traits)": "William Carter (dominant)",
+      "GM (Philosophy / Bias)": "Robert Hale (star power)",
+      "Head Coach (Archetype)": "Jason McBride (motivator)",
+      "Offensive Coordinator (Scheme)": "Tony Blake (vertical spread)",
+      "Defensive Coordinator (Scheme)": "Sam Rutledge (man pressure)"
+    },
+    {
+      "Team": "Denver Summit",
+      "Owner (Traits)": "Gregory Holt (measured)",
+      "GM (Philosophy / Bias)": "Kevin Anders (balanced build)",
+      "Head Coach (Archetype)": "Aaron Walsh (teacher)",
+      "Offensive Coordinator (Scheme)": "Phil Morton (WC PA)",
+      "Defensive Coordinator (Scheme)": "Scott Vance (quarters)"
+    },
+    {
+      "Team": "Phoenix Scorch",
+      "Owner (Traits)": "Victor Hale (innovative)",
+      "GM (Philosophy / Bias)": "Ryan Feldman (analytics, speed)",
+      "Head Coach (Archetype)": "Chuck Taylor (young guru)",
+      "Offensive Coordinator (Scheme)": "Evan Kline (spread motion)",
+      "Defensive Coordinator (Scheme)": "Calvin Rhodes (hybrid 4-3)"
+    },
+    {
+      "Team": "Washington Sentinels",
+      "Owner (Traits)": "Eleanor Wright (institutional)",
+      "GM (Philosophy / Bias)": "Thomas Reed (continuity)",
+      "Head Coach (Archetype)": "Jonathan Pierce (CEO manager)",
+      "Offensive Coordinator (Scheme)": "Marcus Feld (west coast)",
+      "Defensive Coordinator (Scheme)": "Leon Brooks (split safety)"
+    },
+    {
+      "Team": "Atlanta Apex",
+      "Owner (Traits)": "Gerald Monroe (impatient)",
+      "GM (Philosophy / Bias)": "Scott Landry (aggressive reload)",
+      "Head Coach (Archetype)": "Brian Holloway (motivator)",
+      "Offensive Coordinator (Scheme)": "Kelvin Shaw (vertical spread)",
+      "Defensive Coordinator (Scheme)": "Raymond Cole (press blitz)"
+    },
+    {
+      "Team": "Birmingham Vulcans",
+      "Owner (Traits)": "Marcus Hill (patient)",
+      "GM (Philosophy / Bias)": "Devin Porter (development)",
+      "Head Coach (Archetype)": "Alan Morris (teacher)",
+      "Offensive Coordinator (Scheme)": "Trent Lewis (balanced WC)",
+      "Defensive Coordinator (Scheme)": "Howard King (4-3 base)"
+    },
+    {
+      "Team": "Charlotte Crown",
+      "Owner (Traits)": "William Prescott (traditional)",
+      "GM (Philosophy / Bias)": "Aaron Whitman (balance)",
+      "Head Coach (Archetype)": "Steve Donnelly (culture)",
+      "Offensive Coordinator (Scheme)": "Ryan Collins (multiple spread)",
+      "Defensive Coordinator (Scheme)": "Patrick Odom (hybrid 4-2-5)"
+    },
+    {
+      "Team": "New Orleans Hex",
+      "Owner (Traits)": "Claude Boudreaux (volatile)",
+      "GM (Philosophy / Bias)": "Lucas Fontenot (star-driven)",
+      "Head Coach (Archetype)": "Reggie Coleman (offensive mind)",
+      "Offensive Coordinator (Scheme)": "Andre Dupree (spread option)",
+      "Defensive Coordinator (Scheme)": "Milton Graves (attack nickel)"
+    },
+    {
+      "Team": "Nashville Sound",
+      "Owner (Traits)": "Howard Jennings (conservative)",
+      "GM (Philosophy / Bias)": "Eric Donahue (efficiency)",
+      "Head Coach (Archetype)": "Mike Reynolds (grinder)",
+      "Offensive Coordinator (Scheme)": "Caleb Norris (power PA)",
+      "Defensive Coordinator (Scheme)": "Victor Ames (cover-3)"
+    },
+    {
+      "Team": "Austin Empire",
+      "Owner (Traits)": "Raymond Calder (ambitious)",
+      "GM (Philosophy / Bias)": "Nolan Price (controlled aggression)",
+      "Head Coach (Archetype)": "Marcus Vail (modern builder)",
+      "Offensive Coordinator (Scheme)": "Trevor Lang (spread motion)",
+      "Defensive Coordinator (Scheme)": "Isaac Rowe (hybrid 3-4)"
+    },
+    {
+      "Team": "Indianapolis Crossroads",
+      "Owner (Traits)": "Thomas Caldwell (conservative)",
+      "GM (Philosophy / Bias)": "Patrick O\u2019Hara (infrastructure)",
+      "Head Coach (Archetype)": "Brian Lattimer (teacher)",
+      "Offensive Coordinator (Scheme)": "Shane Wilcox (WC PA)",
+      "Defensive Coordinator (Scheme)": "Kelvin Price (cover-3 base)"
+    },
+    {
+      "Team": "Las Vegas Syndicate",
+      "Owner (Traits)": "Victor Salazar (opportunistic)",
+      "GM (Philosophy / Bias)": "Alex Cortez (market exploitation)",
+      "Head Coach (Archetype)": "Damien Knox (motivator)",
+      "Offensive Coordinator (Scheme)": "Julian Sparks (vertical spread)",
+      "Defensive Coordinator (Scheme)": "Reggie Bolton (press blitz)"
+    },
+    {
+      "Team": "Memphis Blues",
+      "Owner (Traits)": "Harold Whitaker (traditional)",
+      "GM (Philosophy / Bias)": "Terrence Lewis (authority reset)",
+      "Head Coach (Archetype)": "Calvin Brooks (disciplinarian)",
+      "Offensive Coordinator (Scheme)": "Darrell Finch (power run)",
+      "Defensive Coordinator (Scheme)": "Malcolm Pierce (4-3 base)"
+    },
+    {
+      "Team": "Milwaukee Northshore",
+      "Owner (Traits)": "Elaine Fischer (patient)",
+      "GM (Philosophy / Bias)": "Owen Hartley (youth build)",
+      "Head Coach (Archetype)": "Lucas Bennett (developmental)",
+      "Offensive Coordinator (Scheme)": "Aaron Feldman (west coast)",
+      "Defensive Coordinator (Scheme)": "Robert Klein (quarters)"
+    },
+    {
+      "Team": "Chicago Union",
+      "Owner (Traits)": "Dennis Kowalski (pragmatic)",
+      "GM (Philosophy / Bias)": "Peter Novak (efficiency)",
+      "Head Coach (Archetype)": "Tom Richardson (stabilizer)",
+      "Offensive Coordinator (Scheme)": "Brian Metz (west coast)",
+      "Defensive Coordinator (Scheme)": "Harold Finch (quarters)"
+    },
+    {
+      "Team": "St. Louis Archons",
+      "Owner (Traits)": "Robert Hensley (disciplined)",
+      "GM (Philosophy / Bias)": "Victor Hammond (trenches)",
+      "Head Coach (Archetype)": "Sean McAllister (hard-nosed)",
+      "Offensive Coordinator (Scheme)": "Colin Barker (ball control)",
+      "Defensive Coordinator (Scheme)": "Darius Coleman (3-4 pressure)"
+    },
+    {
+      "Team": "Seattle Evergreens",
+      "Owner (Traits)": "Nathan Kim (analytical)",
+      "GM (Philosophy / Bias)": "Oliver Chen (efficiency model)",
+      "Head Coach (Archetype)": "Daniel Frost (tactician)",
+      "Offensive Coordinator (Scheme)": "Alex Romero (spread WC)",
+      "Defensive Coordinator (Scheme)": "Paul Ingram (cover-4 match)"
+    },
+    {
+      "Team": "Los Angeles Stars",
+      "Owner (Traits)": "Victor Sandoval (image-focused)",
+      "GM (Philosophy / Bias)": "Alex Moreno (balanced aggression)",
+      "Head Coach (Archetype)": "Kyle Benton (modern CEO)",
+      "Offensive Coordinator (Scheme)": "Jared Lin (spread motion)",
+      "Defensive Coordinator (Scheme)": "Marcus Steele (hybrid split)"
+    },
+    {
+      "Team": "San Diego Armada",
+      "Owner (Traits)": "Miguel Arroyo (measured)",
+      "GM (Philosophy / Bias)": "Daniel Soto (balanced efficiency)",
+      "Head Coach (Archetype)": "Peter Callahan (stabilizer)",
+      "Offensive Coordinator (Scheme)": "Nathan Cole (spread WC)",
+      "Defensive Coordinator (Scheme)": "Frank Dillard (hybrid 4-2-5)"
+    },
+    {
+      "Team": "JOB SECURITY",
+      "Owner (Traits)": null,
+      "GM (Philosophy / Bias)": null,
+      "Head Coach (Archetype)": null,
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "VERY LOW SECURITY",
+      "Owner (Traits)": null,
+      "GM (Philosophy / Bias)": null,
+      "Head Coach (Archetype)": null,
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Team",
+      "Owner (Traits)": "Head Coach",
+      "GM (Philosophy / Bias)": "GM",
+      "Head Coach (Archetype)": "Rationale",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Memphis Blues",
+      "Owner (Traits)": "Very Low",
+      "GM (Philosophy / Bias)": "Moderate",
+      "Head Coach (Archetype)": "New HC, reset season, short leash",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "St. Petersburg Pelicans",
+      "Owner (Traits)": "Very Low",
+      "GM (Philosophy / Bias)": "Moderate",
+      "Head Coach (Archetype)": "New HC, early pick",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Atlanta Apex",
+      "Owner (Traits)": "Very Low",
+      "GM (Philosophy / Bias)": "Low",
+      "Head Coach (Archetype)": "New HC, prior failure, cap stress",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "New York Gothic Guardians",
+      "Owner (Traits)": "Very Low",
+      "GM (Philosophy / Bias)": "Low",
+      "Head Coach (Archetype)": "Media pressure, star expectations",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "LOW SECURITY",
+      "Owner (Traits)": null,
+      "GM (Philosophy / Bias)": null,
+      "Head Coach (Archetype)": null,
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Team",
+      "Owner (Traits)": "Head Coach",
+      "GM (Philosophy / Bias)": "GM",
+      "Head Coach (Archetype)": "Rationale",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Austin Empire",
+      "Owner (Traits)": "Low",
+      "GM (Philosophy / Bias)": "Moderate",
+      "Head Coach (Archetype)": "Ambitious owner, expectations rising",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Jacksonville Fleet",
+      "Owner (Traits)": "Low",
+      "GM (Philosophy / Bias)": "Moderate",
+      "Head Coach (Archetype)": "Aggressive reload posture",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Dallas Imperials",
+      "Owner (Traits)": "Low",
+      "GM (Philosophy / Bias)": "Low",
+      "Head Coach (Archetype)": "Star-driven owner impatience",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "New Orleans Hex",
+      "Owner (Traits)": "Low",
+      "GM (Philosophy / Bias)": "Low",
+      "Head Coach (Archetype)": "Volatile ownership",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Miami Tide",
+      "Owner (Traits)": "Low",
+      "GM (Philosophy / Bias)": "Moderate",
+      "Head Coach (Archetype)": "Media pressure, inconsistency",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Pittsburgh Ironclads",
+      "Owner (Traits)": "Low",
+      "GM (Philosophy / Bias)": "Moderate",
+      "Head Coach (Archetype)": "Results-driven culture",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Orlando Kingdom",
+      "Owner (Traits)": "Low",
+      "GM (Philosophy / Bias)": "Moderate",
+      "Head Coach (Archetype)": "Early pick, no HC insulation",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "MODERATE SECURITY",
+      "Owner (Traits)": null,
+      "GM (Philosophy / Bias)": null,
+      "Head Coach (Archetype)": null,
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Team",
+      "Owner (Traits)": "Head Coach",
+      "GM (Philosophy / Bias)": "GM",
+      "Head Coach (Archetype)": "Rationale",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Detroit Assembly",
+      "Owner (Traits)": "Moderate",
+      "GM (Philosophy / Bias)": "High",
+      "Head Coach (Archetype)": "Performance watched, GM insulated",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Cleveland Forge",
+      "Owner (Traits)": "Moderate",
+      "GM (Philosophy / Bias)": "High",
+      "Head Coach (Archetype)": "Analytics patience, wins help",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Nashville Sound",
+      "Owner (Traits)": "Moderate",
+      "GM (Philosophy / Bias)": "Moderate",
+      "Head Coach (Archetype)": "Conservative owner",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Buffalo Northwind",
+      "Owner (Traits)": "Moderate",
+      "GM (Philosophy / Bias)": "Moderate",
+      "Head Coach (Archetype)": "Defense-first expectations",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Baltimore Admirals",
+      "Owner (Traits)": "Moderate",
+      "GM (Philosophy / Bias)": "High",
+      "Head Coach (Archetype)": "GM trusted, HC judged",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Philadelphia Founders",
+      "Owner (Traits)": "Moderate",
+      "GM (Philosophy / Bias)": "Moderate",
+      "Head Coach (Archetype)": "Stability valued, but stagnation risky",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "St. Louis Archons",
+      "Owner (Traits)": "Moderate",
+      "GM (Philosophy / Bias)": "Moderate",
+      "Head Coach (Archetype)": "Physical identity, slow burn",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Las Vegas Syndicate",
+      "Owner (Traits)": "Moderate",
+      "GM (Philosophy / Bias)": "Moderate",
+      "Head Coach (Archetype)": "Market-driven flexibility",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "HIGH SECURITY",
+      "Owner (Traits)": null,
+      "GM (Philosophy / Bias)": null,
+      "Head Coach (Archetype)": null,
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Team",
+      "Owner (Traits)": "Head Coach",
+      "GM (Philosophy / Bias)": "GM",
+      "Head Coach (Archetype)": "Rationale",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Phoenix Scorch",
+      "Owner (Traits)": "High",
+      "GM (Philosophy / Bias)": "Very High",
+      "Head Coach (Archetype)": "New HC, QB evaluation year",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Los Angeles Stars",
+      "Owner (Traits)": "High",
+      "GM (Philosophy / Bias)": "High",
+      "Head Coach (Archetype)": "Strong roster, market patience",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Washington Sentinels",
+      "Owner (Traits)": "High",
+      "GM (Philosophy / Bias)": "High",
+      "Head Coach (Archetype)": "Institutional stability",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Chicago Union",
+      "Owner (Traits)": "High",
+      "GM (Philosophy / Bias)": "High",
+      "Head Coach (Archetype)": "Mid-round expectations",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Charlotte Crown",
+      "Owner (Traits)": "High",
+      "GM (Philosophy / Bias)": "High",
+      "Head Coach (Archetype)": "Ownership patience",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Denver Summit",
+      "Owner (Traits)": "High",
+      "GM (Philosophy / Bias)": "High",
+      "Head Coach (Archetype)": "Stable roster, no mandate",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Houston Launch",
+      "Owner (Traits)": "High",
+      "GM (Philosophy / Bias)": "High",
+      "Head Coach (Archetype)": "Modern build, owner aligned",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "VERY HIGH SECURITY",
+      "Owner (Traits)": null,
+      "GM (Philosophy / Bias)": null,
+      "Head Coach (Archetype)": null,
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Team",
+      "Owner (Traits)": "Head Coach",
+      "GM (Philosophy / Bias)": "GM",
+      "Head Coach (Archetype)": "Rationale",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Boston Harbormen",
+      "Owner (Traits)": "Very High",
+      "GM (Philosophy / Bias)": "Very High",
+      "Head Coach (Archetype)": "Reigning champions",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Milwaukee Northshore",
+      "Owner (Traits)": "Very High",
+      "GM (Philosophy / Bias)": "Very High",
+      "Head Coach (Archetype)": "New HC + patient rebuild",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Seattle Evergreens",
+      "Owner (Traits)": "Very High",
+      "GM (Philosophy / Bias)": "Very High",
+      "Head Coach (Archetype)": "Analytics owner, stable process",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "Indianapolis Crossroads",
+      "Owner (Traits)": "High",
+      "GM (Philosophy / Bias)": "Very High",
+      "Head Coach (Archetype)": "Infrastructure-first rebuild",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    },
+    {
+      "Team": "San Diego Armada",
+      "Owner (Traits)": "High",
+      "GM (Philosophy / Bias)": "High",
+      "Head Coach (Archetype)": "No urgency, low expectations",
+      "Offensive Coordinator (Scheme)": null,
+      "Defensive Coordinator (Scheme)": null
+    }
+  ]
+}

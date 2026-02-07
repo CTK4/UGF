@@ -1,0 +1,105 @@
+{
+  "sheet": "League Context",
+  "headers": [
+    "Field",
+    "Value",
+    "col_3",
+    "col_4",
+    "col_5",
+    "col_6",
+    "AAV Averages",
+    "col_8"
+  ],
+  "rows": [
+    {
+      "Field": "League",
+      "Value": "United Gridiron Federation (UGF)",
+      "col_3": null,
+      "col_4": null,
+      "col_5": null,
+      "col_6": null,
+      "AAV Averages": "QB",
+      "col_8": "AVERAGEIFS(Roster!O:O, Roster!E:E, G2)"
+    },
+    {
+      "Field": "Year",
+      "Value": 2026,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null,
+      "col_6": null,
+      "AAV Averages": "RB",
+      "col_8": null
+    },
+    {
+      "Field": "SaveVersion",
+      "Value": "1.0",
+      "col_3": null,
+      "col_4": null,
+      "col_5": null,
+      "col_6": null,
+      "AAV Averages": "WR",
+      "col_8": null
+    },
+    {
+      "Field": "OffseasonPhase",
+      "Value": "Pre-Combine / Early Offseason",
+      "col_3": null,
+      "col_4": null,
+      "col_5": null,
+      "col_6": null,
+      "AAV Averages": "TE",
+      "col_8": null
+    },
+    {
+      "Field": "PriorChampion (2025)",
+      "Value": "Boston Harbormen",
+      "col_3": null,
+      "col_4": null,
+      "col_5": null,
+      "col_6": null,
+      "AAV Averages": "OL",
+      "col_8": null
+    },
+    {
+      "Field": "DraftOrder",
+      "Value": "See 'Draft Order' sheet",
+      "col_3": null,
+      "col_4": null,
+      "col_5": null,
+      "col_6": null,
+      "AAV Averages": "DL",
+      "col_8": null
+    },
+    {
+      "Field": "Phoenix QB Canon",
+      "Value": "QB1 high-variance late-1st; QB2 veteran bridge; QB3 day-3 development",
+      "col_3": null,
+      "col_4": null,
+      "col_5": null,
+      "col_6": null,
+      "AAV Averages": "LB",
+      "col_8": null
+    },
+    {
+      "Field": "Milwaukee QB Canon",
+      "Value": "QB1 23yo early-2nd accurate/conservative; QB2 rookie upside; QB3 camp arm",
+      "col_3": null,
+      "col_4": null,
+      "col_5": null,
+      "col_6": null,
+      "AAV Averages": "DB",
+      "col_8": null
+    },
+    {
+      "Field": null,
+      "Value": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null,
+      "col_6": null,
+      "AAV Averages": "ST",
+      "col_8": null
+    }
+  ]
+}

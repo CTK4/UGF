@@ -1,0 +1,32 @@
+{
+  "name": "ugf_app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "UGF Coach RPG prototype",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port ${PORT:-3000}",
+    "start": "npm run build && npm run preview",
+    "start:prod": "npm run start",
+    "smoke": "bash scripts/smoke.sh",
+    "guard:persistence": "bash scripts/guard-persistence-writers.sh src"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0",
+    "vite-plugin-pwa": "^0.20.0"
+  }
+}

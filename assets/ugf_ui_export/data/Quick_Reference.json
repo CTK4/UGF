@@ -1,0 +1,271 @@
+{
+  "sheet": "Quick_Reference",
+  "headers": [
+    "NFL CONTRACT QUICK REFERENCE GUIDE",
+    "col_2",
+    "col_3",
+    "col_4",
+    "col_5"
+  ],
+  "rows": [
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "COMMON CONTRACT STRUCTURES",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Type",
+      "col_2": "Years",
+      "col_3": "GTD %",
+      "col_4": "Structure",
+      "col_5": "Example"
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Elite QB",
+      "col_2": "4-6",
+      "col_3": "60-80%",
+      "col_4": "Years 1-3 fully GTD, Year 4+ team options",
+      "col_5": "Patrick Mahomes"
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Elite Non-QB",
+      "col_2": "3-5",
+      "col_3": "50-70%",
+      "col_4": "Years 1-2 fully GTD, Year 3 partial",
+      "col_5": "Nick Bosa"
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Good Starter",
+      "col_2": "3-4",
+      "col_3": "40-60%",
+      "col_4": "Year 1 fully GTD, Year 2 partial",
+      "col_5": "Most Pro Bowlers"
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Veteran Depth",
+      "col_2": "2-3",
+      "col_3": "20-40%",
+      "col_4": "Signing bonus + Year 1 base only",
+      "col_5": "Role players"
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Prove-It Deal",
+      "col_2": "1-2",
+      "col_3": "90-100%",
+      "col_4": "Short-term, fully GTD",
+      "col_5": "Rehab/comeback"
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "GUARANTEE TYPES EXPLAINED",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Guarantee Type",
+      "col_2": "When Paid",
+      "col_3": "Can Be Lost?",
+      "col_4": "Common Usage",
+      "col_5": "Builder Column"
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Signing Bonus",
+      "col_2": "Upon signing",
+      "col_3": "No",
+      "col_4": "Always guaranteed",
+      "col_5": "Top section"
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Base Salary GTD",
+      "col_2": "Per paycheck",
+      "col_3": "No (if GTD)",
+      "col_4": "First 1-2 years",
+      "col_5": "Column F"
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Roster Bonus GTD",
+      "col_2": "Specific date",
+      "col_3": "Yes (if cut before)",
+      "col_4": "Year 3 partial GTD",
+      "col_5": "Column G"
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Workout Bonus GTD",
+      "col_2": "After workouts",
+      "col_3": "Yes (if doesnt participate)",
+      "col_4": "Rarely guaranteed",
+      "col_5": "Column H"
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Other Bonus GTD",
+      "col_2": "Various triggers",
+      "col_3": "Depends",
+      "col_4": "Escalators, etc.",
+      "col_5": "Column I"
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "STEP-BY-STEP: ENTERING A CONTRACT",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "1. Go to Contract_Builder sheet",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "2. Enter player info (Name, Position, Age, Rating, Team) in BLUE cells",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "3. Enter contract terms (Years, Total Value, Signing Bonus)",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "4. For each year, enter salary components in columns B-E (all BLUE)",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "5. Mark guaranteed items: 1 = Guaranteed, 0 = Not Guaranteed (columns F-I)",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "6. GREEN cells will automatically highlight guaranteed money",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "7. Check bottom verification: \"Difference from Contract Value\" should be $0.0",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "8. If not $0.0, adjust yearly salaries to match total contract value",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "COMMON MISTAKES TO AVOID",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "\u274c WRONG",
+      "col_2": "\u2713 CORRECT",
+      "col_3": "Why It Matters",
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Forgetting signing bonus",
+      "col_2": "Include signing bonus in top section",
+      "col_3": "Bonus prorates over contract",
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Total cash \u2260 contract value",
+      "col_2": "Verify cash equals total value",
+      "col_3": "Math error indicator",
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Marking workout bonus as GTD",
+      "col_2": "Usually leave workout bonus as 0",
+      "col_3": "Rarely guaranteed in real NFL",
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Year 4 fully guaranteed",
+      "col_2": "Year 4 typically non-guaranteed",
+      "col_3": "Team needs outs",
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "EXAMPLE CONTRACTS (Pre-Built)",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "Jerome Villareal WR Contract:",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "\u2022 4 years / $76M total",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "\u2022 $46M guaranteed (61%)",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "\u2022 Years 1-2: Fully guaranteed",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "\u2022 Year 3: Partial (roster bonus not GTD)",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "\u2022 Year 4: Non-guaranteed",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    },
+    {
+      "NFL CONTRACT QUICK REFERENCE GUIDE": "\u2192 See Contract_Builder sheet for full breakdown",
+      "col_2": null,
+      "col_3": null,
+      "col_4": null,
+      "col_5": null
+    }
+  ]
+}
