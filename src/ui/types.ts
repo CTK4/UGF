@@ -1,28 +1,52 @@
 import type { Route } from "@/ui/routes";
-import type { StaffRole } from "@/services/staff";
 
-export type StaffTreeView = {
-  byTeam: Record<string, { HC?: { name: string } | null; OC?: { name: string } | null; DC?: { name: string } | null; QB?: { name: string } | null; ASST?: { name: string } | null }>;
+export type StaffRole = "hc" | "oc" | "dc" | "qb" | "asst";
+export type LeaguePhase = "Preseason" | "RegularSeason";
+
+export type Candidate = {
+  id: string;
+  name: string;
+  role: StaffRole;
+  traits: string[];
+  philosophy: string;
+  availability: "AVAILABLE" | "ALREADY_EMPLOYED" | "INELIGIBLE";
 };
 
-export type UIState = { route: Route };
+export type PhoneMessage = { id: string; from: string; text: string; ts: string };
+export type PhoneThread = { id: string; title: string; unreadCount: number; messages: PhoneMessage[] };
 
-export type UIAction =
-  | { type: "BACK" }
-  | { type: "OPEN_STAFF_TREE" }
-  | { type: "OPEN_HIRE_MARKET"; role: StaffRole }
-  | { type: "OPEN_TEAM_ROSTER"; teamId: string }
-  | { type: "OPEN_CONTRACTS"; teamId: string }
-  | { type: "ADVANCE_WEEK" };
+export type SaveData = {
+  version: 1;
+  createdAt: string;
+  franchiseId: string;
+  league: { season: number; week: number; phase: LeaguePhase; phaseVersion: number };
+  staff: Record<StaffRole, string | null>;
+  phone: { threads: PhoneThread[] };
+  market: { byWeek: Record<string, { weekKey: string; role: StaffRole; candidates: Candidate[] }> };
+  checkpoints: Array<{ ts: string; label: string; snapshotRef?: string }>;
+};
+
+export type ModalState = {
+  title: string;
+  message: string;
+  actions?: Array<{ label: string; action: UIAction }>;
+};
+
+export type UIState = {
+  route: Route;
+  save: SaveData | null;
+  draftFranchiseId: string | null;
+  corruptedSave: boolean;
+  ui: { activeModal: ModalState | null; notifications: string[] };
+};
+
+export type UIAction = { type: string; [key: string]: unknown };
 
 export type UIController = {
   getState: () => UIState;
   dispatch: (action: UIAction) => void;
   selectors: {
-    table: (name: string) => Array<Record<string, unknown>>;
-    franchiseTeamId: () => string;
-    teams: () => string[];
-    staffTree: () => StaffTreeView;
+    routeLabel: () => string;
   };
 };
 

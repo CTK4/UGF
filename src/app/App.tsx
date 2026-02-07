@@ -14,28 +14,43 @@ export function App() {
 
   if (!ui) return <div className="app"><div className="card">Booting...</div></div>;
 
-  const route = ui.getState().route;
-  const key = route.key as RouteKey;
-  const Screen = RouteMap[key];
-
-  if (!Screen) {
-    return <div className="app"><div className="card"><h2>Unknown route key</h2><pre>{JSON.stringify(route, null, 2)}</pre></div></div>;
-  }
+  const state = ui.getState();
+  const Screen = RouteMap[state.route.key as RouteKey];
 
   return (
     <div className="app">
       <header className="ugf-topbar">
         <div className="ugf-brand">
-  <img className="ugf-brand__logo" src={logoUrl} alt="UGF Head Coach" />
-  <div className="ugf-brand__title">
-    <h1>UGF Head Coach</h1>
-    <div>Coach RPG</div>
-  </div>
-</div>
-<div className="ugf-pill">Route: {route.key}</div>
-
+          <img className="ugf-brand__logo" src={logoUrl} alt="UGF Head Coach" />
+          <div className="ugf-brand__title"><h1>UGF Head Coach</h1><div>Coach RPG</div></div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Start" } })}>Start</button>
+          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub" } })}>Hub</button>
+          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffTree" } })}>Staff</button>
+          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "PhoneInbox" } })}>Phone</button>
+          <button className="danger" onClick={() => ui.dispatch({ type: "RESET_SAVE" })}>Reset Save</button>
+        </div>
+        <div className="ugf-pill">Route: {ui.selectors.routeLabel()}</div>
       </header>
+
+      {state.ui.notifications.at(0) ? <div className="ugf-card" style={{ marginBottom: 12 }}><div className="ugf-card__body">{state.ui.notifications.at(0)}</div></div> : null}
+
       <Screen ui={ui} />
+
+      {state.ui.activeModal ? (
+        <div className="modalBackdrop">
+          <div className="modal">
+            <h3 className="modalTitle">{state.ui.activeModal.title}</h3>
+            <div style={{ marginBottom: 12 }}>{state.ui.activeModal.message}</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {(state.ui.activeModal.actions ?? [{ label: "Close", action: { type: "CLOSE_MODAL" } }]).map((a, i) => (
+                <button key={i} onClick={() => ui.dispatch(a.action)}>{a.label}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

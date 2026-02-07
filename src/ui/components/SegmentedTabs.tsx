@@ -17,7 +17,10 @@ export function SegmentedTabs({ value, tabs, onChange, ariaLabel }: Props) {
           key={tab.key}
           role="tab"
           aria-selected={value === tab.key}
-          onClick={() => onChange(tab.key)}
+          onClick={() => {
+            console.log("[ui] segmented tab click", tab.key);
+            onChange(tab.key);
+          }}
           style={{ opacity: value === tab.key ? 1 : 0.8 }}
         >
           {tab.label} {tab.right}
