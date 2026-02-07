@@ -2,29 +2,25 @@ import React from "react";
 
 type Tab = { key: string; label: string; right?: React.ReactNode };
 
-export function SegmentedTabs({
-  value,
-  tabs,
-  onChange,
-  ariaLabel,
-}: {
+type Props = {
   value: string;
   tabs: Tab[];
   onChange: (key: string) => void;
   ariaLabel?: string;
-}) {
+};
+
+export function SegmentedTabs({ value, tabs, onChange, ariaLabel }: Props) {
   return (
     <div role="tablist" aria-label={ariaLabel} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-      {tabs.map((t) => (
+      {tabs.map((tab) => (
         <button
-          key={t.key}
+          key={tab.key}
           role="tab"
-          aria-selected={value === t.key}
-          onClick={() => onChange(t.key)}
-          className="ugf-pill"
-          style={{ opacity: value === t.key ? 1 : 0.8 }}
+          aria-selected={value === tab.key}
+          onClick={() => onChange(tab.key)}
+          style={{ opacity: value === tab.key ? 1 : 0.8 }}
         >
-          {t.label} {t.right}
+          {tab.label} {tab.right}
         </button>
       ))}
     </div>

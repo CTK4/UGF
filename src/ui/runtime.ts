@@ -1,32 +1,30 @@
-import type { UIController, UIState } from "@/ui/types";
+import { loadDataBundle } from "@/bundle/loadBundle";
+import type { UIAction, UIController, UIState } from "@/ui/types";
 
 export async function createUIRuntime(onChange: () => void): Promise<UIController> {
-  const state: UIState = { route: { key: "TeamSummary", teamId: "HOU" } };
+  const data = await loadDataBundle();
+  const teamRows = data.tables["Team Summary"]?.rows ?? [];
+  const teams = Array.from(
+    new Set(teamRows.map((r) => String((r as Record<string, unknown>).Team ?? "").trim()).filter(Boolean)),
+  );
+  const franchiseTeamId = teams[0] ?? "HOU";
 
-  const teamRows = [
-    { Team: "HOU", Wins: 9, Losses: 8, OVR: 78, Offense: 77, Defense: 79, SpecialTeams: 74 },
-    { Team: "DAL", Wins: 11, Losses: 6, OVR: 82, Offense: 84, Defense: 81, SpecialTeams: 76 },
-  ];
+  let state: UIState = { route: { key: "TeamSummary", teamId: franchiseTeamId } };
 
-  const ui: UIController = {
+  const controller: UIController = {
     getState: () => state,
-    dispatch: (action) => {
-      if (action.type === "OPEN_STAFF_TREE") state.route = { key: "StaffTree" };
-      if (action.type === "BACK") state.route = { key: "TeamSummary", teamId: "HOU" };
+    dispatch: (action: UIAction) => {
+      if (action.type === "BACK") state = { ...state, route: { key: "TeamSummary", teamId: franchiseTeamId } };
+      if (action.type === "OPEN_STAFF_TREE") state = { ...state, route: { key: "StaffTree" } };
       onChange();
     },
     selectors: {
-      franchiseTeamId: () => "HOU",
-      table: (name) => (name === "Team Summary" ? teamRows : []),
-      teams: () => ["HOU", "DAL"],
-      staffTree: () => ({
-        byTeam: {
-          HOU: { HC: { name: "Alex Romero" }, OC: null, DC: { name: "Nolan Price" }, QB: null, ASST: null },
-          DAL: { HC: { name: "Sam Rourke" }, OC: { name: "Brian Walsh" }, DC: { name: "Devon Lake" }, QB: null, ASST: null },
-        },
-      }),
+      table: (name: string) => data.tables[name]?.rows ?? [],
+      franchiseTeamId: () => franchiseTeamId,
+      teams: () => teams,
+      staffTree: () => ({ byTeam: Object.fromEntries(teams.map((t) => [t, { HC: null, OC: null, DC: null, QB: null, ASST: null }])) }),
     },
   };
 
-  return ui;
+  return controller;
 }
