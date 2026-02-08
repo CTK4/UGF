@@ -1,5 +1,7 @@
-import React from "react";
-import type { ScreenProps } from "@/ui/types";
+import React, { useMemo, useState } from "react";
+import rosters from "@/data/generated/rosters.json";
+import rostersFull from "@/data/generated/rosters.full.json";
+import teamSummary from "@/data/generated/teamSummary.json";
 import { getFranchise } from "@/ui/data/franchises";
 import { SegmentedTabs } from "@/ui/components/SegmentedTabs";
 import { getDraftOrderRows, getRosterByTeam, getTeamSummaryRows } from "@/data/generatedData";
@@ -11,8 +13,8 @@ function asMoney(n: number): string {
 }
 
 export function HubScreen({ ui }: ScreenProps) {
-  const state = ui.getState();
-  const save = state.save;
+  const [tab, setTab] = useState<HubTab>("Staff");
+  const save = ui.getState().save;
   if (!save) return null;
 
   const fr = getFranchise(save.franchiseId);
@@ -103,12 +105,29 @@ export function HubScreen({ ui }: ScreenProps) {
     );
   };
 
+  const currentTeamRoster = useMemo(() => {
+    if (!team) return [];
+    return rosterRows.filter((row) => resolveUGFTeamByJsonTeam(String(row.Team))?.key === team.key);
+  }, [team]);
+
+  const currentTeamSummary = useMemo(() => {
+    if (!team) return undefined;
+    return summaryRows.find((row) => resolveUGFTeamByJsonTeam(String(row.Team))?.key === team.key);
+  }, [team]);
+
+  const expiringDeals = useMemo(() => {
+    if (!team) return [];
+    return rosterFullRows
+      .filter((row) => resolveUGFTeamByJsonTeam(String(row.Team))?.key === team.key && String(row.Expiring) === "TRUE")
+      .slice(0, 8);
+  }, [team]);
+
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <div className="ugf-card">
         <div className="ugf-card__header">
-          <h2 className="ugf-card__title">{fr?.city} {fr?.name} Hub</h2>
-          <div className="ugf-pill">{save.league.phase} • Week {save.league.week} • v{save.league.phaseVersion}</div>
+          <h2 className="ugf-card__title">{team?.displayName ?? `${fr?.city} ${fr?.name}`} Hub</h2>
+          <div className="ugf-pill">January {save.league.season} • Week {save.league.week} • v{save.league.phaseVersion}</div>
         </div>
         <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
           <SegmentedTabs

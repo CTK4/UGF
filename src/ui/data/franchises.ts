@@ -83,5 +83,20 @@ export const FRANCHISES: Franchise[] = getAllTeamNames().map((teamName, i) => {
 });
 
 export function getFranchise(id: string): Franchise | undefined {
-  return FRANCHISES.find((f) => f.id === id);
+  const found = FRANCHISES.find((f) => f.id === id);
+  if (found) return found;
+  const ugf = getUGFTeamByKey(id);
+  if (!ugf) return undefined;
+  const [city, ...rest] = ugf.displayName.split(" ");
+  return {
+    id: ugf.key,
+    city,
+    name: rest.join(" "),
+    owner: `${city} Sports Group`,
+    traits: ["Development"],
+    jobSecurity: "Medium",
+    gmPhilosophy: "Balanced",
+    hcArchetype: "CEO",
+    expectation: "Build a sustainable contender.",
+  };
 }

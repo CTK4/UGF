@@ -1,6 +1,16 @@
 import type { ComponentType } from "react";
 import type { ScreenProps } from "@/ui/types";
-import { StartScreen, ChooseFranchiseScreen, CareerContextScreen } from "@/ui/screens/StartFlowScreens";
+import {
+  StartScreen,
+  ChooseFranchiseScreen,
+  CareerContextScreen,
+  CreateCoachScreen,
+  CoachBackgroundScreen,
+  InterviewsScreen,
+  OffersScreen,
+  HireCoordinatorsScreen,
+  StaffMeetingScreen,
+} from "@/ui/screens/StartFlowScreens";
 import { HubScreen } from "@/ui/screens/HubScreen";
 import { StaffTreeScreen } from "@/ui/screens/StaffTreeScreen";
 import { HireMarketScreen } from "@/ui/screens/HireMarketScreen";
@@ -11,6 +21,12 @@ export type RouteKey =
   | "Start"
   | "ChooseFranchise"
   | "CareerContext"
+  | "CreateCoach"
+  | "CoachBackground"
+  | "Interviews"
+  | "Offers"
+  | "HireCoordinators"
+  | "StaffMeeting"
   | "Hub"
   | "StaffTree"
   | "HireMarket"
@@ -24,8 +40,8 @@ export type Route =
   | { key: "CareerContext" }
   | { key: "Hub"; tab?: "staff" | "roster" | "contracts" | "standings" | "schedule" | "phone" }
   | { key: "StaffTree" }
-  | { key: "HireMarket"; role: "hc" | "oc" | "dc" | "qb" | "asst" }
-  | { key: "CandidateDetail"; role: "hc" | "oc" | "dc" | "qb" | "asst"; candidateId: string }
+  | { key: "HireMarket"; role: "hc" | "oc" | "dc" | "st" | "qb" | "asst" }
+  | { key: "CandidateDetail"; role: "hc" | "oc" | "dc" | "st" | "qb" | "asst"; candidateId: string }
   | { key: "PhoneInbox" }
   | { key: "PhoneThread"; threadId: string };
 
@@ -33,6 +49,12 @@ export const RouteMap: Record<RouteKey, ComponentType<ScreenProps>> = {
   Start: StartScreen,
   ChooseFranchise: ChooseFranchiseScreen,
   CareerContext: CareerContextScreen,
+  CreateCoach: CreateCoachScreen,
+  CoachBackground: CoachBackgroundScreen,
+  Interviews: InterviewsScreen,
+  Offers: OffersScreen,
+  HireCoordinators: HireCoordinatorsScreen,
+  StaffMeeting: StaffMeetingScreen,
   Hub: HubScreen,
   StaffTree: StaffTreeScreen,
   HireMarket: HireMarketScreen,

@@ -1,6 +1,6 @@
 import type { Route } from "@/ui/routes";
 
-export type StaffRole = "hc" | "oc" | "dc" | "qb" | "asst";
+export type StaffRole = "hc" | "oc" | "dc" | "st" | "qb" | "asst";
 export type LeaguePhase = "Preseason" | "RegularSeason";
 
 export type Candidate = {
@@ -21,6 +21,8 @@ export type SaveData = {
   franchiseId: string;
   league: { season: number; week: number; phase: LeaguePhase; phaseVersion: number };
   staff: Record<StaffRole, string | null>;
+  coachProfile?: { name: string; background: string };
+  onboardingComplete?: boolean;
   phone: { threads: PhoneThread[] };
   market: { byWeek: Record<string, { weekKey: string; role: StaffRole; candidates: Candidate[] }> };
   checkpoints: Array<{ ts: string; label: string; snapshotRef?: string }>;
@@ -37,7 +39,17 @@ export type UIState = {
   save: SaveData | null;
   draftFranchiseId: string | null;
   corruptedSave: boolean;
-  ui: { activeModal: ModalState | null; notifications: string[] };
+  ui: {
+    activeModal: ModalState | null;
+    notifications: string[];
+    opening: {
+      coachName: string;
+      background: string;
+      interviewNotes: string[];
+      offers: string[];
+      coordinatorChoices: Partial<Record<"oc" | "dc" | "st", string>>;
+    };
+  };
 };
 
 export type UIAction = { type: string; [key: string]: unknown };
