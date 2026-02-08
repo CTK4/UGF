@@ -26,10 +26,11 @@ export function getTeamInitials(displayName: string): string {
   return picks.map((token) => token[0]?.toUpperCase() ?? "").join("") || "UGF";
 }
 
-export function TeamLogo({ ugfTeamKey, displayName, size = 32, className }: TeamLogoProps) {
+export function TeamLogo({ ugfTeamKey, displayName, size = 40, className }: TeamLogoProps) {
   const [failed, setFailed] = useState(false);
   const src = useMemo(() => `/logos/${ugfTeamKey}.png`, [ugfTeamKey]);
   const initials = useMemo(() => getTeamInitials(displayName), [displayName]);
+  const innerSize = Math.max(12, size - 8);
 
   if (failed) {
     return (
@@ -42,15 +43,19 @@ export function TeamLogo({ ugfTeamKey, displayName, size = 32, className }: Team
           height: size,
           minWidth: size,
           minHeight: size,
-          borderRadius: "50%",
+          flex: "0 0 auto",
+          flexShrink: 0,
+          boxSizing: "border-box",
+          borderRadius: 8,
+          padding: 4,
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
+          border: "1px solid rgba(255,255,255,0.12)",
+          background: "rgba(255,255,255,0.06)",
           fontWeight: 700,
-          fontSize: Math.max(10, Math.round(size * 0.34)),
+          fontSize: Math.max(10, Math.round(innerSize * 0.34)),
           letterSpacing: "0.04em",
-          border: "1px solid rgba(120,150,190,0.32)",
-          background: "linear-gradient(180deg, rgba(32, 46, 66, 0.95), rgba(14, 20, 30, 0.95))",
           color: "rgba(245,247,250,0.9)",
           textTransform: "uppercase",
           overflow: "hidden",
@@ -70,7 +75,20 @@ export function TeamLogo({ ugfTeamKey, displayName, size = 32, className }: Team
       width={size}
       height={size}
       loading="lazy"
-      style={{ width: size, height: size, objectFit: "cover", borderRadius: "50%", border: "1px solid rgba(120,150,190,0.32)" }}
+      style={{
+        width: size,
+        height: size,
+        minWidth: size,
+        minHeight: size,
+        flex: "0 0 auto",
+        flexShrink: 0,
+        boxSizing: "border-box",
+        padding: 4,
+        objectFit: "contain",
+        borderRadius: 8,
+        border: "1px solid rgba(255,255,255,0.12)",
+        background: "rgba(255,255,255,0.06)",
+      }}
       onError={() => setFailed(true)}
     />
   );

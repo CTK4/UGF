@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import teamSummaryData from "@/data/generated/teamSummary.json";
 import rostersData from "@/data/generated/rosters.json";
 import rostersFullData from "@/data/generated/rosters.full.json";
@@ -76,6 +76,21 @@ function tabs(active: HubTab, onClick: (tab: HubTab) => void) {
   );
 }
 
+function useStandingsLogoSize(): number {
+  const [size, setSize] = useState(32);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(min-width: 768px)");
+    const onChange = () => setSize(media.matches ? 42 : 32);
+    onChange();
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  return size;
+}
+
 export function HubScreen({ ui }: ScreenProps) {
   const state = ui.getState();
   const save = state.save;
@@ -114,12 +129,13 @@ export function HubScreen({ ui }: ScreenProps) {
   const scheduleRows = draftOrderRows.filter((row) => normalizeExcelTeamKey(String(row.Team)) === teamKey).slice(0, 17);
 
   const currentThread: PhoneThread | undefined = save.phone.threads.find((thread) => thread.id === activeThreadId) ?? save.phone.threads[0];
+  const standingsLogoSize = useStandingsLogoSize();
 
   return (
     <div className="ugf-card">
       <div className="ugf-card__header">
         <h2 className="ugf-card__title" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <TeamLogo ugfTeamKey={teamKey} displayName={teamName} size={28} />
+          <TeamLogo ugfTeamKey={teamKey} displayName={teamName} size={36} />
           <span>{teamName} Hub</span>
         </h2>
       </div>
@@ -139,7 +155,7 @@ export function HubScreen({ ui }: ScreenProps) {
         {activeTab === "roster" && (
           <div style={{ display: "grid", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <TeamLogo ugfTeamKey={teamKey} displayName={teamName} size={24} />
+              <TeamLogo ugfTeamKey={teamKey} displayName={teamName} size={32} />
               <b>{teamName} Roster</b>
             </div>
             {[...groupedRoster.entries()].map(([group, positions]) => (
@@ -196,10 +212,12 @@ export function HubScreen({ ui }: ScreenProps) {
                   return (
                     <div key={`${conf}-${division}`}>
                       <b>{division}</b>
-                      <ul>
+                      <ul className="ugf-standings-list">
                         {teams.map((team) => (
-                          <li key={team.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <TeamLogo ugfTeamKey={team.key} displayName={team.team} size={20} />
+                          <li key={team.key} className="ugf-standings-row">
+                            <span className="ugf-standings-logoCol" style={{ width: standingsLogoSize + 8 }}>
+                              <TeamLogo ugfTeamKey={team.key} displayName={team.team} size={standingsLogoSize} />
+                            </span>
                             <span>{team.team} — 0-0</span>
                           </li>
                         ))}
