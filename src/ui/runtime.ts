@@ -1,4 +1,5 @@
 import { STAFF_ROLES, type StaffRole } from "@/domain/staffRoles";
+import { gameActions } from "@/engine/actions";
 import type { GameState, StaffAssignment, Thread } from "@/engine/gameState";
 import { createNewGameState, reduceGameState } from "@/engine/reducer";
 import { generateOffseasonTasks } from "@/engine/tasks";
@@ -57,10 +58,13 @@ function createCandidate(role: StaffRole, id: number) {
 
 export async function createUIRuntime(onChange: () => void): Promise<UIController> {
   const { save, corrupted } = loadSave();
+  const loadedGameState = save?.gameState
+    ? reduceGameState(createNewGameState(1), gameActions.loadState(save.gameState))
+    : null;
 
   let state: UIState = {
-    route: initialRoute(save),
-    save,
+    route: initialRoute(loadedGameState ? { version: 1, gameState: loadedGameState } : null),
+    save: loadedGameState ? { version: 1, gameState: loadedGameState } : null,
     draftFranchiseId: FRANCHISES[0]?.id ?? null,
     corruptedSave: corrupted,
     ui: { activeModal: null, notifications: [], opening: openingState() },
@@ -79,6 +83,13 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
     state = next;
     scheduleSave();
     onChange();
+  };
+
+  const dispatchGameAction = (action: Parameters<typeof reduceGameState>[1]): GameState | null => {
+    if (!state.save) return null;
+    const gameState = reduceGameState(state.save.gameState, action);
+    setState({ ...state, save: { version: 1, gameState } });
+    return gameState;
   };
 
   const controller: UIController = {
@@ -110,21 +121,21 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           const franchiseId = String(action.franchiseId);
           const f = getFranchise(franchiseId);
           if (!f) return;
-          let gameState = reduceGameState(createNewGameState(1), { type: "START_NEW", payload: { week: 1 } });
-          gameState = reduceGameState(gameState, {
-            type: "SET_COACH_PROFILE",
-            payload: {
+          let gameState = reduceGameState(createNewGameState(1), gameActions.startNew(1));
+          gameState = reduceGameState(
+            gameState,
+            gameActions.setCoachProfile({
               name: state.ui.opening.coachName || "You",
               age: 35,
               hometown: "Unknown",
               reputation: 50,
               mediaStyle: "Balanced",
               personalityBaseline: "Balanced",
-            },
-          });
-          gameState = reduceGameState(gameState, { type: "SET_BACKGROUND", payload: { backgroundKey: state.ui.opening.background } });
-          gameState = reduceGameState(gameState, { type: "ACCEPT_OFFER", payload: { ugfTeamKey: franchiseId, excelTeamKey: normalizeExcelTeamKey(f.fullName) } });
-          gameState = { ...gameState, inbox: ensureThreads(gameState) };
+            }),
+          );
+          gameState = reduceGameState(gameState, gameActions.setBackground(state.ui.opening.background));
+          gameState = reduceGameState(gameState, gameActions.acceptOffer(franchiseId, normalizeExcelTeamKey(f.fullName)));
+          gameState = { ...gameState, inbox: ensureThreads(gameState), tasks: [{ id: "task-1", title: "Hire coordinators", completed: false }] };
           setState({ ...state, save: { version: 1, gameState }, route: { key: "HireCoordinators" } });
           return;
         }
@@ -148,10 +159,12 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             const pick = state.ui.opening.coordinatorChoices[role];
             if (!pick) return;
             const assignment: StaffAssignment = { candidateId: `${role}-${pick}`, coachName: pick, salary: 1_200_000, years: 3, hiredWeek: nowWeek };
-            gameState = reduceGameState(gameState, { type: "HIRE_COACH", payload: { role, assignment } });
+            gameState = reduceGameState(gameState, gameActions.hireCoach(role, assignment));
           });
-          gameState = { ...gameState, phase: "JANUARY_OFFSEASON", time: { ...gameState.time, label: "January Offseason" } };
-          gameState = { ...gameState, tasks: generateOffseasonTasks(gameState) };
+          gameState = reduceGameState(
+            gameState,
+            gameActions.setOffseasonPlan({ priorities: [], resignTargets: [], shopTargets: [], tradeNotes: "" }),
+          );
           setState({ ...state, save: { version: 1, gameState }, route: { key: "Hub" } });
           return;
         }
@@ -169,30 +182,19 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           const role = action.role as StaffRole;
           const candidateId = String(action.candidateId);
           const assignment: StaffAssignment = { candidateId, coachName: candidateId, salary: 1_300_000, years: 3, hiredWeek: state.save.gameState.time.week };
-          const gameState = reduceGameState(state.save.gameState, { type: "HIRE_COACH", payload: { role, assignment } });
+          const gameState = reduceGameState(state.save.gameState, gameActions.hireCoach(role, assignment));
           setState({ ...state, save: { version: 1, gameState }, route: { key: "StaffTree" }, ui: { ...state.ui, activeModal: null } });
           return;
         }
         case "COMPLETE_TASK": {
-          if (!state.save) return;
-          const gameState = reduceGameState(state.save.gameState, { type: "COMPLETE_TASK", payload: { taskId: String(action.taskId) } });
-          setState({ ...state, save: { version: 1, gameState } });
+          const gameState = dispatchGameAction(gameActions.completeTask(String(action.taskId)));
+          if (!gameState) return;
           return;
         }
         case "ADVANCE_WEEK": {
-          if (!state.save) return;
-          const priorState = state.save.gameState;
-          const gameState = reduceGameState(priorState, { type: "ADVANCE_WEEK" });
-          const shouldShowErrorModal = gameState.lastUiError && gameState.time.week === priorState.time.week;
-          setState({
-            ...state,
-            save: { version: 1, gameState },
-            route: { key: "Hub" },
-            ui: {
-              ...state.ui,
-              activeModal: shouldShowErrorModal ? { title: "Cannot Advance Week", message: gameState.lastUiError as string, actions: [{ label: "OK", action: { type: "CLOSE_MODAL" } }] } : state.ui.activeModal,
-            },
-          });
+          const gameState = dispatchGameAction(gameActions.advanceWeek());
+          if (!gameState) return;
+          setState({ ...state, route: { key: "Hub" } });
           return;
         }
         case "LOAD_GAME":
