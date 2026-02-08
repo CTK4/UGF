@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import type { ScreenProps } from "@/ui/types";
+import type { StaffRole } from "@/domain/staffRoles";
 import {
   StartScreen,
   ChooseFranchiseScreen,
@@ -40,8 +41,8 @@ export type Route =
   | { key: "CareerContext" }
   | { key: "Hub"; tab?: "staff" | "roster" | "contracts" | "standings" | "schedule" | "phone" }
   | { key: "StaffTree" }
-  | { key: "HireMarket"; role: "hc" | "oc" | "dc" | "st" | "qb" | "asst" }
-  | { key: "CandidateDetail"; role: "hc" | "oc" | "dc" | "st" | "qb" | "asst"; candidateId: string }
+  | { key: "HireMarket"; role: StaffRole }
+  | { key: "CandidateDetail"; role: StaffRole; candidateId: string }
   | { key: "PhoneInbox" }
   | { key: "PhoneThread"; threadId: string };
 

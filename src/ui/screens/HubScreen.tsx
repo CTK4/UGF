@@ -122,15 +122,18 @@ export function HubScreen({ ui }: ScreenProps) {
       <div className="ugf-card__body" style={{ display: "grid", gap: 12 }}>
         {tabs(activeTab, (tab) => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub", tab } }))}
 
-        {activeTab === "staff" && (
+                {activeTab === "staff" && (
           <div style={{ display: "grid", gap: 6 }}>
-            <div><b>Head Coach:</b> {save.staff.hc ?? "Vacant"}</div>
-            <div><b>Offensive Coordinator:</b> {save.staff.oc ?? "Vacant"}</div>
-            <div><b>Defensive Coordinator:</b> {save.staff.dc ?? "Vacant"}</div>
-            <div><b>Special Teams:</b> {save.staff.st ?? "Vacant"}</div>
+            <div><b>Head Coach:</b> {save.staff.HC ?? "Vacant"}</div>
+            <div><b>Offensive Coordinator:</b> {save.staff.OC ?? "Vacant"}</div>
+            <div><b>Defensive Coordinator:</b> {save.staff.DC ?? "Vacant"}</div>
+            <div><b>Special Teams:</b> {save.staff.STC ?? "Vacant"}</div>
+            <div><b>Position Coaches Filled:</b> {[save.staff.QB, save.staff.RB, save.staff.WR, save.staff.OL, save.staff.DL, save.staff.LB, save.staff.DB, save.staff.ASST].filter(Boolean).length}/8</div>
+            <div><b>Coach Budget:</b> {asMoney(save.finances.coachBudgetUsed)} / {asMoney(save.finances.coachBudgetTotal)}</div>
             <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffTree" } })}>Open Staff Tree</button>
           </div>
         )}
+
 
         {activeTab === "roster" && (
           <div style={{ display: "grid", gap: 10 }}>
