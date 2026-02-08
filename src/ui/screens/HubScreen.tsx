@@ -174,7 +174,7 @@ export function HubScreen({ ui }: ScreenProps) {
 
         {tabs(activeTab, (tab) => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub", tab } }))}
 
-        {activeTab === "staff" && (
+                {activeTab === "staff" && (
           <div style={{ display: "grid", gap: 6 }}>
             <div><b>Head Coach:</b> {save.staff.HC ?? "Vacant"}</div>
             <div><b>Offensive Coordinator:</b> {save.staff.OC ?? "Vacant"}</div>
@@ -183,6 +183,7 @@ export function HubScreen({ ui }: ScreenProps) {
             <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffTree" } })}>Open Staff Tree</button>
           </div>
         )}
+
 
         {activeTab === "roster" && (
           <div style={{ display: "grid", gap: 10 }}>

@@ -11,6 +11,8 @@ export function StaffTreeScreen({ ui }: ScreenProps) {
   if (!save) return null;
   const filled = STAFF_ROLES.filter((r) => !!save.staffAssignments[r]).length;
 
+  const filled = STAFF_ROLES.filter((role) => !!save.staff[role]).length;
+
   return (
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Staff Tree</h2></div>
