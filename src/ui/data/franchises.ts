@@ -1,4 +1,5 @@
 import { getAllTeamNames, getTeamIdByName, getTeamPersonnelRows } from "@/data/generatedData";
+import { getUgfTeamByExcelKey } from "@/data/teamMap";
 
 export type Franchise = {
   id: string;
@@ -85,13 +86,14 @@ export const FRANCHISES: Franchise[] = getAllTeamNames().map((teamName, i) => {
 export function getFranchise(id: string): Franchise | undefined {
   const found = FRANCHISES.find((f) => f.id === id);
   if (found) return found;
-  const ugf = getUGFTeamByKey(id);
+  const ugf = getUgfTeamByExcelKey(id);
   if (!ugf) return undefined;
-  const [city, ...rest] = ugf.displayName.split(" ");
+  const [city, ...rest] = ugf.team.split(" ");
   return {
-    id: ugf.key,
+    id,
     city,
     name: rest.join(" "),
+    fullName: ugf.team,
     owner: `${city} Sports Group`,
     traits: ["Development"],
     jobSecurity: "Medium",

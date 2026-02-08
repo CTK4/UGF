@@ -1,159 +1,248 @@
-import React, { useMemo, useState } from "react";
-import rosters from "@/data/generated/rosters.json";
-import rostersFull from "@/data/generated/rosters.full.json";
-import teamSummary from "@/data/generated/teamSummary.json";
+import React, { useState } from "react";
+import teamSummaryData from "@/data/generated/teamSummary.json";
+import rostersData from "@/data/generated/rosters.json";
+import rostersFullData from "@/data/generated/rosters.full.json";
+import draftOrderData from "@/data/generated/draftOrder.json";
+import { UGF_TEAMS } from "@/data/ugfTeams";
+import { getDisplayTeamName, normalizeExcelTeamKey } from "@/data/teamMap";
 import { getFranchise } from "@/ui/data/franchises";
-import { SegmentedTabs } from "@/ui/components/SegmentedTabs";
-import { getDraftOrderRows, getRosterByTeam, getTeamSummaryRows } from "@/data/generatedData";
+import type { ScreenProps, PhoneThread } from "@/ui/types";
 
 type HubTab = "staff" | "roster" | "contracts" | "standings" | "schedule" | "phone";
 
-function asMoney(n: number): string {
-  return `$${(n / 1_000_000).toFixed(1)}M`;
+type RosterRow = {
+  Team: string;
+  PositionGroup: string;
+  Position: string;
+  PlayerName: string;
+  Age: number;
+  Rating: number;
+  "Depth Chart": number;
+  "Player ID": number;
+  AAV?: number;
+};
+
+type TeamSummaryRow = {
+  Team: string;
+  Conference: string;
+  Division: string;
+  Players: number;
+  "Cap Space": number;
+  "Current Cap Hits": number;
+};
+
+type DraftOrderRow = {
+  Team: string;
+  Pick: number;
+  Player: string;
+  Pos: string;
+};
+
+const rosterRows = rostersData as RosterRow[];
+const rosterFullRows = rostersFullData as RosterRow[];
+const summaryRows = teamSummaryData as TeamSummaryRow[];
+const draftOrderRows = draftOrderData as DraftOrderRow[];
+
+function asMoney(value: number): string {
+  return `$${(value / 1_000_000).toFixed(1)}M`;
+}
+
+function tabs(active: HubTab, onClick: (tab: HubTab) => void) {
+  const labels: Array<{ key: HubTab; label: string }> = [
+    { key: "staff", label: "Staff" },
+    { key: "roster", label: "Roster" },
+    { key: "contracts", label: "Contracts" },
+    { key: "standings", label: "Standings" },
+    { key: "schedule", label: "Schedule" },
+    { key: "phone", label: "Phone" },
+  ];
+
+  return (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      {labels.map((tab) => (
+        <button
+          key={tab.key}
+          onClick={() => onClick(tab.key)}
+          style={{
+            fontWeight: active === tab.key ? 700 : 500,
+            border: active === tab.key ? "2px solid currentColor" : undefined,
+          }}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function HubScreen({ ui }: ScreenProps) {
-  const [tab, setTab] = useState<HubTab>("Staff");
-  const save = ui.getState().save;
+  const state = ui.getState();
+  const save = state.save;
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   if (!save) return null;
 
-  const fr = getFranchise(save.franchiseId);
-  const teamName = fr?.fullName ?? save.franchiseId;
-  const unread = save.phone.threads.reduce((a, t) => a + t.unreadCount, 0);
-  const activeTab: HubTab = state.route.key === "Hub" ? (state.route.tab ?? "staff") : "staff";
+  const franchise = getFranchise(save.franchiseId);
+  const teamName = franchise?.fullName ?? getDisplayTeamName(save.franchiseId);
+  const teamKey = normalizeExcelTeamKey(teamName);
+  const activeTab: HubTab = state.route.key === "Hub" ? state.route.tab ?? "staff" : "staff";
 
-  const rosterRows = getRosterByTeam(teamName);
-  const teamSummary = getTeamSummaryRows();
-  const teamRow = teamSummary.find((row) => row.Team === teamName);
-  const contracts = [...rosterRows].sort((a, b) => Number(b.AAV ?? 0) - Number(a.AAV ?? 0));
-  const standings = [...teamSummary].sort((a, b) => Number(b.AvgRating ?? 0) - Number(a.AvgRating ?? 0));
-  const teamSchedule = getDraftOrderRows().filter((row) => row.Team === teamName).slice(0, 17);
+  const teamRoster = rosterRows.filter((row) => normalizeExcelTeamKey(String(row.Team)) === teamKey);
+  const teamSummary = summaryRows.find((row) => normalizeExcelTeamKey(String(row.Team)) === teamKey);
+  const topCapHits = rosterFullRows
+    .filter((row) => normalizeExcelTeamKey(String(row.Team)) === teamKey)
+    .sort((a, b) => Number(b.AAV ?? 0) - Number(a.AAV ?? 0))
+    .slice(0, 8);
 
-  const renderTab = () => {
-    if (activeTab === "staff") {
-      return (
-        <div style={{ display: "grid", gap: 8 }}>
-          <div><b>Head Coach:</b> {save.staff.hc ?? "Vacant"}</div>
-          <div><b>Offensive Coordinator:</b> {save.staff.oc ?? "Vacant"}</div>
-          <div><b>Defensive Coordinator:</b> {save.staff.dc ?? "Vacant"}</div>
-          <div><b>QB Coach:</b> {save.staff.qb ?? "Vacant"}</div>
-          <div><b>Assistant:</b> {save.staff.asst ?? "Vacant"}</div>
-          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffTree" } })}>Open Staff Tree</button>
-        </div>
-      );
+  const groupedRoster = (() => {
+    const grouped = new Map<string, Map<string, RosterRow[]>>();
+    for (const row of teamRoster) {
+      const group = row.PositionGroup || "Other";
+      const pos = row.Position || "UNK";
+      if (!grouped.has(group)) grouped.set(group, new Map());
+      if (!grouped.get(group)?.has(pos)) grouped.get(group)?.set(pos, []);
+      grouped.get(group)?.get(pos)?.push(row);
     }
-
-    if (activeTab === "phone") {
-      return (
-        <div style={{ display: "grid", gap: 8 }}>
-          <div>Unread threads: <b>{unread}</b></div>
-          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "PhoneInbox" } })}>Open Phone</button>
-        </div>
-      );
+    for (const positions of grouped.values()) {
+      for (const rows of positions.values()) {
+        rows.sort((a, b) => Number(a["Depth Chart"] ?? 99) - Number(b["Depth Chart"] ?? 99));
+      }
     }
+    return grouped;
+  })();
 
-    if (activeTab === "roster") {
-      return (
-        <table>
-          <thead><tr><th>Player</th><th>Pos</th><th>Age</th><th>Rating</th><th>Role</th></tr></thead>
-          <tbody>
-            {rosterRows.map((row) => (
-              <tr key={row["Player ID"]}><td>{row.PlayerName}</td><td>{row.Position}</td><td>{row.Age}</td><td>{row.Rating}</td><td>{row.Role}</td></tr>
-            ))}
-          </tbody>
-        </table>
-      );
-    }
+  const scheduleRows = draftOrderRows.filter((row) => normalizeExcelTeamKey(String(row.Team)) === teamKey).slice(0, 17);
 
-    if (activeTab === "contracts") {
-      return (
-        <table>
-          <thead><tr><th>Player</th><th>Pos</th><th>AAV</th><th>Cap Status</th></tr></thead>
-          <tbody>
-            {contracts.map((row) => (
-              <tr key={row["Player ID"]}><td>{row.PlayerName}</td><td>{row.Position}</td><td>{asMoney(Number(row.AAV ?? 0))}</td><td>{Number(row.AAV ?? 0) > 15_000_000 ? "Core" : "Depth"}</td></tr>
-            ))}
-          </tbody>
-        </table>
-      );
-    }
-
-    if (activeTab === "standings") {
-      return (
-        <table>
-          <thead><tr><th>#</th><th>Team</th><th>Conf</th><th>Div</th><th>Avg</th></tr></thead>
-          <tbody>
-            {standings.map((row, idx) => (
-              <tr key={row.Team}><td>{idx + 1}</td><td>{row.Team}</td><td>{row.Conference}</td><td>{row.Division}</td><td>{Number(row.AvgRating).toFixed(1)}</td></tr>
-            ))}
-          </tbody>
-        </table>
-      );
-    }
-
-    return (
-      <table>
-        <thead><tr><th>Week</th><th>Opponent/Event</th><th>Type</th></tr></thead>
-        <tbody>
-          {teamSchedule.length ? teamSchedule.map((row, idx) => (
-            <tr key={`${row.Pick}-${idx}`}><td>{idx + 1}</td><td>{row.Player} ({row.Pos})</td><td>Draft Board</td></tr>
-          )) : (
-            <tr><td colSpan={3}>No schedule rows currently available in generated JSON for this team.</td></tr>
-          )}
-        </tbody>
-      </table>
-    );
-  };
-
-  const currentTeamRoster = useMemo(() => {
-    if (!team) return [];
-    return rosterRows.filter((row) => resolveUGFTeamByJsonTeam(String(row.Team))?.key === team.key);
-  }, [team]);
-
-  const currentTeamSummary = useMemo(() => {
-    if (!team) return undefined;
-    return summaryRows.find((row) => resolveUGFTeamByJsonTeam(String(row.Team))?.key === team.key);
-  }, [team]);
-
-  const expiringDeals = useMemo(() => {
-    if (!team) return [];
-    return rosterFullRows
-      .filter((row) => resolveUGFTeamByJsonTeam(String(row.Team))?.key === team.key && String(row.Expiring) === "TRUE")
-      .slice(0, 8);
-  }, [team]);
+  const currentThread: PhoneThread | undefined = save.phone.threads.find((thread) => thread.id === activeThreadId) ?? save.phone.threads[0];
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div className="ugf-card">
-        <div className="ugf-card__header">
-          <h2 className="ugf-card__title">{team?.displayName ?? `${fr?.city} ${fr?.name}`} Hub</h2>
-          <div className="ugf-pill">January {save.league.season} • Week {save.league.week} • v{save.league.phaseVersion}</div>
-        </div>
-        <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
-          <SegmentedTabs
-            value={activeTab}
-            tabs={[
-              { key: "staff", label: "Staff" },
-              { key: "roster", label: `Roster (${rosterRows.length})` },
-              { key: "contracts", label: "Contracts" },
-              { key: "standings", label: "Standings" },
-              { key: "schedule", label: "Schedule" },
-              { key: "phone", label: `Phone (${unread})` },
-            ]}
-            onChange={(tab) => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub", tab } })}
-            ariaLabel="Hub tabs"
-          />
+    <div className="ugf-card">
+      <div className="ugf-card__header">
+        <h2 className="ugf-card__title">{teamName} Hub</h2>
+      </div>
+      <div className="ugf-card__body" style={{ display: "grid", gap: 12 }}>
+        {tabs(activeTab, (tab) => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub", tab } }))}
 
-          {teamRow ? (
-            <div style={{ opacity: 0.85 }}>
-              {teamRow.Team} • {teamRow.Conference} {teamRow.Division} • Players: {teamRow.Players} • Cap Space: {asMoney(Number(teamRow["Cap Space"] ?? 0))}
+        {activeTab === "staff" && (
+          <div style={{ display: "grid", gap: 6 }}>
+            <div><b>Head Coach:</b> {save.staff.hc ?? "Vacant"}</div>
+            <div><b>Offensive Coordinator:</b> {save.staff.oc ?? "Vacant"}</div>
+            <div><b>Defensive Coordinator:</b> {save.staff.dc ?? "Vacant"}</div>
+            <div><b>Special Teams:</b> {save.staff.st ?? "Vacant"}</div>
+            <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffTree" } })}>Open Staff Tree</button>
+          </div>
+        )}
+
+        {activeTab === "roster" && (
+          <div style={{ display: "grid", gap: 10 }}>
+            {[...groupedRoster.entries()].map(([group, positions]) => (
+              <div key={group}>
+                <h3>{group}</h3>
+                {[...positions.entries()].map(([position, rows]) => (
+                  <div key={`${group}-${position}`} style={{ marginBottom: 8 }}>
+                    <div><b>{position}</b></div>
+                    <table>
+                      <thead><tr><th>Name</th><th>Pos</th><th>Age</th><th>Rating</th><th>Depth</th></tr></thead>
+                      <tbody>
+                        {rows.map((row) => (
+                          <tr key={String(row["Player ID"])}>
+                            <td>{row.PlayerName}</td><td>{row.Position}</td><td>{row.Age}</td><td>{row.Rating}</td><td>{row["Depth Chart"]}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === "contracts" && (
+          <div style={{ display: "grid", gap: 10 }}>
+            <div>
+              <b>Team Cap Summary:</b>{" "}
+              {teamSummary ? `${asMoney(Number(teamSummary["Current Cap Hits"] ?? 0))} used • ${asMoney(Number(teamSummary["Cap Space"] ?? 0))} space • ${teamSummary.Players} players` : "No team summary available."}
             </div>
-          ) : null}
+            <div>
+              <b>Top Cap Hits</b>
+              <table>
+                <thead><tr><th>Player</th><th>Pos</th><th>AAV</th></tr></thead>
+                <tbody>
+                  {topCapHits.map((row) => (
+                    <tr key={String(row["Player ID"])}><td>{row.PlayerName}</td><td>{row.Position}</td><td>{asMoney(Number(row.AAV ?? 0))}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
-          {renderTab()}
+        {activeTab === "standings" && (
+          <div style={{ display: "grid", gap: 8 }}>
+            {(["AC", "NC"] as const).map((conf) => (
+              <div key={conf}>
+                <h3>{conf}</h3>
+                {(["East", "North", "South", "West"] as const).map((division) => {
+                  const teams = UGF_TEAMS.filter((team) => team.conference === conf && team.division === division);
+                  if (!teams.length) return null;
+                  return (
+                    <div key={`${conf}-${division}`}>
+                      <b>{division}</b>
+                      <ul>
+                        {teams.map((team) => (
+                          <li key={team.key}>{team.team} — 0-0</li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        )}
 
-          <button onClick={() => ui.dispatch({ type: "ADVANCE_WEEK" })}>Advance Week</button>
-        </div>
+        {activeTab === "schedule" && (
+          <div>
+            {scheduleRows.length ? (
+              <table>
+                <thead><tr><th>Week</th><th>Opponent/Event</th><th>Type</th></tr></thead>
+                <tbody>
+                  {scheduleRows.map((row, i) => (
+                    <tr key={`${row.Pick}-${i}`}><td>{i + 1}</td><td>{row.Player} ({row.Pos})</td><td>Draft Context</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <ul>
+                {Array.from({ length: 5 }, (_, i) => (
+                  <li key={i}>Week {save.league.week + i}: Schedule data unavailable — placeholder event.</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {activeTab === "phone" && (
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 1fr) 2fr", gap: 12 }}>
+            <div style={{ display: "grid", gap: 6 }}>
+              {save.phone.threads.map((thread) => (
+                <button key={thread.id} style={{ textAlign: "left" }} onClick={() => setActiveThreadId(thread.id)}>
+                  <div><b>{thread.title}</b></div>
+                  <div style={{ opacity: 0.8 }}>Unread: {thread.unreadCount}</div>
+                </button>
+              ))}
+            </div>
+            <div>
+              {currentThread ? currentThread.messages.map((message) => (
+                <div key={message.id} className="ugf-card" style={{ marginBottom: 8 }}>
+                  <div className="ugf-card__body"><b>{message.from}:</b> {message.text}</div>
+                </div>
+              )) : "No messages"}
+            </div>
+          </div>
+        )}
+
+        <button onClick={() => ui.dispatch({ type: "ADVANCE_WEEK" })}>Advance Week</button>
       </div>
     </div>
   );

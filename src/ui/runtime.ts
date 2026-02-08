@@ -268,10 +268,27 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             showModal("Advance Blocked", `You must hire: ${missing.join(", ")}.`, [{ label: "Go Fix", action: { type: "NAVIGATE", route: { key: "StaffTree" } } }]);
             return;
           }
+          const nextWeek = state.save.league.week + 1;
+          const timestamp = new Date().toISOString();
+          const updatedThreads = state.save.phone.threads.map((thread) => {
+            const message = {
+              id: `${thread.id}-wk-${nextWeek}`,
+              from: thread.title,
+              text: `Week ${nextWeek} update: review priorities and inbox actions.`,
+              ts: timestamp,
+            };
+            return {
+              ...thread,
+              unreadCount: thread.unreadCount + 1,
+              messages: [...thread.messages, message],
+            };
+          });
+
           const save2: SaveData = withCheckpoint({
             ...state.save,
-            league: { ...state.save.league, week: state.save.league.week + 1, phaseVersion: state.save.league.phaseVersion + 1, phase: "RegularSeason" },
-          }, `Advanced to week ${state.save.league.week + 1}`);
+            league: { ...state.save.league, week: nextWeek, phaseVersion: state.save.league.phaseVersion + 1, phase: "RegularSeason" },
+            phone: { threads: updatedThreads },
+          }, `Advanced to week ${nextWeek}`);
           persist(save2, { key: "Hub" });
           return;
         }
