@@ -81,6 +81,13 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
         lastUiError: null,
       };
     }
+    case "ENTER_JANUARY_OFFSEASON":
+      return {
+        ...prev,
+        phase: "JANUARY_OFFSEASON",
+        time: { ...prev.time, label: phaseLabel("JANUARY_OFFSEASON") },
+        lastUiError: null,
+      };
     case "SET_OFFSEASON_PLAN":
       return {
         ...prev,
