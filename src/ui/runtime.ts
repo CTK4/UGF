@@ -2,7 +2,8 @@ import { STAFF_ROLES, type StaffRole } from "@/domain/staffRoles";
 import { gameActions } from "@/engine/actions";
 import type { GameState, StaffAssignment, Thread } from "@/engine/gameState";
 import { createNewGameState, reduceGameState } from "@/engine/reducer";
-import { generateOffseasonTasks } from "@/engine/tasks";
+import { generateBeatTasks } from "@/engine/tasks";
+import { getScoutablePositions } from "@/engine/scouting";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
 import type { SaveData, UIAction, UIController, UIState } from "@/ui/types";
@@ -138,7 +139,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           gameState = {
             ...gameState,
             inbox: ensureThreads(gameState),
-            tasks: [{ id: "task-1", title: "Hire coordinators", description: "Fill OC/DC/STC positions.", status: "OPEN" }],
+            tasks: [{ id: "task-1", type: "STAFF_MEETING", title: "Hire coordinators", description: "Fill OC/DC/STC positions.", status: "OPEN" }],
             draft: gameState.draft ?? { discovered: {}, watchlist: [] },
           };
           setState({ ...state, save: { version: 1, gameState }, route: { key: "HireCoordinators" } });
@@ -159,7 +160,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
         case "FINALIZE_NEW_SAVE": {
           if (!state.save) return;
           let gameState = state.save.gameState;
-          const nowWeek = gameState.time.week;
+          const nowWeek = gameState.time.beatIndex;
           (["OC", "DC", "STC"] as const).forEach((role) => {
             const pick = state.ui.opening.coordinatorChoices[role];
             if (!pick) return;
@@ -167,7 +168,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             gameState = reduceGameState(gameState, gameActions.hireCoach(role, assignment));
           });
           gameState = reduceGameState(gameState, gameActions.enterJanuaryOffseason());
-          gameState = { ...gameState, tasks: generateOffseasonTasks(gameState) };
+          gameState = { ...gameState, tasks: generateBeatTasks(gameState) };
           setState({ ...state, save: { version: 1, gameState }, route: { key: "StaffMeeting" } });
           return;
         }
@@ -200,20 +201,74 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           if (!state.save) return;
           const role = action.role as StaffRole;
           const candidateId = String(action.candidateId);
-          const assignment: StaffAssignment = { candidateId, coachName: candidateId, salary: 1_300_000, years: 3, hiredWeek: state.save.gameState.time.week };
+          const assignment: StaffAssignment = { candidateId, coachName: candidateId, salary: 1_300_000, years: 3, hiredWeek: state.save.gameState.time.beatIndex };
           const gameState = reduceGameState(state.save.gameState, gameActions.hireCoach(role, assignment));
           setState({ ...state, save: { version: 1, gameState }, route: { key: "StaffTree" }, ui: { ...state.ui, activeModal: null } });
           return;
         }
         case "COMPLETE_TASK": {
-          const gameState = dispatchGameAction(gameActions.completeTask(String(action.taskId)));
+          const taskId = String(action.taskId);
+          const task = state.save?.gameState.tasks.find((item) => item.id === taskId);
+          if (task?.type === "SCOUT_POSITION") {
+            const positions = getScoutablePositions();
+            setState({
+              ...state,
+              ui: {
+                ...state.ui,
+                activeModal: {
+                  title: "Scout Position",
+                  message: "Choose exactly one position for this scouting action.",
+                  actions: positions.slice(0, 12).map((position) => ({
+                    label: position,
+                    action: { type: "CONFIRM_SCOUT_POSITION", taskId, position },
+                  })),
+                },
+              },
+            });
+            return;
+          }
+          const gameState = dispatchGameAction(gameActions.completeTask(taskId));
           if (!gameState) return;
+          return;
+        }
+        case "CONFIRM_SCOUT_POSITION": {
+          const taskId = String(action.taskId);
+          const position = String(action.position);
+          const gameState = dispatchGameAction(gameActions.completeTask(taskId, [position]));
+          if (!gameState) return;
+          setState({ ...state, ui: { ...state.ui, activeModal: null } });
           return;
         }
         case "ADVANCE_WEEK": {
           const gameState = dispatchGameAction(gameActions.advanceWeek());
           if (!gameState) return;
+          if (gameState.lastUiError) {
+            const routeAction = gameState.lastUiError.toLowerCase().includes("hire")
+              ? { type: "NAVIGATE", route: { key: "StaffTree" } }
+              : { type: "NAVIGATE", route: { key: "StaffMeeting" } };
+            setState({
+              ...state,
+              ui: {
+                ...state.ui,
+                activeModal: {
+                  title: "Advance Blocked",
+                  message: gameState.lastUiError,
+                  actions: [
+                    { label: "Go to Required Screen", action: routeAction },
+                    { label: "Close", action: { type: "CLOSE_MODAL" } },
+                  ],
+                },
+              },
+            });
+            return;
+          }
           setState({ ...state, route: { key: "Hub" } });
+          return;
+        }
+        case "OPEN_PHONE_THREAD": {
+          if (!state.save) return;
+          const gameState = reduceGameState(state.save.gameState, gameActions.markThreadRead(String(action.threadId)));
+          setState({ ...state, save: { version: 1, gameState }, route: { key: "PhoneThread", threadId: String(action.threadId) } });
           return;
         }
         case "LOAD_GAME":
@@ -236,6 +291,6 @@ export function buildMarketForRole(role: StaffRole) {
 }
 
 export function marketByWeekFor(state: GameState) {
-  const weekKey = `${state.time.season}-${state.time.week}`;
+  const weekKey = `${state.time.season}-${state.time.beatIndex}`;
   return Object.fromEntries(STAFF_ROLES.map((role) => [`${weekKey}:${role}`, buildMarketForRole(role)]));
 }

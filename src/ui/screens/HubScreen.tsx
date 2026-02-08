@@ -1,6 +1,7 @@
 import React from "react";
 import type { ScreenProps } from "@/ui/types";
 import { getProspectLabel } from "@/services/draftDiscovery";
+import { getSuggestedNeed } from "@/engine/scouting";
 
 export function HubScreen({ ui }: ScreenProps) {
   const save = ui.getState().save;
@@ -13,8 +14,8 @@ export function HubScreen({ ui }: ScreenProps) {
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Hub</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
-        <div className="ugf-pill">Week {gs.time.week} • {gs.phase}</div>
-        <div className="ugf-pill">Label: {gs.time.label}</div>
+        <div className="ugf-pill">{gs.time.season} · {gs.time.label}</div>
+        <div className="ugf-pill">Beat: {gs.time.beatKey}</div>
         <div>Coach: <b>{gs.coach.name || "Unnamed"}</b></div>
         <div>Franchise: {gs.franchise.ugfTeamKey || "Not selected"}</div>
 
@@ -26,6 +27,7 @@ export function HubScreen({ ui }: ScreenProps) {
               <div className="ugf-card__body" style={{ display: "grid", gap: 6 }}>
                 <div><b>{task.status === "DONE" ? "✓ " : ""}{task.title}</b></div>
                 <div>{task.description}</div>
+                {task.type === "SCOUT_POSITION" && <small>Suggested Need: {getSuggestedNeed(gs) ?? "N/A"}</small>}
                 {task.routeHint && <small>Hint: {task.routeHint}</small>}
                 <button disabled={task.status === "DONE"} onClick={() => ui.dispatch({ type: "COMPLETE_TASK", taskId: task.id })}>
                   {task.status === "DONE" ? "Completed" : "Complete"}
@@ -51,7 +53,7 @@ export function HubScreen({ ui }: ScreenProps) {
               <div className="ugf-card__body" style={{ display: "grid", gap: 4 }}>
                 <div><b>{getProspectLabel(prospectId)}</b></div>
                 <div>Discovery Level: {report.level}/3</div>
-                <small>{report.notes}</small>
+                <small>{report.notes.at(-1) ?? "No notes"}</small>
               </div>
             </div>
           ))}
