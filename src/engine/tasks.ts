@@ -1,91 +1,42 @@
-import type { GameState, Task } from "@/engine/gameState";
+import type { GameState, Task, TaskType } from "@/engine/gameState";
 
 type TaskTemplate = {
-  type: string;
+  type: TaskType;
   title: string;
   description: string;
-  routeHint?: string;
+  gateId?: string;
 };
 
-const OFFSEASON_TEMPLATES: TaskTemplate[] = [
-  {
-    type: "INITIAL_STAFF_MEETING",
-    title: "Initial staff meeting",
-    description: "Meet with your staff and lock your offseason plan before advancing the calendar.",
-    routeHint: "StaffMeeting",
-  },
-  {
-    type: "ROSTER_REVIEW",
-    title: "Review roster needs",
-    description: "Audit every position group and flag where starters or depth must be upgraded this offseason.",
-    routeHint: "TeamSummary",
-  },
-  {
-    type: "SCOUT_WATCHLIST",
-    title: "Scout 3 prospects (All-Star watchlist)",
-    description: "Create an initial All-Star watchlist with three prospects that fit team priorities.",
-    routeHint: "PhoneInbox",
-  },
-  {
-    type: "RESIGN_SHORTLIST",
-    title: "Set re-sign shortlist",
-    description: "Identify expiring players worth retaining and set a first-pass re-sign shortlist.",
-    routeHint: "StaffTree",
-  },
-  {
-    type: "TRADE_NOTES",
-    title: "Set trade exploration notes",
-    description: "Capture potential trade ideas by position and target range for the front office.",
-    routeHint: "Hub",
-  },
-  {
-    type: "COORDINATOR_SYNC",
-    title: "Meet coordinators (install kickoff)",
-    description: "Run install kickoff with OC/DC/STC and lock opening offseason priorities.",
-    routeHint: "StaffTree",
-  },
-  {
-    type: "CAP_REVIEW",
-    title: "Review cap flexibility",
-    description: "Check current commitments and identify one move to create cap space before free agency.",
-    routeHint: "Hub",
-  },
-];
+const TASKS_BY_BEAT: Record<string, TaskTemplate[]> = {
+  "OFFSEASON.JAN_STAFF_MEETING": [
+    { type: "STAFF_MEETING", title: "Staff Meeting", description: "Meet with your staff and lock offseason priorities.", gateId: "GATE.STAFF_MEETING_DONE" },
+  ],
+  "OFFSEASON.JAN_SCOUTING_1": [{ type: "SCOUT_POSITION", title: "Scout Position Group", description: "Select one position and scout three prospects." }],
+  "OFFSEASON.JAN_SCOUTING_2": [{ type: "SCOUT_POSITION", title: "Scout Position Group", description: "Select one position and scout three prospects." }],
+  "OFFSEASON.FEB_ALL_STAR": [
+    { type: "SCOUT_POSITION", title: "All-Star Scouting", description: "Scout one position from all-star week standouts." },
+    { type: "WATCHLIST_UPDATE", title: "Update Watchlist", description: "Optional: update watchlist based on all-star practices." },
+  ],
+  "OFFSEASON.FEB_COMBINE": [
+    { type: "COMBINE_REVIEW", title: "Combine Review", description: "Review combine metrics and update projections." },
+    { type: "WATCHLIST_UPDATE", title: "Watchlist Update", description: "Refresh watchlist after combine interviews." },
+  ],
+  "OFFSEASON.MAR_FA_WAVE_1": [{ type: "FA_PRIORITIES", title: "FA Priorities", description: "Set first-wave free agency priorities." }],
+  "OFFSEASON.MAR_FA_WAVE_2": [{ type: "FA_PRIORITIES", title: "FA Priorities", description: "Set second-wave free agency priorities." }],
+  "OFFSEASON.APR_PRIVATE_WORKOUTS": [{ type: "SCOUT_POSITION", title: "Private Workout Scouting", description: "Scout one position from private workouts." }],
+  "OFFSEASON.APR_DRAFT": [{ type: "DRAFT_BOARD_FINALIZE", title: "Finalize Draft Board", description: "Finalize the board and lock draft strategy." }],
+  "OFFSEASON.MAY_ROOKIE_MINICAMP": [{ type: "WATCHLIST_UPDATE", title: "Rookie Minicamp Notes", description: "Light watchlist and combine note refresh." }],
+  "OFFSEASON.JUN_CAMP_PREP": [{ type: "WATCHLIST_UPDATE", title: "Camp Prep Watchlist", description: "Final lightweight watchlist pass before camp." }],
+};
 
-function deterministicSortValue(week: number, index: number): number {
-  return (week * 97 + (index + 1) * 53) % 997;
-}
-
-function toTaskId(week: number, type: string): string {
-  return `jan-offseason-w${week}-${type.toLowerCase()}`;
-}
-
-export function generateOffseasonTasks(state: GameState): Task[] {
-  if (state.phase !== "JANUARY_OFFSEASON") return state.tasks;
-  if (state.time.week === 1) {
-    return [
-      {
-        id: toTaskId(state.time.week, "INITIAL_STAFF_MEETING"),
-        title: "Initial staff meeting",
-        description: "Meet with your staff and lock your offseason plan before advancing the calendar.",
-        status: state.offseasonPlan ? "DONE" : "OPEN",
-        routeHint: "StaffMeeting",
-      },
-    ];
-  }
-
-  const taskCount = 3 + (state.time.week % 4);
-  const selected = [...OFFSEASON_TEMPLATES]
-    .map((template, index) => ({ template, score: deterministicSortValue(state.time.week, index) }))
-    .sort((a, b) => a.score - b.score)
-    .slice(0, taskCount)
-    .map(({ template }) => template);
-
-  return selected.map((template) => ({
-    id: toTaskId(state.time.week, template.type),
+export function generateBeatTasks(state: GameState): Task[] {
+  const templates = TASKS_BY_BEAT[state.time.beatKey] ?? [];
+  return templates.map((template) => ({
+    id: `${state.time.season}.${state.time.beatIndex}.${template.type}`,
+    type: template.type,
     title: template.title,
     description: template.description,
     status: "OPEN",
-    routeHint: template.routeHint,
+    gateId: template.gateId,
   }));
 }

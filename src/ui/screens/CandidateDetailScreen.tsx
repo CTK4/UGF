@@ -7,7 +7,7 @@ export function CandidateDetailScreen({ ui }: ScreenProps) {
   const save = state.save;
   if (!save || state.route.key !== "CandidateDetail") return null;
   const role = state.route.role;
-  const session = marketByWeekFor(save.gameState)[`${save.gameState.time.season}-${save.gameState.time.week}:${role}`];
+  const session = marketByWeekFor(save.gameState)[`${save.gameState.time.season}-${save.gameState.time.beatIndex}:${role}`];
   const candidate = session.candidates.find((c) => c.id === state.route.candidateId);
   if (!candidate) return null;
 

@@ -10,7 +10,7 @@ export function PhoneInboxScreen({ ui }: ScreenProps) {
       <div className="ugf-card__header"><h2 className="ugf-card__title">Phone Inbox</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
         {save.gameState.inbox.map((t) => (
-          <button key={t.id} style={{ textAlign: "left" }} onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "PhoneThread", threadId: t.id } })}>
+          <button key={t.id} style={{ textAlign: "left" }} onClick={() => ui.dispatch({ type: "OPEN_PHONE_THREAD", threadId: t.id })}>
             <div><strong>{t.title}</strong></div>
             <div style={{ opacity: 0.8 }}>Unread: {t.unreadCount} • {t.messages.at(-1)?.text ?? "No messages"}</div>
           </button>
