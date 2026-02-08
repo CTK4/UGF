@@ -12,13 +12,29 @@ function validateSave(v: unknown): v is SaveData {
   return save.version === 1 && !!save.franchiseId && !!save.league && !!save.staff && !!save.phone && !!save.market;
 }
 
+function migrateLegacySave(v: unknown): SaveData | null {
+  if (!v || typeof v !== "object") return null;
+  const save = v as Partial<SaveData>;
+  if (save.version !== 1 || !save.franchiseId || !save.league || !save.staff || !save.phone || !save.market) return null;
+
+  return {
+    ...save,
+    staffAssignments: save.staffAssignments ?? {},
+    finances: save.finances ?? { coachBudgetTotal: 0, coachBudgetUsed: 0 },
+    standards: save.standards ?? { ownerStandard: "Balanced", disciplineStandard: "Balanced", schemeStandard: "Balanced" },
+    pendingOwnerRisks: save.pendingOwnerRisks ?? [],
+    checkpoints: save.checkpoints ?? [],
+  } as SaveData;
+}
+
 function loadSave(): { save: SaveData | null; corrupted: boolean } {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return { save: null, corrupted: false };
     const parsed = JSON.parse(raw);
-    if (!validateSave(parsed)) return { save: null, corrupted: true };
-    return { save: parsed, corrupted: false };
+    const migrated = migrateLegacySave(parsed);
+    if (!migrated || !validateSave(migrated)) return { save: null, corrupted: true };
+    return { save: ensureFinancials(migrated), corrupted: false };
   } catch {
     return { save: null, corrupted: true };
   }
@@ -48,7 +64,7 @@ function ensureMarket(save: SaveData, role: StaffRole, refresh = false): SaveDat
 }
 
 function markThreadRead(save: SaveData, threadId: string): SaveData {
-  return { ...save, phone: { threads: save.phone.threads.map((t) => t.id === threadId ? { ...t, unreadCount: 0 } : t) } };
+  return { ...save, phone: { threads: save.phone.threads.map((t) => (t.id === threadId ? { ...t, unreadCount: 0 } : t)) } };
 }
 
 function withCheckpoint(save: SaveData, label: string): SaveData {
@@ -85,8 +101,9 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
   };
 
   const persist = (saveData: SaveData, route = state.route) => {
-    writeSave(saveData);
-    setState({ ...state, save: saveData, route });
+    const normalized = ensureFinancials(saveData);
+    writeSave(normalized);
+    setState({ ...state, save: normalized, route });
   };
 
   const showModal = (title: string, message: string, actions?: Array<{ label: string; action: UIAction }>) => {
@@ -94,7 +111,9 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
   };
 
   const withError = (fn: () => void) => {
-    try { fn(); } catch (err) {
+    try {
+      fn();
+    } catch (err) {
       showModal("Action Failed", err instanceof Error ? err.message : String(err), [
         { label: "Return to Hub", action: { type: "NAVIGATE", route: { key: "Hub" } } },
         { label: "Reset Save", action: { type: "RESET_SAVE" } },
@@ -104,18 +123,36 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
 
   const controller: UIController = {
     getState: () => state,
-    dispatch: (action: UIAction) => withError(() => {
-      switch (action.type) {
-        case "NAVIGATE": {
-          const route = action.route as UIState["route"];
-          if (route.key === "PhoneThread" && state.save) {
-            const save2 = markThreadRead(state.save, route.threadId);
-            persist(save2, route);
+    dispatch: (action: UIAction) =>
+      withError(() => {
+        switch (action.type) {
+          case "NAVIGATE": {
+            const route = action.route as UIState["route"];
+            if (route.key === "PhoneThread" && state.save) {
+              const save2 = markThreadRead(state.save, route.threadId);
+              persist(save2, route);
+              return;
+            }
+            if (route.key === "HireMarket" && state.save) {
+              const save2 = ensureMarket(state.save, route.role);
+              persist(save2, route);
+              return;
+            }
+            setState({ ...state, route, ui: { ...state.ui, activeModal: null } });
             return;
           }
-          if (route.key === "HireMarket" && state.save) {
-            const save2 = ensureMarket(state.save, route.role);
-            persist(save2, route);
+          case "SET_DRAFT_FRANCHISE":
+            setState({ ...state, draftFranchiseId: String(action.franchiseId) });
+            return;
+          case "SET_COACH_NAME":
+            setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachName: String(action.coachName ?? "") } } });
+            return;
+          case "SET_BACKGROUND":
+            setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, background: String(action.background ?? "Former QB") } } });
+            return;
+          case "RUN_INTERVIEWS": {
+            const notes = ["Owner values discipline.", "GM prioritizes trenches.", "Need coordinator stability."];
+            setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, interviewNotes: notes, offers: [state.draftFranchiseId ?? FRANCHISES[0].id] } }, route: { key: "Offers" } });
             return;
           }
           setState({ ...state, route, ui: { ...state.ui, activeModal: null } });
@@ -283,7 +320,34 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               unreadCount: thread.unreadCount + 1 + riskMsgs.length,
               messages: [...thread.messages, normal, ...riskMsgs],
             };
-          });
+            save2 = withCheckpoint(save2, `Hired ${role}: ${pick.name}`);
+            persist(save2, { key: "StaffTree" });
+            setState({ ...state, save: save2, route: { key: "StaffTree" }, ui: { ...state.ui, activeModal: null, notifications: [`Hired ${role}: ${pick.name}`] } });
+            return;
+          }
+          case "ADVANCE_WEEK": {
+            if (!state.save) return;
+            const missing = MANDATORY_ADVANCE_ROLES.filter((role) => !state.save.staff[role]);
+            if (missing.length) {
+              showModal("Advance Blocked", `You must hire: ${missing.join(", ")}.`, [{ label: "Go Fix", action: { type: "NAVIGATE", route: { key: "StaffTree" } } }]);
+              return;
+            }
+            const nextWeek = state.save.league.week + 1;
+            const timestamp = new Date().toISOString();
+            const ownerRiskMessage = state.save.pendingOwnerRisks.length ? `Owner concern: ${state.save.pendingOwnerRisks[0]}` : `Week ${nextWeek} update: review priorities and inbox actions.`;
+            const updatedThreads = state.save.phone.threads.map((thread) => {
+              const message = {
+                id: `${thread.id}-wk-${nextWeek}`,
+                from: thread.title,
+                text: thread.id === "owner" ? ownerRiskMessage : `Week ${nextWeek} update: review priorities and inbox actions.`,
+                ts: timestamp,
+              };
+              return {
+                ...thread,
+                unreadCount: thread.unreadCount + 1,
+                messages: [...thread.messages, message],
+              };
+            });
 
           const save2: SaveData = withCheckpoint({
             ...state.save,
@@ -294,17 +358,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           persist(save2, { key: "Hub" });
           return;
         }
-        case "CLOSE_MODAL":
-          setState({ ...state, ui: { ...state.ui, activeModal: null } });
-          return;
-        case "RESET_SAVE":
-          resetSave();
-          setState({ route: { key: "Start" }, save: null, draftFranchiseId: null, corruptedSave: false, ui: { activeModal: null, notifications: ["Save reset."], opening: openingState() } });
-          return;
-        default:
-          return;
-      }
-    }),
+      }),
     selectors: {
       routeLabel: () => {
         const r = state.route;

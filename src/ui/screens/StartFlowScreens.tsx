@@ -148,7 +148,7 @@ export function HireCoordinatorsScreen({ ui }: ScreenProps) {
             <div className="ugf-card__body" style={{ display: "grid", gap: 6 }}>
               <b>{pos}</b>
               {rolePool(pos).map((c) => (
-                <button key={`${pos}-${c.DisplayName}`} onClick={() => ui.dispatch({ type: "SELECT_OPENING_COORDINATOR", role, candidateName: c.DisplayName })} style={{ textAlign: "left" }}>
+                <button key={`${pos}-${c.DisplayName}`} onClick={() => ui.dispatch({ type: "SET_COORDINATOR_CHOICE", role, candidateName: c.DisplayName })} style={{ textAlign: "left" }}>
                   {picks[role] === c.DisplayName ? "✓ " : ""}
                   {c.DisplayName} • Scheme: {c.Scheme ?? "Balanced"} • Playbook: {toPlaybook(c.Scheme)} • Install: {difficulty(c.Scheme)}
                 </button>

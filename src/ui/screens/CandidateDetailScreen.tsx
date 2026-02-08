@@ -1,4 +1,5 @@
 import React from "react";
+import { STAFF_ROLE_LABELS } from "@/domain/staffRoles";
 import type { ScreenProps } from "@/ui/types";
 
 function fmtMoney(v: number): string {
@@ -26,8 +27,11 @@ export function CandidateDetailScreen({ ui }: ScreenProps) {
         <div><b>Contract Years:</b> {candidate.defaultContractYears}</div>
         <div><b>Standards:</b> {candidate.standardsNote} • Perceived risk {candidate.perceivedRisk}</div>
         <div><b>Status:</b> {candidate.availability.replaceAll("_", " ")}</div>
+        <div><b>Demand:</b> {money(candidate.salaryDemand)} • <b>Recommended:</b> {money(candidate.recommendedOffer)}</div>
+        <div><b>Contract:</b> {candidate.contractYears} years</div>
+        <div><b>Standards:</b> {candidate.standardsNote} • Risk {candidate.perceivedRisk}%</div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => ui.dispatch({ type: "TRY_HIRE", role, candidateId: candidate.id })}>Hire</button>
+          <button onClick={() => ui.dispatch({ type: "TRY_HIRE", role, candidateId: candidate.id })}>Hire (Locks decision this week)</button>
           <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "HireMarket", role } })}>Back to Market</button>
         </div>
       </div>

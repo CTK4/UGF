@@ -10,7 +10,7 @@ export function HireMarketScreen({ ui }: ScreenProps) {
   const state = ui.getState();
   const save = state.save;
   if (!save || state.route.key !== "HireMarket") return null;
-  const role = state.route.role as StaffRole;
+  const role = state.route.role;
   const weekKey = `${save.league.season}-${save.league.week}`;
   const marketKey = `${weekKey}:${role}`;
   const session = save.market.byWeek[marketKey];

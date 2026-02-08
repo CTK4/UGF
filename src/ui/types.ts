@@ -1,5 +1,6 @@
 import type { StaffRole } from "@/domain/staffRoles";
 import type { Route } from "@/ui/routes";
+import type { StaffRole } from "@/domain/staffRoles";
 
 export type LeaguePhase = "Preseason" | "RegularSeason";
 export type OwnerStandard = "Cheap" | "Balanced" | "Premium";
