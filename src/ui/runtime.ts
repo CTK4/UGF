@@ -1,166 +1,96 @@
-import type { SaveData, UIAction, UIController, UIState } from "@/ui/types";
-import type { StaffRole } from "@/domain/staffRoles";
-import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
-import { MANDATORY_STAFF_ROLES, STAFF_ROLE_LABELS, STAFF_ROLES } from "@/domain/staffRoles";
-import { buildMarketCandidates, deriveCoachBudgetTotal } from "@/services/staffHiring";
-import { createInitialGameState } from "@/engine/gameState";
-import { reduceGameState } from "@/engine/reducer";
+import { STAFF_ROLES, type StaffRole } from "@/domain/staffRoles";
+import type { GameState, StaffAssignment, Thread } from "@/engine/gameState";
+import { createNewGameState, reduceGameState } from "@/engine/reducer";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
+import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
+import type { SaveData, UIAction, UIController, UIState } from "@/ui/types";
 
 const SAVE_KEY = "ugf.save.v1";
-
-function validateSave(v: unknown): v is SaveData {
-  if (!v || typeof v !== "object") return false;
-  const save = v as SaveData;
-  return save.version === 1 && !!save.franchiseId && !!save.league && !!save.staff && !!save.phone && !!save.market;
-}
-
-function migrateLegacySave(v: unknown): SaveData | null {
-  if (!v || typeof v !== "object") return null;
-  const save = v as Partial<SaveData>;
-  if (save.version !== 1 || !save.franchiseId || !save.league || !save.staff || !save.phone || !save.market) return null;
-
-  return {
-    ...save,
-    staffAssignments: save.staffAssignments ?? {},
-    finances: save.finances ?? { coachBudgetTotal: 0, coachBudgetUsed: 0 },
-    standards: save.standards ?? { ownerStandard: "Balanced", disciplineStandard: "Balanced", schemeStandard: "Balanced" },
-    pendingOwnerRisks: save.pendingOwnerRisks ?? [],
-    checkpoints: save.checkpoints ?? [],
-  } as SaveData;
-}
 
 function loadSave(): { save: SaveData | null; corrupted: boolean } {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return { save: null, corrupted: false };
-    const parsed = JSON.parse(raw);
-    const migrated = migrateLegacySave(parsed);
-    if (!migrated || !validateSave(migrated)) return { save: null, corrupted: true };
-    return { save: ensureFinancials(migrated), corrupted: false };
+    const parsed = JSON.parse(raw) as SaveData;
+    if (parsed?.version !== 1 || !parsed?.gameState) return { save: null, corrupted: true };
+    return { save: parsed, corrupted: false };
   } catch {
     return { save: null, corrupted: true };
   }
-}
-
-function writeSave(save: SaveData) {
-  localStorage.setItem(SAVE_KEY, JSON.stringify(save));
-}
-
-function resetSave() {
-  localStorage.removeItem(SAVE_KEY);
-}
-
-function weekKey(save: SaveData): string {
-  return `${save.league.season}-${save.league.week}`;
-}
-
-function fmtMoney(v: number): string {
-  return `$${Math.round(v).toLocaleString()}`;
-}
-
-function ensureMarket(save: SaveData, role: StaffRole, refresh = false): SaveData {
-  const key = `${weekKey(save)}:${role}`;
-  if (!refresh && save.market.byWeek[key]) return save;
-  const candidates = buildMarketCandidates(save, role);
-  return { ...save, market: { byWeek: { ...save.market.byWeek, [key]: { weekKey: weekKey(save), role, candidates } } } };
-}
-
-function markThreadRead(save: SaveData, threadId: string): SaveData {
-  return { ...save, phone: { threads: save.phone.threads.map((t) => (t.id === threadId ? { ...t, unreadCount: 0 } : t)) } };
-}
-
-function withCheckpoint(save: SaveData, label: string): SaveData {
-  return { ...save, checkpoints: [...save.checkpoints, { ts: new Date().toISOString(), label }] };
 }
 
 function openingState(): UIState["ui"]["opening"] {
   return { coachName: "", background: "Former QB", interviewNotes: [], offers: [], coordinatorChoices: {} };
 }
 
-function initialRouteForSave(save: SaveData | null): UIState["route"] {
+function initialRoute(save: SaveData | null): UIState["route"] {
   if (!save) return { key: "Start" };
-  return save.onboardingComplete ? { key: "Hub" } : { key: "StaffMeeting" };
+  return { key: "Hub" };
+}
+
+function ensureThreads(state: GameState): Thread[] {
+  if (state.inbox.length) return state.inbox;
+  return [
+    { id: "owner", title: "Owner", unreadCount: 1, messages: [{ id: "owner-1", from: "Owner", text: "Welcome to the job. Set your offseason priorities.", ts: new Date().toISOString() }] },
+    { id: "gm", title: "GM", unreadCount: 1, messages: [{ id: "gm-1", from: "GM", text: "Let me know which coordinators you want to target.", ts: new Date().toISOString() }] },
+  ];
+}
+
+function createCandidate(role: StaffRole, id: number) {
+  return {
+    id: `${role}-${id}`,
+    name: `${role} Candidate ${id}`,
+    role,
+    primaryRole: role,
+    traits: ["Teacher", "Player-dev"],
+    philosophy: "Balanced",
+    fitLabel: "Natural Fit" as const,
+    salaryDemand: 1_000_000 + id * 150_000,
+    recommendedOffer: 1_100_000 + id * 120_000,
+    availability: "FREE_AGENT" as const,
+    standardsNote: "Within standards",
+    perceivedRisk: 20,
+    defaultContractYears: 3,
+  };
 }
 
 export async function createUIRuntime(onChange: () => void): Promise<UIController> {
   const { save, corrupted } = loadSave();
 
   let state: UIState = {
-    route: initialRouteForSave(save),
+    route: initialRoute(save),
     save,
-    draftFranchiseId: save?.franchiseId ?? null,
+    draftFranchiseId: FRANCHISES[0]?.id ?? null,
     corruptedSave: corrupted,
-    ui: {
-      activeModal: corrupted ? { title: "Save Recovery", message: "Your save appears corrupted. Reset save to continue.", actions: [{ label: "Reset Save", action: { type: "RESET_SAVE" } }] } : null,
-      notifications: [],
-      opening: openingState(),
-    },
+    ui: { activeModal: null, notifications: [], opening: openingState() },
+  };
+
+  let writeTimer: number | null = null;
+  const scheduleSave = () => {
+    if (!state.save) return;
+    if (writeTimer) window.clearTimeout(writeTimer);
+    writeTimer = window.setTimeout(() => {
+      if (state.save) localStorage.setItem(SAVE_KEY, JSON.stringify(state.save));
+    }, 120);
   };
 
   const setState = (next: UIState) => {
     state = next;
+    scheduleSave();
     onChange();
-  };
-
-  const persist = (saveData: SaveData, route = state.route) => {
-    const normalized = ensureFinancials(saveData);
-    writeSave(normalized);
-    setState({ ...state, save: normalized, route });
-  };
-
-  const showModal = (title: string, message: string, actions?: Array<{ label: string; action: UIAction }>) => {
-    setState({ ...state, ui: { ...state.ui, activeModal: { title, message, actions } } });
-  };
-
-  const withError = (fn: () => void) => {
-    try {
-      fn();
-    } catch (err) {
-      showModal("Action Failed", err instanceof Error ? err.message : String(err), [
-        { label: "Return to Hub", action: { type: "NAVIGATE", route: { key: "Hub" } } },
-        { label: "Reset Save", action: { type: "RESET_SAVE" } },
-      ]);
-    }
   };
 
   const controller: UIController = {
     getState: () => state,
-    dispatch: (action: UIAction) =>
-      withError(() => {
-        switch (action.type) {
-          case "NAVIGATE": {
-            const route = action.route as UIState["route"];
-            if (route.key === "PhoneThread" && state.save) {
-              const save2 = markThreadRead(state.save, route.threadId);
-              persist(save2, route);
-              return;
-            }
-            if (route.key === "HireMarket" && state.save) {
-              const save2 = ensureMarket(state.save, route.role);
-              persist(save2, route);
-              return;
-            }
-            setState({ ...state, route, ui: { ...state.ui, activeModal: null } });
-            return;
-          }
-          case "SET_DRAFT_FRANCHISE":
-            setState({ ...state, draftFranchiseId: String(action.franchiseId) });
-            return;
-          case "SET_COACH_NAME":
-            setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachName: String(action.coachName ?? "") } } });
-            return;
-          case "SET_BACKGROUND":
-            setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, background: String(action.background ?? "Former QB") } } });
-            return;
-          case "RUN_INTERVIEWS": {
-            const notes = ["Owner values discipline.", "GM prioritizes trenches.", "Need coordinator stability."];
-            setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, interviewNotes: notes, offers: [state.draftFranchiseId ?? FRANCHISES[0].id] } }, route: { key: "Offers" } });
-            return;
-          }
-          setState({ ...state, route, ui: { ...state.ui, activeModal: null } });
+    dispatch: (action: UIAction) => {
+      switch (action.type) {
+        case "NAVIGATE":
+          setState({ ...state, route: action.route as UIState["route"], ui: { ...state.ui, activeModal: null } });
           return;
-        }
+        case "RESET_SAVE":
+          localStorage.removeItem(SAVE_KEY);
+          setState({ ...state, save: null, route: { key: "Start" }, corruptedSave: false, ui: { ...state.ui, opening: openingState() } });
+          return;
         case "SET_DRAFT_FRANCHISE":
           setState({ ...state, draftFranchiseId: String(action.franchiseId) });
           return;
@@ -168,230 +98,111 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachName: String(action.coachName ?? "") } } });
           return;
         case "SET_BACKGROUND":
-          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, background: String(action.background ?? "Former QB") } } });
+          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, background: String(action.background ?? "") } } });
           return;
         case "RUN_INTERVIEWS": {
-          const selected = getFranchise(state.draftFranchiseId ?? "") ?? FRANCHISES[0];
-          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, interviewNotes: ["Owner alignment: balanced"], offers: [selected.id] } } });
+          const offers = FRANCHISES.slice(0, 3).map((f) => f.id);
+          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, interviewNotes: ["Interview cycle complete"], offers } }, route: { key: "Offers" } });
           return;
         }
-        case "ACCEPT_OFFER":
-          setState({ ...state, draftFranchiseId: String(action.franchiseId), route: { key: "HireCoordinators" } });
-          return;
-        case "SELECT_OPENING_COORDINATOR": {
-          const role = String(action.role) as "OC" | "DC" | "STC";
-          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coordinatorChoices: { ...state.ui.opening.coordinatorChoices, [role]: String(action.candidateName) } } } });
-          return;
-        }
-        case "FINALIZE_NEW_SAVE": {
-          const f = getFranchise(state.draftFranchiseId ?? "") ?? FRANCHISES[0];
-          const staff = Object.fromEntries(STAFF_ROLES.map((r) => [r, null])) as Record<StaffRole, string | null>;
-          staff.HC = state.ui.opening.coachName || "You";
-          staff.OC = state.ui.opening.coordinatorChoices.OC ?? null;
-          staff.DC = state.ui.opening.coordinatorChoices.DC ?? null;
-          staff.STC = state.ui.opening.coordinatorChoices.STC ?? null;
-          const standards = { ownerStandard: "Balanced", disciplineStandard: "Balanced", schemeStandard: "Balanced" } as const;
-          const budgetTotal = deriveCoachBudgetTotal(f.id, standards.ownerStandard);
-
-          const freshBase: SaveData = withCheckpoint({
-            version: 1,
-            createdAt: new Date().toISOString(),
-            franchiseId: f.id,
-            league: { season: 2026, week: 1, phase: "Preseason", phaseVersion: 1 },
-            staff,
-            staffAssignments: {},
-            finances: { coachBudgetTotal: budgetTotal, coachBudgetUsed: 0 },
-            standards: { ...standards },
-            coachProfile: { name: state.ui.opening.coachName || "You", background: state.ui.opening.background },
-            onboardingComplete: false,
-            phone: {
-              threads: [
-                { id: "owner", title: "Owner", unreadCount: 1, messages: [{ id: "m1", from: "Owner", text: "Mandatory January staff meeting is waiting for you.", ts: new Date().toISOString() }] },
-                { id: "gm", title: "GM", unreadCount: 1, messages: [{ id: "m2", from: "GM", text: "Coordinator contracts processed.", ts: new Date().toISOString() }] },
-              ],
+        case "ACCEPT_OFFER": {
+          const franchiseId = String(action.franchiseId);
+          const f = getFranchise(franchiseId);
+          if (!f) return;
+          let gameState = reduceGameState(createNewGameState(1), { type: "START_NEW", payload: { week: 1 } });
+          gameState = reduceGameState(gameState, {
+            type: "SET_COACH_PROFILE",
+            payload: {
+              name: state.ui.opening.coachName || "You",
+              age: 35,
+              hometown: "Unknown",
+              reputation: 50,
+              mediaStyle: "Balanced",
+              personalityBaseline: "Balanced",
             },
-            market: { byWeek: {} },
-            checkpoints: [],
-          }, "Career started");
-          const fresh = {
-            ...freshBase,
-            gameState: createInitialGameState({
-              season: freshBase.league.season,
-              week: freshBase.league.week,
-              ugfTeamKey: f.id,
-              excelTeamKey: normalizeExcelTeamKey(f.fullName),
-              coachName: state.ui.opening.coachName || "You",
-              background: state.ui.opening.background,
-            }),
-          };
-          persist(fresh, { key: "StaffMeeting" });
+          });
+          gameState = reduceGameState(gameState, { type: "SET_BACKGROUND", payload: { backgroundKey: state.ui.opening.background } });
+          gameState = reduceGameState(gameState, { type: "ACCEPT_OFFER", payload: { ugfTeamKey: franchiseId, excelTeamKey: normalizeExcelTeamKey(f.fullName) } });
+          gameState = { ...gameState, inbox: ensureThreads(gameState), tasks: [{ id: "task-1", title: "Hire coordinators", completed: false }] };
+          setState({ ...state, save: { version: 1, gameState }, route: { key: "HireCoordinators" } });
           return;
         }
-        case "COMPLETE_STAFF_MEETING": {
+        case "SET_COORDINATOR_CHOICE":
+          setState({
+            ...state,
+            ui: {
+              ...state.ui,
+              opening: {
+                ...state.ui.opening,
+                coordinatorChoices: { ...state.ui.opening.coordinatorChoices, [String(action.role)]: String(action.candidateName) },
+              },
+            },
+          });
+          return;
+        case "FINALIZE_NEW_SAVE": {
           if (!state.save) return;
-          const gameState = state.save.gameState ? {
-            ...state.save.gameState,
-            checkpoints: [...state.save.gameState.checkpoints, { id: `meeting-${Date.now()}`, ts: new Date().toISOString(), label: "January 2026 mandatory staff meeting complete", code: "staff-meeting-complete" }],
-            tasks: state.save.gameState.tasks.map((task) => task.id.includes("staff-meeting") ? { ...task, completed: true } : task),
-          } : state.save.gameState;
-          const save2 = withCheckpoint({ ...state.save, onboardingComplete: true, gameState }, "January 2026 mandatory staff meeting complete");
-          persist(save2, { key: "Hub" });
+          let gameState = state.save.gameState;
+          const nowWeek = gameState.time.week;
+          (["OC", "DC", "STC"] as const).forEach((role) => {
+            const pick = state.ui.opening.coordinatorChoices[role];
+            if (!pick) return;
+            const assignment: StaffAssignment = { candidateId: `${role}-${pick}`, coachName: pick, salary: 1_200_000, years: 3, hiredWeek: nowWeek };
+            gameState = reduceGameState(gameState, { type: "HIRE_COACH", payload: { role, assignment } });
+          });
+          gameState = { ...gameState, phase: "JANUARY_OFFSEASON", time: { ...gameState.time, label: "January Offseason" } };
+          setState({ ...state, save: { version: 1, gameState }, route: { key: "Hub" } });
           return;
         }
-        case "REFRESH_MARKET": {
-          if (!state.save) return;
-          const role = action.role as StaffRole;
-          const save2 = ensureMarket(state.save, role, true);
-          persist(save2, { key: "HireMarket", role });
+        case "REFRESH_MARKET":
+          setState({ ...state });
           return;
-        }
-        case "TRY_HIRE": {
-          if (!state.save) return;
-          const role = action.role as StaffRole;
-          const candidateId = String(action.candidateId);
-          const session = state.save.market.byWeek[`${weekKey(state.save)}:${role}`];
-          const c = session?.candidates.find((x) => x.id === candidateId);
-          if (!c) return;
-          if (c.availability !== "FREE_AGENT") {
-            showModal("Not Available", `${c.name} is currently employed and cannot be hired in MVP1.`);
-            return;
-          }
-          showModal("Confirm Hire", `Hiring locks decision this week. Demand: ${fmtMoney(c.salaryDemand)}.`, [{ label: "Confirm", action: { type: "CONFIRM_HIRE", role, candidateId, salaryOffer: c.recommendedOffer } }, { label: "Cancel", action: { type: "CLOSE_MODAL" } }]);
+        case "TRY_HIRE":
+          setState({ ...state, ui: { ...state.ui, activeModal: { title: "Confirm Hire", message: "Proceed with this hire?", actions: [{ label: "Confirm", action: { type: "CONFIRM_HIRE", role: action.role, candidateId: action.candidateId } }, { label: "Cancel", action: { type: "CLOSE_MODAL" } }] } } });
           return;
-        }
+        case "CLOSE_MODAL":
+          setState({ ...state, ui: { ...state.ui, activeModal: null } });
+          return;
         case "CONFIRM_HIRE": {
           if (!state.save) return;
           const role = action.role as StaffRole;
           const candidateId = String(action.candidateId);
-          const offer = Number(action.salaryOffer ?? 0);
-          const key = `${weekKey(state.save)}:${role}`;
-          const session = state.save.market.byWeek[key];
-          const pick = session?.candidates.find((x) => x.id === candidateId);
-          if (!pick) return;
-
-          const minAccepted = Math.round(pick.salaryDemand * 0.9);
-          if (offer < minAccepted) {
-            showModal("Offer Rejected", `${pick.name} rejected ${fmtMoney(offer)}. Minimum acceptable is ${fmtMoney(minAccepted)}.`, [{ label: "OK", action: { type: "CLOSE_MODAL" } }]);
-            return;
-          }
-
-          const existing = state.save.staffAssignments[role];
-          const buyout = existing ? Math.round(existing.salary * 0.25) : 0;
-          const nextUsed = state.save.finances.coachBudgetUsed - (existing?.salary ?? 0) + offer + buyout;
-          const overflow = nextUsed - state.save.finances.coachBudgetTotal;
-          if (overflow > 0) {
-            const remaining = state.save.finances.coachBudgetTotal - (state.save.finances.coachBudgetUsed - (existing?.salary ?? 0) + buyout);
-            const lowOffer = Math.max(0, Math.floor(remaining));
-            showModal(
-              "Budget Exceeded",
-              `Budget exceeded by ${fmtMoney(overflow)}.`,
-              [
-                { label: "Offer less", action: { type: "CONFIRM_HIRE", role, candidateId, salaryOffer: lowOffer } },
-                { label: "Cancel", action: { type: "CLOSE_MODAL" } },
-              ],
-            );
-            return;
-          }
-
-          const assignment = {
-            coachId: pick.id,
-            salary: offer,
-            contractYears: pick.defaultContractYears,
-            hiredWeek: state.save.league.week,
-            coachName: pick.name,
-            traits: pick.traits,
-          };
-
-          let save2: SaveData = {
-            ...state.save,
-            staff: { ...state.save.staff, [role]: pick.name },
-            staffAssignments: { ...state.save.staffAssignments, [role]: assignment },
-            finances: { ...state.save.finances, coachBudgetUsed: nextUsed },
-            gameState: state.save.gameState ? reduceGameState(state.save.gameState, { type: "HIRE_COACH", payload: { role, candidateId: pick.id, coachName: pick.name, salary: offer, years: pick.defaultContractYears } }) : state.save.gameState,
-          };
-          if (pick.standardsNote === "Risky Hire") {
-            save2.pendingOwnerMessages = [...(save2.pendingOwnerMessages ?? []), `${pick.name} (${STAFF_ROLE_LABELS[role]}) flagged as risky versus team standards.`];
-          }
-          save2 = withCheckpoint(save2, `Hired ${STAFF_ROLE_LABELS[role]}: ${pick.name}`);
-          writeSave(save2);
-          setState({ ...state, save: save2, route: { key: "StaffTree" }, ui: { ...state.ui, activeModal: null, notifications: [`Hired ${STAFF_ROLE_LABELS[role]}: ${pick.name}`] } });
+          const assignment: StaffAssignment = { candidateId, coachName: candidateId, salary: 1_300_000, years: 3, hiredWeek: state.save.gameState.time.week };
+          const gameState = reduceGameState(state.save.gameState, { type: "HIRE_COACH", payload: { role, assignment } });
+          setState({ ...state, save: { version: 1, gameState }, route: { key: "StaffTree" }, ui: { ...state.ui, activeModal: null } });
+          return;
+        }
+        case "COMPLETE_TASK": {
+          if (!state.save) return;
+          const gameState = reduceGameState(state.save.gameState, { type: "COMPLETE_TASK", payload: { taskId: String(action.taskId) } });
+          setState({ ...state, save: { version: 1, gameState } });
           return;
         }
         case "ADVANCE_WEEK": {
           if (!state.save) return;
-          const missing = MANDATORY_STAFF_ROLES.filter((role) => !state.save.staff[role]).map((role) => role.replace("C", ""));
-          if (missing.length) {
-            showModal("Advance Blocked", `You must hire: ${missing.join(", ")}.`, [{ label: "Go Fix", action: { type: "NAVIGATE", route: { key: "StaffTree" } } }]);
-            return;
-          }
-          if (!state.save.gameState) return;
-          const reduced = reduceGameState(state.save.gameState, { type: "ADVANCE_WEEK", payload: { nowIso: new Date().toISOString() } });
-          const nextWeek = state.save.league.week + 1;
-          const timestamp = new Date().toISOString();
-          const ownerAdds = (state.save.pendingOwnerMessages ?? []).map((text, i) => ({ id: `owner-risk-${nextWeek}-${i}`, from: "Owner", text, ts: timestamp }));
-          const updatedThreads = state.save.phone.threads.map((thread) => {
-            const normal = {
-              id: `${thread.id}-wk-${nextWeek}`,
-              from: thread.title,
-              text: `Week ${nextWeek} update: review priorities and inbox actions.`,
-              ts: timestamp,
-            };
-            const riskMsgs = thread.id === "owner" ? ownerAdds : [];
-            return {
-              ...thread,
-              unreadCount: thread.unreadCount + 1 + riskMsgs.length,
-              messages: [...thread.messages, normal, ...riskMsgs],
-            };
-            save2 = withCheckpoint(save2, `Hired ${role}: ${pick.name}`);
-            persist(save2, { key: "StaffTree" });
-            setState({ ...state, save: save2, route: { key: "StaffTree" }, ui: { ...state.ui, activeModal: null, notifications: [`Hired ${role}: ${pick.name}`] } });
-            return;
-          }
-          case "ADVANCE_WEEK": {
-            if (!state.save) return;
-            const missing = MANDATORY_ADVANCE_ROLES.filter((role) => !state.save.staff[role]);
-            if (missing.length) {
-              showModal("Advance Blocked", `You must hire: ${missing.join(", ")}.`, [{ label: "Go Fix", action: { type: "NAVIGATE", route: { key: "StaffTree" } } }]);
-              return;
-            }
-            const nextWeek = state.save.league.week + 1;
-            const timestamp = new Date().toISOString();
-            const ownerRiskMessage = state.save.pendingOwnerRisks.length ? `Owner concern: ${state.save.pendingOwnerRisks[0]}` : `Week ${nextWeek} update: review priorities and inbox actions.`;
-            const updatedThreads = state.save.phone.threads.map((thread) => {
-              const message = {
-                id: `${thread.id}-wk-${nextWeek}`,
-                from: thread.title,
-                text: thread.id === "owner" ? ownerRiskMessage : `Week ${nextWeek} update: review priorities and inbox actions.`,
-                ts: timestamp,
-              };
-              return {
-                ...thread,
-                unreadCount: thread.unreadCount + 1,
-                messages: [...thread.messages, message],
-              };
-            });
-
-          const save2: SaveData = withCheckpoint({
-            ...state.save,
-            league: { ...state.save.league, week: nextWeek, phaseVersion: state.save.league.phaseVersion + 1, phase: "RegularSeason" },
-            phone: { threads: updatedThreads },
-            pendingOwnerMessages: [],
-            gameState: reduced,
-          }, `Advanced to week ${nextWeek}`);
-          persist(save2, { key: "Hub" });
+          const gameState = reduceGameState(state.save.gameState, { type: "ADVANCE_WEEK" });
+          setState({ ...state, save: { version: 1, gameState }, route: { key: "Hub" } });
           return;
         }
-      }),
+        case "LOAD_GAME":
+          if (state.save) setState({ ...state, route: { key: "Hub" } });
+          return;
+        default:
+          return;
+      }
+    },
     selectors: {
-      routeLabel: () => {
-        const r = state.route;
-        if (r.key === "HireMarket") return `HireMarket/${r.role}`;
-        if (r.key === "CandidateDetail") return `CandidateDetail/${r.role}/${r.candidateId}`;
-        if (r.key === "PhoneThread") return `PhoneThread/${r.threadId}`;
-        return r.key;
-      },
+      routeLabel: () => state.route.key,
     },
   };
 
   return controller;
+}
+
+export function buildMarketForRole(role: StaffRole) {
+  return { weekKey: "2026-1", role, candidates: [createCandidate(role, 1), createCandidate(role, 2), createCandidate(role, 3)] };
+}
+
+export function marketByWeekFor(state: GameState) {
+  const weekKey = `${state.time.season}-${state.time.week}`;
+  return Object.fromEntries(STAFF_ROLES.map((role) => [`${weekKey}:${role}`, buildMarketForRole(role)]));
 }
