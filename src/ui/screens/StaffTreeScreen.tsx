@@ -1,7 +1,7 @@
 import React from "react";
 import type { ScreenProps, StaffRole } from "@/ui/types";
 
-const roleLabels: Record<StaffRole, string> = { hc: "HC", oc: "OC", dc: "DC", qb: "QB Coach", asst: "Assistant" };
+const roleLabels: Record<StaffRole, string> = { hc: "HC", oc: "OC", dc: "DC", st: "ST", qb: "QB Coach", asst: "Assistant" };
 
 export function StaffTreeScreen({ ui }: ScreenProps) {
   const save = ui.getState().save;
