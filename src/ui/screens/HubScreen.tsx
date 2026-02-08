@@ -97,6 +97,7 @@ export function HubScreen({ ui }: ScreenProps) {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   if (!save) return null;
 
+  const gameState = save.gameState;
   const franchise = getFranchise(save.franchiseId);
   const teamName = franchise?.fullName ?? getDisplayTeamName(save.franchiseId);
   const teamKey = normalizeExcelTeamKey(teamName);
@@ -140,6 +141,37 @@ export function HubScreen({ ui }: ScreenProps) {
         </h2>
       </div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 12 }}>
+        {gameState ? (
+          <div className="ugf-pill">Season {gameState.time.season} • Week {gameState.time.week} • {gameState.time.phase}</div>
+        ) : null}
+
+        {gameState?.weeklyRecap ? (
+          <div className="ugf-card">
+            <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+              <b>Weekly Recap • Week {gameState.weeklyRecap.week}</b>
+              <div><b>Tasks Created:</b> {gameState.weeklyRecap.tasksCreated.join(" • ")}</div>
+              <div><b>Messages:</b> {gameState.weeklyRecap.messagesAdded.join(" • ")}</div>
+              <div><b>Roster Notes:</b> {gameState.weeklyRecap.rosterChanges.join(" • ")}</div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="ugf-card">
+          <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+            <b>Tasks</b>
+            {(gameState?.tasks ?? []).map((task) => (
+              <div key={task.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                <div>
+                  <div><b>{task.title}</b> {task.completed ? "✓" : ""}</div>
+                  <div style={{ opacity: 0.85 }}>{task.detail}</div>
+                </div>
+                <button disabled={task.completed} onClick={() => ui.dispatch({ type: "COMPLETE_TASK", taskId: task.id })}>Complete</button>
+              </div>
+            ))}
+            {!gameState?.tasks?.length ? <div>No tasks generated yet.</div> : null}
+          </div>
+        </div>
+
         {tabs(activeTab, (tab) => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub", tab } }))}
 
         {activeTab === "staff" && (
