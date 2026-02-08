@@ -17,7 +17,19 @@ export function HubScreen({ ui }: ScreenProps) {
 
         <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
           <b>Tasks</b>
-          {gs.tasks.map((task) => <button key={task.id} disabled={task.completed} onClick={() => ui.dispatch({ type: "COMPLETE_TASK", taskId: task.id })}>{task.completed ? "✓ " : ""}{task.title}</button>)}
+          {gs.tasks.length === 0 && <div>No tasks available this week.</div>}
+          {gs.tasks.map((task) => (
+            <div key={task.id} className="ugf-card" style={{ opacity: task.status === "DONE" ? 0.7 : 1 }}>
+              <div className="ugf-card__body" style={{ display: "grid", gap: 6 }}>
+                <div><b>{task.status === "DONE" ? "✓ " : ""}{task.title}</b></div>
+                <div>{task.description}</div>
+                {task.routeHint && <small>Hint: {task.routeHint}</small>}
+                <button disabled={task.status === "DONE"} onClick={() => ui.dispatch({ type: "COMPLETE_TASK", taskId: task.id })}>
+                  {task.status === "DONE" ? "Completed" : "Complete"}
+                </button>
+              </div>
+            </div>
+          ))}
         </div></div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
