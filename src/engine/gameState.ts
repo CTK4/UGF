@@ -33,6 +33,11 @@ export type Thread = {
   messages: ThreadMessage[];
 };
 
+export type ProspectDiscovery = {
+  level: 0 | 1 | 2 | 3;
+  notes: string;
+};
+
 export type GameState = {
   meta: { version: 1 };
   phase: GamePhase;
@@ -62,4 +67,8 @@ export type GameState = {
   lastUiError: string | null;
   inbox: Thread[];
   checkpoints: { ts: number; label: string; week: number; phaseVersion: number }[];
+  draft: {
+    discovered: Record<string, ProspectDiscovery>;
+    watchlist: string[];
+  };
 };

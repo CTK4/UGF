@@ -2,6 +2,7 @@ import { STAFF_ROLES } from "@/domain/staffRoles";
 import type { GameAction } from "@/engine/actions";
 import type { GamePhase, GameState, Role } from "@/engine/gameState";
 import { generateOffseasonTasks } from "@/engine/tasks";
+import { applyScoutTaskCompletion } from "@/services/draftDiscovery";
 
 function emptyAssignments() {
   return Object.fromEntries(STAFF_ROLES.map((role) => [role, null])) as Record<Role, null>;
@@ -28,6 +29,7 @@ export function createNewGameState(week = 1): GameState {
     lastUiError: null,
     inbox: [],
     checkpoints: [],
+    draft: { discovered: {}, watchlist: [] },
   };
 }
 
@@ -52,7 +54,10 @@ function missingCoordinatorRole(state: GameState): Role | null {
 export function reduceGameState(prev: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "LOAD_STATE":
-      return action.payload.state;
+      return {
+        ...action.payload.state,
+        draft: action.payload.state.draft ?? { discovered: {}, watchlist: [] },
+      };
     case "START_NEW":
       return createNewGameState(action.payload?.week ?? 1);
     case "SET_COACH_PROFILE":
@@ -96,11 +101,16 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
         offseasonPlan: action.payload,
         lastUiError: null,
       };
-    case "COMPLETE_TASK":
+    case "COMPLETE_TASK": {
+      const tasks = prev.tasks.map((task) => (task.id === action.payload.taskId ? { ...task, status: "DONE" } : task));
+      const completedTask = prev.tasks.find((task) => task.id === action.payload.taskId);
+      const draft = completedTask ? applyScoutTaskCompletion(prev.time.week, prev.draft, completedTask) : prev.draft;
       return {
         ...prev,
-        tasks: prev.tasks.map((task) => (task.id === action.payload.taskId ? { ...task, status: "DONE" } : task)),
+        tasks,
+        draft,
       };
+    }
     case "ADVANCE_WEEK": {
       const missingRole = missingCoordinatorRole(prev);
       if (missingRole) {
