@@ -3,6 +3,9 @@ import type { StaffRole } from "@/domain/staffRoles";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
 import { MANDATORY_STAFF_ROLES, STAFF_ROLE_LABELS, STAFF_ROLES } from "@/domain/staffRoles";
 import { buildMarketCandidates, deriveCoachBudgetTotal } from "@/services/staffHiring";
+import { createInitialGameState } from "@/engine/gameState";
+import { reduceGameState } from "@/engine/reducer";
+import { normalizeExcelTeamKey } from "@/data/teamMap";
 
 const SAVE_KEY = "ugf.save.v1";
 
@@ -190,7 +193,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           const standards = { ownerStandard: "Balanced", disciplineStandard: "Balanced", schemeStandard: "Balanced" } as const;
           const budgetTotal = deriveCoachBudgetTotal(f.id, standards.ownerStandard);
 
-          const fresh: SaveData = withCheckpoint({
+          const freshBase: SaveData = withCheckpoint({
             version: 1,
             createdAt: new Date().toISOString(),
             franchiseId: f.id,
@@ -210,12 +213,28 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             market: { byWeek: {} },
             checkpoints: [],
           }, "Career started");
+          const fresh = {
+            ...freshBase,
+            gameState: createInitialGameState({
+              season: freshBase.league.season,
+              week: freshBase.league.week,
+              ugfTeamKey: f.id,
+              excelTeamKey: normalizeExcelTeamKey(f.fullName),
+              coachName: state.ui.opening.coachName || "You",
+              background: state.ui.opening.background,
+            }),
+          };
           persist(fresh, { key: "StaffMeeting" });
           return;
         }
         case "COMPLETE_STAFF_MEETING": {
           if (!state.save) return;
-          const save2 = withCheckpoint({ ...state.save, onboardingComplete: true }, "January 2026 mandatory staff meeting complete");
+          const gameState = state.save.gameState ? {
+            ...state.save.gameState,
+            checkpoints: [...state.save.gameState.checkpoints, { id: `meeting-${Date.now()}`, ts: new Date().toISOString(), label: "January 2026 mandatory staff meeting complete", code: "staff-meeting-complete" }],
+            tasks: state.save.gameState.tasks.map((task) => task.id.includes("staff-meeting") ? { ...task, completed: true } : task),
+          } : state.save.gameState;
+          const save2 = withCheckpoint({ ...state.save, onboardingComplete: true, gameState }, "January 2026 mandatory staff meeting complete");
           persist(save2, { key: "Hub" });
           return;
         }
@@ -288,6 +307,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             staff: { ...state.save.staff, [role]: pick.name },
             staffAssignments: { ...state.save.staffAssignments, [role]: assignment },
             finances: { ...state.save.finances, coachBudgetUsed: nextUsed },
+            gameState: state.save.gameState ? reduceGameState(state.save.gameState, { type: "HIRE_COACH", payload: { role, candidateId: pick.id, coachName: pick.name, salary: offer, years: pick.defaultContractYears } }) : state.save.gameState,
           };
           if (pick.standardsNote === "Risky Hire") {
             save2.pendingOwnerMessages = [...(save2.pendingOwnerMessages ?? []), `${pick.name} (${STAFF_ROLE_LABELS[role]}) flagged as risky versus team standards.`];
@@ -304,6 +324,8 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             showModal("Advance Blocked", `You must hire: ${missing.join(", ")}.`, [{ label: "Go Fix", action: { type: "NAVIGATE", route: { key: "StaffTree" } } }]);
             return;
           }
+          if (!state.save.gameState) return;
+          const reduced = reduceGameState(state.save.gameState, { type: "ADVANCE_WEEK", payload: { nowIso: new Date().toISOString() } });
           const nextWeek = state.save.league.week + 1;
           const timestamp = new Date().toISOString();
           const ownerAdds = (state.save.pendingOwnerMessages ?? []).map((text, i) => ({ id: `owner-risk-${nextWeek}-${i}`, from: "Owner", text, ts: timestamp }));
@@ -354,6 +376,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             league: { ...state.save.league, week: nextWeek, phaseVersion: state.save.league.phaseVersion + 1, phase: "RegularSeason" },
             phone: { threads: updatedThreads },
             pendingOwnerMessages: [],
+            gameState: reduced,
           }, `Advanced to week ${nextWeek}`);
           persist(save2, { key: "Hub" });
           return;

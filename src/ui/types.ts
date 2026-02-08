@@ -46,6 +46,7 @@ export type SaveData = {
   phone: { threads: PhoneThread[] };
   market: { byWeek: Record<string, { weekKey: string; role: StaffRole; candidates: Candidate[] }> };
   checkpoints: Array<{ ts: string; label: string; snapshotRef?: string }>;
+  gameState?: GameState;
 };
 
 export type ModalState = {
