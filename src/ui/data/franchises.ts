@@ -36,11 +36,40 @@ function parsePersonnelByTeam() {
 
 const personnelByTeam = parsePersonnelByTeam();
 
+// Keep save compatibility with older ugf.save.v1 files that stored legacy NFL-style
+// franchise IDs (e.g. ARI, DAL, PIT) before we switched to generated UGF IDs.
+const LEGACY_ID_BY_TEAM_NAME: Record<string, string> = {
+  "Phoenix Scorch": "ARI",
+  "Atlanta Apex": "ATL",
+  "Baltimore Admirals": "BAL",
+  "Buffalo Northwind": "BUF",
+  "Charlotte Crown": "CAR",
+  "Chicago Union": "CHI",
+  "Cleveland Forge": "CLE",
+  "Dallas Imperials": "DAL",
+  "Denver Summit": "DEN",
+  "Detroit Assembly": "DET",
+  "Houston Launch": "HOU",
+  "Indianapolis Crossroads": "IND",
+  "Jacksonville Fleet": "JAX",
+  "Las Vegas Syndicate": "LV",
+  "Los Angeles Stars": "LAR",
+  "Miami Tide": "MIA",
+  "New Orleans Voodoo": "NO",
+  "Pittsburgh Ironclads": "PIT",
+  "Seattle Evergreens": "SEA",
+  "Washington Sentinels": "WAS",
+};
+
+function getFranchiseId(teamName: string): string {
+  return LEGACY_ID_BY_TEAM_NAME[teamName] ?? getTeamIdByName(teamName);
+}
+
 export const FRANCHISES: Franchise[] = getAllTeamNames().map((teamName, i) => {
   const parsed = splitCityName(teamName);
   const p = personnelByTeam.get(teamName);
   return {
-    id: getTeamIdByName(teamName),
+    id: getFranchiseId(teamName),
     city: parsed.city,
     name: parsed.name,
     fullName: teamName,
