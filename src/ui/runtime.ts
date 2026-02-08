@@ -2,6 +2,7 @@ import { STAFF_ROLES, type StaffRole } from "@/domain/staffRoles";
 import { gameActions } from "@/engine/actions";
 import type { GameState, StaffAssignment, Thread } from "@/engine/gameState";
 import { createNewGameState, reduceGameState } from "@/engine/reducer";
+import { generateOffseasonTasks } from "@/engine/tasks";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
 import type { SaveData, UIAction, UIController, UIState } from "@/ui/types";

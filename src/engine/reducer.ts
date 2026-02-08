@@ -1,6 +1,7 @@
 import { STAFF_ROLES } from "@/domain/staffRoles";
 import type { GameAction } from "@/engine/actions";
 import type { GamePhase, GameState, Role } from "@/engine/gameState";
+import { generateOffseasonTasks } from "@/engine/tasks";
 
 function emptyAssignments() {
   return Object.fromEntries(STAFF_ROLES.map((role) => [role, null])) as Record<Role, null>;
@@ -24,6 +25,7 @@ export function createNewGameState(week = 1): GameState {
     staff: { assignments: emptyAssignments(), budgetTotal: 18_000_000, budgetUsed: 0 },
     offseasonPlan: null,
     tasks: [],
+    lastUiError: null,
     inbox: [],
     checkpoints: [],
   };
@@ -42,6 +44,11 @@ function phaseLabel(phase: GamePhase): string {
   }
 }
 
+function missingCoordinatorRole(state: GameState): Role | null {
+  const required: Role[] = ["OC", "DC", "STC"];
+  return required.find((role) => !state.staff.assignments[role]) ?? null;
+}
+
 export function reduceGameState(prev: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "LOAD_STATE":
@@ -58,6 +65,7 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
         phase: "COORD_HIRING",
         time: { ...prev.time, label: phaseLabel("COORD_HIRING") },
         franchise: { ugfTeamKey: action.payload.ugfTeamKey, excelTeamKey: action.payload.excelTeamKey },
+        lastUiError: null,
       };
     case "HIRE_COACH": {
       const { role, assignment } = action.payload;
@@ -70,20 +78,46 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
           budgetUsed,
           assignments: { ...prev.staff.assignments, [role]: assignment },
         },
+        lastUiError: null,
       };
     }
     case "SET_OFFSEASON_PLAN":
-      return { ...prev, phase: "JANUARY_OFFSEASON", time: { ...prev.time, label: phaseLabel("JANUARY_OFFSEASON") }, offseasonPlan: action.payload };
+      return {
+        ...prev,
+        phase: "JANUARY_OFFSEASON",
+        time: { ...prev.time, label: phaseLabel("JANUARY_OFFSEASON") },
+        offseasonPlan: action.payload,
+        lastUiError: null,
+      };
     case "COMPLETE_TASK":
-      return { ...prev, tasks: prev.tasks.map((task) => (task.id === action.payload.taskId ? { ...task, completed: true } : task)) };
+      return {
+        ...prev,
+        tasks: prev.tasks.map((task) => (task.id === action.payload.taskId ? { ...task, status: "DONE" } : task)),
+      };
     case "ADVANCE_WEEK": {
+      const missingRole = missingCoordinatorRole(prev);
+      if (missingRole) {
+        return { ...prev, lastUiError: `Cannot advance week: hire a ${missingRole} first.` };
+      }
+
+      const isFirstJanuaryWeek = prev.phase === "JANUARY_OFFSEASON" && prev.time.week === 1;
+      if (isFirstJanuaryWeek && !prev.offseasonPlan) {
+        return { ...prev, lastUiError: "Cannot advance week: set your offseason plan first." };
+      }
+
       const week = prev.time.week + 1;
       const phaseVersion = prev.time.phaseVersion + 1;
       const label = action.payload?.label ?? `${phaseLabel(prev.phase)} Week ${week}`;
-      return {
+      const nextState: GameState = {
         ...prev,
         time: { ...prev.time, week, phaseVersion, label },
         checkpoints: [...prev.checkpoints, { ts: Date.now(), label, week, phaseVersion }],
+        lastUiError: null,
+      };
+
+      return {
+        ...nextState,
+        tasks: generateOffseasonTasks(nextState),
       };
     }
     default:

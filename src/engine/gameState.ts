@@ -14,7 +14,9 @@ export type StaffAssignment = {
 export type Task = {
   id: string;
   title: string;
-  completed: boolean;
+  description: string;
+  status: "OPEN" | "DONE";
+  routeHint?: string;
 };
 
 export type ThreadMessage = {
@@ -57,6 +59,7 @@ export type GameState = {
     tradeNotes: string;
   } | null;
   tasks: Task[];
+  lastUiError: string | null;
   inbox: Thread[];
   checkpoints: { ts: number; label: string; week: number; phaseVersion: number }[];
 };
