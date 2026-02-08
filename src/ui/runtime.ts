@@ -161,10 +161,24 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             const assignment: StaffAssignment = { candidateId: `${role}-${pick}`, coachName: pick, salary: 1_200_000, years: 3, hiredWeek: nowWeek };
             gameState = reduceGameState(gameState, gameActions.hireCoach(role, assignment));
           });
-          gameState = reduceGameState(
-            gameState,
-            gameActions.setOffseasonPlan({ priorities: [], resignTargets: [], shopTargets: [], tradeNotes: "" }),
-          );
+          gameState = reduceGameState(gameState, gameActions.enterJanuaryOffseason());
+          gameState = { ...gameState, tasks: generateOffseasonTasks(gameState) };
+          setState({ ...state, save: { version: 1, gameState }, route: { key: "StaffMeeting" } });
+          return;
+        }
+        case "SUBMIT_STAFF_MEETING": {
+          if (!state.save) return;
+          const payload = {
+            priorities: Array.isArray(action.payload?.priorities) ? (action.payload.priorities as string[]) : [],
+            resignTargets: Array.isArray(action.payload?.resignTargets) ? (action.payload.resignTargets as string[]) : [],
+            shopTargets: Array.isArray(action.payload?.shopTargets) ? (action.payload.shopTargets as string[]) : [],
+            tradeNotes: String(action.payload?.tradeNotes ?? ""),
+          };
+          let gameState = reduceGameState(state.save.gameState, gameActions.setOffseasonPlan(payload));
+          const initialMeetingTask = gameState.tasks.find((task) => task.title === "Initial staff meeting");
+          if (initialMeetingTask) {
+            gameState = reduceGameState(gameState, gameActions.completeTask(initialMeetingTask.id));
+          }
           setState({ ...state, save: { version: 1, gameState }, route: { key: "Hub" } });
           return;
         }

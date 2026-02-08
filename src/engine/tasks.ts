@@ -9,6 +9,12 @@ type TaskTemplate = {
 
 const OFFSEASON_TEMPLATES: TaskTemplate[] = [
   {
+    type: "INITIAL_STAFF_MEETING",
+    title: "Initial staff meeting",
+    description: "Meet with your staff and lock your offseason plan before advancing the calendar.",
+    routeHint: "StaffMeeting",
+  },
+  {
     type: "ROSTER_REVIEW",
     title: "Review roster needs",
     description: "Audit every position group and flag where starters or depth must be upgraded this offseason.",
@@ -56,6 +62,17 @@ function toTaskId(week: number, type: string): string {
 
 export function generateOffseasonTasks(state: GameState): Task[] {
   if (state.phase !== "JANUARY_OFFSEASON") return state.tasks;
+  if (state.time.week === 1) {
+    return [
+      {
+        id: toTaskId(state.time.week, "INITIAL_STAFF_MEETING"),
+        title: "Initial staff meeting",
+        description: "Meet with your staff and lock your offseason plan before advancing the calendar.",
+        status: state.offseasonPlan ? "DONE" : "OPEN",
+        routeHint: "StaffMeeting",
+      },
+    ];
+  }
 
   const taskCount = 3 + (state.time.week % 4);
   const selected = [...OFFSEASON_TEMPLATES]
