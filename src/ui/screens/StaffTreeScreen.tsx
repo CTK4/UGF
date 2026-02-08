@@ -9,8 +9,6 @@ function fmtMoney(v: number): string {
 export function StaffTreeScreen({ ui }: ScreenProps) {
   const save = ui.getState().save;
   if (!save) return null;
-  const filled = STAFF_ROLES.filter((r) => !!save.staffAssignments[r]).length;
-
   const filled = STAFF_ROLES.filter((role) => !!save.staff[role]).length;
 
   return (
