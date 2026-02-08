@@ -114,7 +114,9 @@ function ownerBudget(ownerStandard: SaveData["standards"]["ownerStandard"]): num
 export function ensureFinancials(save: SaveData): SaveData {
   const teamRow = teamSummary.find((r) => String(r.Team) === save.franchiseId);
   const capProxy = Number(teamRow?.["Cap Space"] ?? 0);
-  const total = save.finances.coachBudgetTotal ?? (capProxy > 0 ? Math.max(ownerBudget(save.standards.ownerStandard), Math.min(45_000_000, capProxy * 0.5)) : ownerBudget(save.standards.ownerStandard));
+  const savedTotal = Number(save.finances.coachBudgetTotal ?? 0);
+  const computedDefault = capProxy > 0 ? Math.max(ownerBudget(save.standards.ownerStandard), Math.min(45_000_000, capProxy * 0.5)) : ownerBudget(save.standards.ownerStandard);
+  const total = savedTotal > 0 ? savedTotal : computedDefault;
   const used = Object.values(save.staffAssignments).reduce((sum, slot) => sum + (slot?.salary ?? 0), 0);
   return { ...save, finances: { coachBudgetTotal: Math.round(total), coachBudgetUsed: Math.round(used) } };
 }

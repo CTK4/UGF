@@ -2,7 +2,7 @@ import type { SaveData, UIAction, UIController, UIState } from "@/ui/types";
 import type { StaffRole } from "@/domain/staffRoles";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
 import { MANDATORY_ADVANCE_ROLES } from "@/domain/staffRoles";
-import { buildMarketForRole, canAfford, ensureFinancials } from "@/services/staffMarket";
+import { buildMarketForRole, ensureFinancials } from "@/services/staffMarket";
 
 const SAVE_KEY = "ugf.save.v1";
 
@@ -12,13 +12,29 @@ function validateSave(v: unknown): v is SaveData {
   return save.version === 1 && !!save.franchiseId && !!save.league && !!save.staff && !!save.phone && !!save.market;
 }
 
+function migrateLegacySave(v: unknown): SaveData | null {
+  if (!v || typeof v !== "object") return null;
+  const save = v as Partial<SaveData>;
+  if (save.version !== 1 || !save.franchiseId || !save.league || !save.staff || !save.phone || !save.market) return null;
+
+  return {
+    ...save,
+    staffAssignments: save.staffAssignments ?? {},
+    finances: save.finances ?? { coachBudgetTotal: 0, coachBudgetUsed: 0 },
+    standards: save.standards ?? { ownerStandard: "Balanced", disciplineStandard: "Balanced", schemeStandard: "Balanced" },
+    pendingOwnerRisks: save.pendingOwnerRisks ?? [],
+    checkpoints: save.checkpoints ?? [],
+  } as SaveData;
+}
+
 function loadSave(): { save: SaveData | null; corrupted: boolean } {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return { save: null, corrupted: false };
     const parsed = JSON.parse(raw);
-    if (!validateSave(parsed)) return { save: null, corrupted: true };
-    return { save: ensureFinancials(parsed), corrupted: false };
+    const migrated = migrateLegacySave(parsed);
+    if (!migrated || !validateSave(migrated)) return { save: null, corrupted: true };
+    return { save: ensureFinancials(migrated), corrupted: false };
   } catch {
     return { save: null, corrupted: true };
   }
@@ -227,23 +243,19 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               showModal("Offer Rejected", `${pick.name} refused. Offer must be at least 90% of demand.`, [{ label: "Back", action: { type: "CLOSE_MODAL" } }]);
               return;
             }
-            const budget = canAfford(state.save, salary);
-            if (!budget.ok) {
-              showModal("Budget Exceeded", `Budget exceeded by $${budget.exceededBy.toLocaleString()}. Offer less or cancel.`, [
+            const existingSalary = state.save.staffAssignments[role]?.salary ?? 0;
+            const replaced = state.save.staff[role];
+            const buyout = replaced ? Math.round(existingSalary * 0.25) : 0;
+            const projectedUsed = Math.max(0, state.save.finances.coachBudgetUsed - existingSalary) + salary + buyout;
+            if (projectedUsed > state.save.finances.coachBudgetTotal) {
+              const exceededBy = projectedUsed - state.save.finances.coachBudgetTotal;
+              showModal("Budget Exceeded", `Budget exceeded by $${exceededBy.toLocaleString()}${buyout > 0 ? " with buyout included" : ""}.`, [
                 { label: "Offer 90%", action: { type: "CONFIRM_HIRE", role, candidateId, offerSalary: Math.round(pick.salaryDemand * 0.9) } },
                 { label: "Cancel", action: { type: "CLOSE_MODAL" } },
               ]);
               return;
             }
 
-            const replaced = state.save.staff[role];
-            const buyout = replaced ? Math.round((state.save.staffAssignments[role]?.salary ?? 0) * 0.25) : 0;
-            const totalCost = salary + buyout;
-            const budget2 = canAfford(state.save, totalCost);
-            if (!budget2.ok) {
-              showModal("Budget Exceeded", `Budget exceeded by $${budget2.exceededBy.toLocaleString()} with buyout included.`, [{ label: "Cancel", action: { type: "CLOSE_MODAL" } }]);
-              return;
-            }
 
             const nextAssignments = {
               ...state.save.staffAssignments,
@@ -255,7 +267,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               staff: { ...state.save.staff, [role]: pick.name },
               staffAssignments: nextAssignments,
               pendingOwnerRisks: note,
-              finances: { ...state.save.finances, coachBudgetUsed: state.save.finances.coachBudgetUsed + totalCost },
+              finances: { ...state.save.finances, coachBudgetUsed: projectedUsed },
             };
             save2 = withCheckpoint(save2, `Hired ${role}: ${pick.name}`);
             persist(save2, { key: "StaffTree" });
