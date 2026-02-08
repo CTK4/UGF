@@ -132,7 +132,7 @@ export function OffersScreen({ ui }: ScreenProps) {
 
 export function HireCoordinatorsScreen({ ui }: ScreenProps) {
   const picks = ui.getState().ui.opening.coordinatorChoices;
-  const roles: Array<["oc" | "dc" | "st", "OC" | "DC" | "ST Coordinator"]> = [["oc", "OC"], ["dc", "DC"], ["st", "ST Coordinator"]];
+  const roles: Array<["OC" | "DC" | "STC", "OC" | "DC" | "ST Coordinator"]> = [["OC", "OC"], ["DC", "DC"], ["STC", "ST Coordinator"]];
 
   return (
     <div className="ugf-card">
@@ -151,7 +151,7 @@ export function HireCoordinatorsScreen({ ui }: ScreenProps) {
             </div>
           </div>
         ))}
-        <button disabled={!picks.oc || !picks.dc || !picks.st} onClick={() => ui.dispatch({ type: "FINALIZE_NEW_SAVE" })}>Finalize and Enter January 2026</button>
+        <button disabled={!picks.OC || !picks.DC || !picks.STC} onClick={() => ui.dispatch({ type: "FINALIZE_NEW_SAVE" })}>Finalize and Enter January 2026</button>
       </div>
     </div>
   );
@@ -164,10 +164,10 @@ export function StaffMeetingScreen({ ui }: ScreenProps) {
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Mandatory Staff Meeting • January 2026</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
-        <div>HC: {save.staff.hc}</div>
-        <div>OC: {save.staff.oc ?? "Vacant"}</div>
-        <div>DC: {save.staff.dc ?? "Vacant"}</div>
-        <div>ST: {save.staff.st ?? "Vacant"}</div>
+        <div>HC: {save.staff.HC}</div>
+        <div>OC: {save.staff.OC ?? "Vacant"}</div>
+        <div>DC: {save.staff.DC ?? "Vacant"}</div>
+        <div>ST: {save.staff.STC ?? "Vacant"}</div>
         <button onClick={() => ui.dispatch({ type: "COMPLETE_STAFF_MEETING" })}>Complete Meeting and Unlock Hub</button>
       </div>
     </div>

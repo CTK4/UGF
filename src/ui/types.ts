@@ -1,19 +1,34 @@
+import type { StaffRole } from "@/domain/staffRoles";
 import type { Route } from "@/ui/routes";
 
-export type StaffRole = "hc" | "oc" | "dc" | "st" | "qb" | "asst";
 export type LeaguePhase = "Preseason" | "RegularSeason";
+export type OwnerStandard = "Cheap" | "Balanced" | "Premium";
 
 export type Candidate = {
   id: string;
   name: string;
   role: StaffRole;
+  primaryRole: StaffRole;
   traits: string[];
   philosophy: string;
-  availability: "AVAILABLE" | "ALREADY_EMPLOYED" | "INELIGIBLE";
+  fitLabel: "Natural Fit" | "Cross-Train" | "Out-of-Role";
+  salaryDemand: number;
+  recommendedOffer: number;
+  availability: "FREE_AGENT" | "EMPLOYED" | "INELIGIBLE";
+  standardsNote: string;
+  perceivedRisk: number;
+  defaultContractYears: number;
 };
 
 export type PhoneMessage = { id: string; from: string; text: string; ts: string };
 export type PhoneThread = { id: string; title: string; unreadCount: number; messages: PhoneMessage[] };
+
+export type StaffAssignment = { coachId: string; salary: number; contractYears: number; hiredWeek: number; coachName: string; traits: string[] };
+export type Standards = {
+  ownerStandard: OwnerStandard;
+  disciplineStandard: "Lenient" | "Balanced" | "Strict";
+  schemeStandard: "Conservative" | "Balanced" | "Aggressive";
+};
 
 export type SaveData = {
   version: 1;
@@ -21,6 +36,10 @@ export type SaveData = {
   franchiseId: string;
   league: { season: number; week: number; phase: LeaguePhase; phaseVersion: number };
   staff: Record<StaffRole, string | null>;
+  staffAssignments: Partial<Record<StaffRole, StaffAssignment>>;
+  finances: { coachBudgetTotal: number; coachBudgetUsed: number };
+  standards: Standards;
+  pendingOwnerMessages?: string[];
   coachProfile?: { name: string; background: string };
   onboardingComplete?: boolean;
   phone: { threads: PhoneThread[] };
@@ -47,7 +66,7 @@ export type UIState = {
       background: string;
       interviewNotes: string[];
       offers: string[];
-      coordinatorChoices: Partial<Record<"oc" | "dc" | "st", string>>;
+      coordinatorChoices: Partial<Record<"OC" | "DC" | "STC", string>>;
     };
   };
 };

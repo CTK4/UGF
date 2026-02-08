@@ -124,10 +124,10 @@ export function HubScreen({ ui }: ScreenProps) {
 
         {activeTab === "staff" && (
           <div style={{ display: "grid", gap: 6 }}>
-            <div><b>Head Coach:</b> {save.staff.hc ?? "Vacant"}</div>
-            <div><b>Offensive Coordinator:</b> {save.staff.oc ?? "Vacant"}</div>
-            <div><b>Defensive Coordinator:</b> {save.staff.dc ?? "Vacant"}</div>
-            <div><b>Special Teams:</b> {save.staff.st ?? "Vacant"}</div>
+            <div><b>Head Coach:</b> {save.staff.HC ?? "Vacant"}</div>
+            <div><b>Offensive Coordinator:</b> {save.staff.OC ?? "Vacant"}</div>
+            <div><b>Defensive Coordinator:</b> {save.staff.DC ?? "Vacant"}</div>
+            <div><b>Special Teams:</b> {save.staff.STC ?? "Vacant"}</div>
             <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffTree" } })}>Open Staff Tree</button>
           </div>
         )}
