@@ -135,7 +135,12 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           );
           gameState = reduceGameState(gameState, gameActions.setBackground(state.ui.opening.background));
           gameState = reduceGameState(gameState, gameActions.acceptOffer(franchiseId, normalizeExcelTeamKey(f.fullName)));
-          gameState = { ...gameState, inbox: ensureThreads(gameState), tasks: [{ id: "task-1", title: "Hire coordinators", completed: false }] };
+          gameState = {
+            ...gameState,
+            inbox: ensureThreads(gameState),
+            tasks: [{ id: "task-1", title: "Hire coordinators", description: "Fill OC/DC/STC positions.", status: "OPEN" }],
+            draft: gameState.draft ?? { discovered: {}, watchlist: [] },
+          };
           setState({ ...state, save: { version: 1, gameState }, route: { key: "HireCoordinators" } });
           return;
         }
