@@ -7,13 +7,79 @@ import type { SaveData, UIAction, UIController, UIState } from "@/ui/types";
 
 const SAVE_KEY = "ugf.save.v1";
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isCanonicalGameState(gameState: unknown): gameState is GameState {
+  if (!isObject(gameState)) return false;
+  if (!isObject(gameState.meta) || gameState.meta.version !== 1) return false;
+  if (!isObject(gameState.time) || typeof gameState.time.week !== "number") return false;
+  if (!isObject(gameState.coach) || typeof gameState.coach.name !== "string") return false;
+  if (!isObject(gameState.franchise) || typeof gameState.franchise.ugfTeamKey !== "string") return false;
+  if (!isObject(gameState.staff) || !isObject(gameState.staff.assignments)) return false;
+  if (!Array.isArray(gameState.tasks) || !Array.isArray(gameState.inbox) || !Array.isArray(gameState.checkpoints)) return false;
+  return true;
+}
+
+function migrateLegacyGameState(gameState: unknown): GameState | null {
+  if (!isObject(gameState)) return null;
+  if (!isObject(gameState.coachProfile) || !isObject(gameState.staffAssignments)) return null;
+
+  let migrated = createNewGameState(1);
+
+  if (typeof gameState.coachProfile.name === "string" && gameState.coachProfile.name.trim()) {
+    migrated = reduceGameState(migrated, {
+      type: "SET_COACH_PROFILE",
+      payload: {
+        name: gameState.coachProfile.name,
+        age: typeof gameState.coachProfile.age === "number" ? gameState.coachProfile.age : migrated.coach.age,
+        hometown: typeof gameState.coachProfile.hometown === "string" ? gameState.coachProfile.hometown : migrated.coach.hometown,
+        reputation: typeof gameState.coachProfile.reputation === "number" ? gameState.coachProfile.reputation : migrated.coach.reputation,
+        mediaStyle: typeof gameState.coachProfile.mediaStyle === "string" ? gameState.coachProfile.mediaStyle : migrated.coach.mediaStyle,
+        personalityBaseline:
+          typeof gameState.coachProfile.personalityBaseline === "string" ? gameState.coachProfile.personalityBaseline : migrated.coach.personalityBaseline,
+      },
+    });
+  }
+
+  if (typeof gameState.coachProfile.backgroundKey === "string" && gameState.coachProfile.backgroundKey.trim()) {
+    migrated = reduceGameState(migrated, { type: "SET_BACKGROUND", payload: { backgroundKey: gameState.coachProfile.backgroundKey } });
+  }
+
+  if (isObject(gameState.franchise) && typeof gameState.franchise.ugfTeamKey === "string" && typeof gameState.franchise.excelTeamKey === "string") {
+    migrated = reduceGameState(migrated, {
+      type: "ACCEPT_OFFER",
+      payload: { ugfTeamKey: gameState.franchise.ugfTeamKey, excelTeamKey: gameState.franchise.excelTeamKey },
+    });
+  }
+
+  if (isObject(gameState.time) && typeof gameState.time.week === "number" && Number.isFinite(gameState.time.week)) {
+    migrated = { ...migrated, time: { ...migrated.time, week: Math.max(1, Math.floor(gameState.time.week)) } };
+  }
+
+  return migrated;
+}
+
+function normalizeSaveData(parsed: unknown): SaveData | null {
+  if (!isObject(parsed) || parsed.version !== 1) return null;
+  const candidateState = parsed.gameState;
+  if (isCanonicalGameState(candidateState)) {
+    return { version: 1, gameState: candidateState };
+  }
+  const migrated = migrateLegacyGameState(candidateState);
+  if (migrated) return { version: 1, gameState: migrated };
+  return null;
+}
+
 function loadSave(): { save: SaveData | null; corrupted: boolean } {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return { save: null, corrupted: false };
-    const parsed = JSON.parse(raw) as SaveData;
-    if (parsed?.version !== 1 || !parsed?.gameState) return { save: null, corrupted: true };
-    return { save: parsed, corrupted: false };
+    const parsed = JSON.parse(raw) as unknown;
+    const save = normalizeSaveData(parsed);
+    if (!save) return { save: null, corrupted: true };
+    return { save, corrupted: false };
   } catch {
     return { save: null, corrupted: true };
   }
