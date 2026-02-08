@@ -1,52 +1,9 @@
-import type { StaffRole } from "@/domain/staffRoles";
+import type { GameState } from "@/engine/gameState";
 import type { Route } from "@/ui/routes";
-import type { StaffRole } from "@/domain/staffRoles";
-
-export type LeaguePhase = "Preseason" | "RegularSeason";
-export type OwnerStandard = "Cheap" | "Balanced" | "Premium";
-
-export type Candidate = {
-  id: string;
-  name: string;
-  role: StaffRole;
-  primaryRole: StaffRole;
-  traits: string[];
-  philosophy: string;
-  fitLabel: "Natural Fit" | "Cross-Train" | "Out-of-Role";
-  salaryDemand: number;
-  recommendedOffer: number;
-  availability: "FREE_AGENT" | "EMPLOYED" | "INELIGIBLE";
-  standardsNote: string;
-  perceivedRisk: number;
-  defaultContractYears: number;
-};
-
-export type PhoneMessage = { id: string; from: string; text: string; ts: string };
-export type PhoneThread = { id: string; title: string; unreadCount: number; messages: PhoneMessage[] };
-
-export type StaffAssignment = { coachId: string; salary: number; contractYears: number; hiredWeek: number; coachName: string; traits: string[] };
-export type Standards = {
-  ownerStandard: OwnerStandard;
-  disciplineStandard: "Lenient" | "Balanced" | "Strict";
-  schemeStandard: "Conservative" | "Balanced" | "Aggressive";
-};
 
 export type SaveData = {
   version: 1;
-  createdAt: string;
-  franchiseId: string;
-  league: { season: number; week: number; phase: LeaguePhase; phaseVersion: number };
-  staff: Record<StaffRole, string | null>;
-  staffAssignments: Partial<Record<StaffRole, StaffAssignment>>;
-  finances: { coachBudgetTotal: number; coachBudgetUsed: number };
-  standards: Standards;
-  pendingOwnerMessages?: string[];
-  coachProfile?: { name: string; background: string };
-  onboardingComplete?: boolean;
-  phone: { threads: PhoneThread[] };
-  market: { byWeek: Record<string, { weekKey: string; role: StaffRole; candidates: Candidate[] }> };
-  checkpoints: Array<{ ts: string; label: string; snapshotRef?: string }>;
-  gameState?: GameState;
+  gameState: GameState;
 };
 
 export type ModalState = {
