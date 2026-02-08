@@ -5,6 +5,7 @@ import rostersFullData from "@/data/generated/rosters.full.json";
 import draftOrderData from "@/data/generated/draftOrder.json";
 import { UGF_TEAMS } from "@/data/ugfTeams";
 import { getDisplayTeamName, normalizeExcelTeamKey } from "@/data/teamMap";
+import { TeamLogo } from "@/ui/components/TeamLogo";
 import { getFranchise } from "@/ui/data/franchises";
 import type { ScreenProps, PhoneThread } from "@/ui/types";
 
@@ -117,7 +118,10 @@ export function HubScreen({ ui }: ScreenProps) {
   return (
     <div className="ugf-card">
       <div className="ugf-card__header">
-        <h2 className="ugf-card__title">{teamName} Hub</h2>
+        <h2 className="ugf-card__title" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <TeamLogo ugfTeamKey={teamKey} displayName={teamName} size={28} />
+          <span>{teamName} Hub</span>
+        </h2>
       </div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 12 }}>
         {tabs(activeTab, (tab) => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub", tab } }))}
@@ -134,6 +138,10 @@ export function HubScreen({ ui }: ScreenProps) {
 
         {activeTab === "roster" && (
           <div style={{ display: "grid", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <TeamLogo ugfTeamKey={teamKey} displayName={teamName} size={24} />
+              <b>{teamName} Roster</b>
+            </div>
             {[...groupedRoster.entries()].map(([group, positions]) => (
               <div key={group}>
                 <h3>{group}</h3>
@@ -190,7 +198,10 @@ export function HubScreen({ ui }: ScreenProps) {
                       <b>{division}</b>
                       <ul>
                         {teams.map((team) => (
-                          <li key={team.key}>{team.team} — 0-0</li>
+                          <li key={team.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <TeamLogo ugfTeamKey={team.key} displayName={team.team} size={20} />
+                            <span>{team.team} — 0-0</span>
+                          </li>
                         ))}
                       </ul>
                     </div>

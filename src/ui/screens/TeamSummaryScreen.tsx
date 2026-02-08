@@ -1,6 +1,8 @@
 import React from "react";
 import type { ScreenProps } from "@/ui/types";
 import { TeamLogo } from "@/ui/components/TeamLogo";
+import { normalizeExcelTeamKey } from "@/data/teamMap";
+import { getFranchise } from "@/ui/data/franchises";
 import { SegmentedTabs } from "@/ui/components/SegmentedTabs";
 import { MeterBar } from "@/ui/components/MeterBar";
 
@@ -9,6 +11,9 @@ export function TeamSummaryScreen({ ui }: ScreenProps) {
   const teamId = state.save?.teamId ?? ui.selectors.franchiseTeamId();
   const rows = ui.selectors.table("Team Summary").filter((r) => String(r.Team ?? "").trim() === teamId);
   const first = (rows[0] ?? {}) as Record<string, unknown>;
+  const franchise = getFranchise(teamId);
+  const displayName = franchise?.fullName ?? teamId;
+  const ugfTeamKey = normalizeExcelTeamKey(displayName);
 
   const wins = Number(first.Wins ?? first.W ?? 0);
   const losses = Number(first.Losses ?? first.L ?? 0);
@@ -26,7 +31,7 @@ export function TeamSummaryScreen({ ui }: ScreenProps) {
         <div className="ugf-card__header">
           <h2 className="ugf-card__title">Team Summary</h2>
           <div className="ugf-card__right">
-            <TeamLogo teamId={teamId} />
+            <TeamLogo ugfTeamKey={ugfTeamKey} displayName={displayName} />
           </div>
         </div>
         <div className="ugf-card__body" style={{ display: "grid", gap: 12 }}>
@@ -51,7 +56,7 @@ export function TeamSummaryScreen({ ui }: ScreenProps) {
           <MeterBar value={winPct} label="Win %" rightLabel={`${Math.round(winPct * 100)}%`} />
 
           <div>
-            <strong>{teamId}</strong> — {wins}-{losses}
+            <strong>{displayName}</strong> — {wins}-{losses}
           </div>
 
           {rows.length ? (
