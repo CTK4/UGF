@@ -22,7 +22,7 @@ export type Route =
   | { key: "Start" }
   | { key: "ChooseFranchise" }
   | { key: "CareerContext" }
-  | { key: "Hub" }
+  | { key: "Hub"; tab?: "staff" | "roster" | "contracts" | "standings" | "schedule" | "phone" }
   | { key: "StaffTree" }
   | { key: "HireMarket"; role: "hc" | "oc" | "dc" | "qb" | "asst" }
   | { key: "CandidateDetail"; role: "hc" | "oc" | "dc" | "qb" | "asst"; candidateId: string }
