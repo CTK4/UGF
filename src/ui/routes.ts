@@ -38,13 +38,7 @@ export type Route =
   | { key: "Start" }
   | { key: "ChooseFranchise" }
   | { key: "CareerContext" }
-  | { key: "CreateCoach" }
-  | { key: "CoachBackground" }
-  | { key: "Interviews" }
-  | { key: "Offers" }
-  | { key: "HireCoordinators" }
-  | { key: "StaffMeeting" }
-  | { key: "Hub" }
+  | { key: "Hub"; tab?: "staff" | "roster" | "contracts" | "standings" | "schedule" | "phone" }
   | { key: "StaffTree" }
   | { key: "HireMarket"; role: "hc" | "oc" | "dc" | "st" | "qb" | "asst" }
   | { key: "CandidateDetail"; role: "hc" | "oc" | "dc" | "st" | "qb" | "asst"; candidateId: string }

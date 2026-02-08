@@ -3,15 +3,14 @@ import rosters from "@/data/generated/rosters.json";
 import rostersFull from "@/data/generated/rosters.full.json";
 import teamSummary from "@/data/generated/teamSummary.json";
 import { getFranchise } from "@/ui/data/franchises";
-import type { ScreenProps } from "@/ui/types";
-import { UGF_TEAMS, getUGFTeamByKey, resolveUGFTeamByJsonTeam } from "@/data/ugfTeams";
+import { SegmentedTabs } from "@/ui/components/SegmentedTabs";
+import { getDraftOrderRows, getRosterByTeam, getTeamSummaryRows } from "@/data/generatedData";
 
-type HubTab = "Staff" | "Roster" | "Contracts" | "Standings" | "Schedule" | "Phone";
-const tabs: HubTab[] = ["Staff", "Roster", "Contracts", "Standings", "Schedule", "Phone"];
+type HubTab = "staff" | "roster" | "contracts" | "standings" | "schedule" | "phone";
 
-const rosterRows = rosters as Array<Record<string, string | number>>;
-const rosterFullRows = rostersFull as Array<Record<string, string | number>>;
-const summaryRows = teamSummary as Array<Record<string, string | number>>;
+function asMoney(n: number): string {
+  return `$${(n / 1_000_000).toFixed(1)}M`;
+}
 
 export function HubScreen({ ui }: ScreenProps) {
   const [tab, setTab] = useState<HubTab>("Staff");
@@ -19,8 +18,92 @@ export function HubScreen({ ui }: ScreenProps) {
   if (!save) return null;
 
   const fr = getFranchise(save.franchiseId);
-  const team = getUGFTeamByKey(save.franchiseId);
+  const teamName = fr?.fullName ?? save.franchiseId;
   const unread = save.phone.threads.reduce((a, t) => a + t.unreadCount, 0);
+  const activeTab: HubTab = state.route.key === "Hub" ? (state.route.tab ?? "staff") : "staff";
+
+  const rosterRows = getRosterByTeam(teamName);
+  const teamSummary = getTeamSummaryRows();
+  const teamRow = teamSummary.find((row) => row.Team === teamName);
+  const contracts = [...rosterRows].sort((a, b) => Number(b.AAV ?? 0) - Number(a.AAV ?? 0));
+  const standings = [...teamSummary].sort((a, b) => Number(b.AvgRating ?? 0) - Number(a.AvgRating ?? 0));
+  const teamSchedule = getDraftOrderRows().filter((row) => row.Team === teamName).slice(0, 17);
+
+  const renderTab = () => {
+    if (activeTab === "staff") {
+      return (
+        <div style={{ display: "grid", gap: 8 }}>
+          <div><b>Head Coach:</b> {save.staff.hc ?? "Vacant"}</div>
+          <div><b>Offensive Coordinator:</b> {save.staff.oc ?? "Vacant"}</div>
+          <div><b>Defensive Coordinator:</b> {save.staff.dc ?? "Vacant"}</div>
+          <div><b>QB Coach:</b> {save.staff.qb ?? "Vacant"}</div>
+          <div><b>Assistant:</b> {save.staff.asst ?? "Vacant"}</div>
+          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffTree" } })}>Open Staff Tree</button>
+        </div>
+      );
+    }
+
+    if (activeTab === "phone") {
+      return (
+        <div style={{ display: "grid", gap: 8 }}>
+          <div>Unread threads: <b>{unread}</b></div>
+          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "PhoneInbox" } })}>Open Phone</button>
+        </div>
+      );
+    }
+
+    if (activeTab === "roster") {
+      return (
+        <table>
+          <thead><tr><th>Player</th><th>Pos</th><th>Age</th><th>Rating</th><th>Role</th></tr></thead>
+          <tbody>
+            {rosterRows.map((row) => (
+              <tr key={row["Player ID"]}><td>{row.PlayerName}</td><td>{row.Position}</td><td>{row.Age}</td><td>{row.Rating}</td><td>{row.Role}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+
+    if (activeTab === "contracts") {
+      return (
+        <table>
+          <thead><tr><th>Player</th><th>Pos</th><th>AAV</th><th>Cap Status</th></tr></thead>
+          <tbody>
+            {contracts.map((row) => (
+              <tr key={row["Player ID"]}><td>{row.PlayerName}</td><td>{row.Position}</td><td>{asMoney(Number(row.AAV ?? 0))}</td><td>{Number(row.AAV ?? 0) > 15_000_000 ? "Core" : "Depth"}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+
+    if (activeTab === "standings") {
+      return (
+        <table>
+          <thead><tr><th>#</th><th>Team</th><th>Conf</th><th>Div</th><th>Avg</th></tr></thead>
+          <tbody>
+            {standings.map((row, idx) => (
+              <tr key={row.Team}><td>{idx + 1}</td><td>{row.Team}</td><td>{row.Conference}</td><td>{row.Division}</td><td>{Number(row.AvgRating).toFixed(1)}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    }
+
+    return (
+      <table>
+        <thead><tr><th>Week</th><th>Opponent/Event</th><th>Type</th></tr></thead>
+        <tbody>
+          {teamSchedule.length ? teamSchedule.map((row, idx) => (
+            <tr key={`${row.Pick}-${idx}`}><td>{idx + 1}</td><td>{row.Player} ({row.Pos})</td><td>Draft Board</td></tr>
+          )) : (
+            <tr><td colSpan={3}>No schedule rows currently available in generated JSON for this team.</td></tr>
+          )}
+        </tbody>
+      </table>
+    );
+  };
 
   const currentTeamRoster = useMemo(() => {
     if (!team) return [];
@@ -47,66 +130,27 @@ export function HubScreen({ ui }: ScreenProps) {
           <div className="ugf-pill">January {save.league.season} • Week {save.league.week} • v{save.league.phaseVersion}</div>
         </div>
         <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {tabs.map((x) => <button key={x} onClick={() => setTab(x)} className={tab === x ? "danger" : ""}>{x}</button>)}
-          </div>
+          <SegmentedTabs
+            value={activeTab}
+            tabs={[
+              { key: "staff", label: "Staff" },
+              { key: "roster", label: `Roster (${rosterRows.length})` },
+              { key: "contracts", label: "Contracts" },
+              { key: "standings", label: "Standings" },
+              { key: "schedule", label: "Schedule" },
+              { key: "phone", label: `Phone (${unread})` },
+            ]}
+            onChange={(tab) => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub", tab } })}
+            ariaLabel="Hub tabs"
+          />
 
-          {tab === "Staff" ? (
-            <div style={{ display: "grid", gap: 6 }}>
-              <div>HC: {save.staff.hc}</div><div>OC: {save.staff.oc ?? "Vacant"}</div><div>DC: {save.staff.dc ?? "Vacant"}</div><div>ST: {save.staff.st ?? "Vacant"}</div>
-              <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffTree" } })}>Open Staff Tree</button>
+          {teamRow ? (
+            <div style={{ opacity: 0.85 }}>
+              {teamRow.Team} • {teamRow.Conference} {teamRow.Division} • Players: {teamRow.Players} • Cap Space: {asMoney(Number(teamRow["Cap Space"] ?? 0))}
             </div>
           ) : null}
 
-          {tab === "Roster" ? (
-            <div style={{ display: "grid", gap: 4 }}>
-              {currentTeamRoster.slice(0, 30).map((row) => (
-                <div key={String(row["Player ID"])} className="ugf-card"><div className="ugf-card__body">{String(row.PlayerName)} • {String(row.Position)} • OVR {String(row.Rating)}</div></div>
-              ))}
-            </div>
-          ) : null}
-
-          {tab === "Contracts" ? (
-            <div style={{ display: "grid", gap: 6 }}>
-              <div className="ugf-pill">Cap Space: {String(currentTeamSummary?.["Cap Space"] ?? "N/A")}</div>
-              <div className="ugf-pill">Current Cap Hits: {String(currentTeamSummary?.["Current Cap Hits"] ?? "N/A")}</div>
-              {expiringDeals.length ? expiringDeals.map((p) => (
-                <div key={String(p["Player ID"])} className="ugf-card"><div className="ugf-card__body">{String(p.PlayerName)} • {String(p.Position)} • AAV {String(p.AAV)} • Expiring</div></div>
-              )) : <div>No expiring deals found.</div>}
-            </div>
-          ) : null}
-
-          {tab === "Standings" ? (
-            <div style={{ display: "grid", gap: 8 }}>
-              {["Eastern", "Western"].map((conf) => (
-                <div key={conf} className="ugf-card">
-                  <div className="ugf-card__body" style={{ display: "grid", gap: 4 }}>
-                    <b>{conf} Conference</b>
-                    {["North", "South"].map((division) => (
-                      <div key={division}>
-                        <div style={{ opacity: 0.8 }}>{division}</div>
-                        {UGF_TEAMS.filter((t) => t.conference === conf && t.division === division).map((t) => <div key={t.key}>{t.displayName} — 0-0</div>)}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          {tab === "Schedule" ? (
-            <div>
-              <div className="ugf-pill">Schedule feed unavailable in current JSON bundle.</div>
-              <div style={{ marginTop: 8 }}>Placeholder active: preseason planning and game-week controls will appear here when schedule JSON is wired.</div>
-            </div>
-          ) : null}
-
-          {tab === "Phone" ? (
-            <div style={{ display: "grid", gap: 8 }}>
-              <div className="ugf-pill">Unread: {unread}</div>
-              <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "PhoneInbox" } })}>Open Phone Inbox</button>
-            </div>
-          ) : null}
+          {renderTab()}
 
           <button onClick={() => ui.dispatch({ type: "ADVANCE_WEEK" })}>Advance Week</button>
         </div>
