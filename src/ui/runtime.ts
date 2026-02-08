@@ -104,11 +104,16 @@ function openingState(): UIState["ui"]["opening"] {
   return { coachName: "", background: "Former QB", interviewNotes: [], offers: [], coordinatorChoices: {} };
 }
 
+function initialRouteForSave(save: SaveData | null): UIState["route"] {
+  if (!save) return { key: "Start" };
+  return save.onboardingComplete ? { key: "Hub" } : { key: "StaffMeeting" };
+}
+
 export async function createUIRuntime(onChange: () => void): Promise<UIController> {
   const { save, corrupted } = loadSave();
 
   let state: UIState = {
-    route: save ? { key: "Hub" } : { key: "Start" },
+    route: initialRouteForSave(save),
     save,
     draftFranchiseId: save?.franchiseId ?? null,
     corruptedSave: corrupted,
