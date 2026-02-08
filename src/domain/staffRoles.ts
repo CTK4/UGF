@@ -1,8 +1,9 @@
 export const STAFF_ROLES = ["HC", "OC", "DC", "STC", "QB", "RB", "WR", "OL", "DL", "LB", "DB", "ASST"] as const;
-
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
-export const MANDATORY_ADVANCE_ROLES: StaffRole[] = ["OC", "DC", "STC"];
+export const MANDATORY_STAFF_ROLES: StaffRole[] = ["OC", "DC", "STC"];
+
+export const ASSISTANT_STAFF_ROLES: StaffRole[] = ["QB", "RB", "WR", "OL", "DL", "LB", "DB", "ASST"];
 
 export const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
   HC: "Head Coach",
@@ -18,5 +19,3 @@ export const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
   DB: "DB Coach",
   ASST: "Assistant Coach",
 };
-
-export const ASSISTANT_ROLES: StaffRole[] = ["QB", "RB", "WR", "OL", "DL", "LB", "DB", "ASST"];

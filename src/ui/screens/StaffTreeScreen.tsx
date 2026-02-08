@@ -1,14 +1,15 @@
 import React from "react";
-import { STAFF_ROLES, STAFF_ROLE_LABELS, type StaffRole } from "@/domain/staffRoles";
+import { MANDATORY_STAFF_ROLES, STAFF_ROLE_LABELS, STAFF_ROLES, type StaffRole } from "@/domain/staffRoles";
 import type { ScreenProps } from "@/ui/types";
 
-function money(v: number): string {
-  return `$${(v / 1_000_000).toFixed(2)}M`;
+function fmtMoney(v: number): string {
+  return `$${Math.round(v).toLocaleString()}`;
 }
 
 export function StaffTreeScreen({ ui }: ScreenProps) {
   const save = ui.getState().save;
   if (!save) return null;
+  const filled = STAFF_ROLES.filter((r) => !!save.staffAssignments[r]).length;
 
   const filled = STAFF_ROLES.filter((role) => !!save.staff[role]).length;
 
@@ -16,21 +17,19 @@ export function StaffTreeScreen({ ui }: ScreenProps) {
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Staff Tree</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
-        <div><b>Staff completeness:</b> {filled}/{STAFF_ROLES.length} filled</div>
-        <div><b>Coach Budget:</b> {money(save.finances.coachBudgetUsed)} / {money(save.finances.coachBudgetTotal)}</div>
-        {STAFF_ROLES.map((role) => {
-          const name = save.staff[role];
+        <div className="ugf-pill">Staff completeness: {filled}/{STAFF_ROLES.length} filled</div>
+        <div className="ugf-pill">Budget: {fmtMoney(save.finances.coachBudgetUsed)} / {fmtMoney(save.finances.coachBudgetTotal)}</div>
+        {(STAFF_ROLES as StaffRole[]).map((role) => {
           const assignment = save.staffAssignments[role];
+          const occupied = !!assignment;
           return (
             <div key={role} className="ugf-card">
               <div className="ugf-card__body" style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                 <div>
-                  <b>{STAFF_ROLE_LABELS[role]}:</b> {name ?? <span style={{ color: "crimson" }}>(Vacant)</span>}
-                  <div style={{ opacity: 0.8 }}>
-                    Salary: {assignment ? money(assignment.salary) : "—"} • Traits: {assignment ? "See market card" : "—"}
-                  </div>
+                  <b>{STAFF_ROLE_LABELS[role]}{MANDATORY_STAFF_ROLES.includes(role) ? " *" : ""}:</b> {occupied ? assignment.coachName : <span style={{ color: "crimson" }}>(Vacant)</span>}
+                  {occupied ? <div style={{ opacity: 0.85 }}>Salary: {fmtMoney(assignment.salary)} • Traits: {assignment.traits.slice(0, 3).join(" • ") || "N/A"}</div> : null}
                 </div>
-                <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "HireMarket", role: role as StaffRole } })}>{name ? "Replace" : "Hire"}</button>
+                <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "HireMarket", role } })}>{occupied ? "Replace" : "Hire"}</button>
               </div>
             </div>
           );

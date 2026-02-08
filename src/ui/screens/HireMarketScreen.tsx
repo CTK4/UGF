@@ -1,8 +1,10 @@
 import React from "react";
-import { STAFF_ROLE_LABELS } from "@/domain/staffRoles";
+import { STAFF_ROLE_LABELS, type StaffRole } from "@/domain/staffRoles";
 import type { ScreenProps } from "@/ui/types";
 
-const money = (v: number) => `$${(v / 1_000_000).toFixed(2)}M`;
+function fmtMoney(v: number): string {
+  return `$${Math.round(v).toLocaleString()}`;
+}
 
 export function HireMarketScreen({ ui }: ScreenProps) {
   const state = ui.getState();
@@ -23,8 +25,8 @@ export function HireMarketScreen({ ui }: ScreenProps) {
         </div>
         {(session?.candidates ?? []).map((c) => (
           <button key={c.id} style={{ textAlign: "left" }} onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CandidateDetail", role, candidateId: c.id } })}>
-            <div><strong>{c.name}</strong> • {c.primaryRole}</div>
-            <div style={{ opacity: 0.8 }}>{c.fitLabel} • Demand: {money(c.salaryDemand)} • <span className="ugf-pill">{c.availability.replaceAll("_", " ")}</span></div>
+            <div><strong>{c.name}</strong> • Primary: {c.primaryRole}</div>
+            <div style={{ opacity: 0.8 }}>{c.fitLabel} • Demand: {fmtMoney(c.salaryDemand)} • <span className="ugf-pill">{c.availability.replaceAll("_", " ")}</span></div>
           </button>
         ))}
       </div>

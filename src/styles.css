@@ -175,6 +175,25 @@ code, pre {
 ul { margin: 0; padding-left: 18px; }
 li { margin: 6px 0; }
 
+.ugf-standings-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.ugf-standings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ugf-standings-logoCol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

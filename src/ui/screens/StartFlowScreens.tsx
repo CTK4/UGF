@@ -1,6 +1,8 @@
 import React from "react";
 import personnelData from "@/data/generated/personnel.json";
+import { normalizeExcelTeamKey } from "@/data/teamMap";
 import type { ScreenProps } from "@/ui/types";
+import { TeamLogo } from "@/ui/components/TeamLogo";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
 
 type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string };
@@ -47,7 +49,10 @@ export function ChooseFranchiseScreen({ ui }: ScreenProps) {
         <div style={{ maxHeight: 420, overflow: "auto", display: "grid", gap: 8 }}>
           {FRANCHISES.map((f) => (
             <button key={f.id} onClick={() => ui.dispatch({ type: "SET_DRAFT_FRANCHISE", franchiseId: f.id })} style={{ textAlign: "left" }}>
-              <div><strong>{f.city} {f.name}</strong></div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <TeamLogo ugfTeamKey={normalizeExcelTeamKey(f.fullName)} displayName={f.fullName} size={32} />
+                <strong>{f.city} {f.name}</strong>
+              </div>
             </button>
           ))}
         </div>
