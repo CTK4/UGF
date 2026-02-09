@@ -4,6 +4,8 @@ import rosterData from "@/data/generated/rosters.json";
 import type { ScreenProps } from "@/ui/types";
 import { HOMETOWNS } from "@/data/hometowns";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
+import { normalizeExcelTeamKey } from "@/data/teamMap";
+import { TeamIcon } from "@/ui/components/TeamLogo";
 
 type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string };
 const personnel = personnelData as PersonnelRow[];
@@ -62,7 +64,21 @@ export function ChooseFranchiseScreen({ ui }: ScreenProps) {
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Choose Franchise</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
-        {FRANCHISES.map((f) => <button key={f.id} onClick={() => ui.dispatch({ type: "SET_DRAFT_FRANCHISE", franchiseId: f.id })}>{f.fullName}</button>)}
+        {FRANCHISES.map((f) => {
+          const teamKey = normalizeExcelTeamKey(f.fullName);
+          return (
+            <button
+              key={f.id}
+              onClick={() => ui.dispatch({ type: "SET_DRAFT_FRANCHISE", franchiseId: f.id })}
+              style={{ display: "flex", alignItems: "center", gap: 10 }}
+            >
+              <span style={{ display: "inline-flex", width: 64, minWidth: 64, justifyContent: "center", alignItems: "center" }}>
+                <TeamIcon teamKey={teamKey} size={48} />
+              </span>
+              <span>{f.fullName}</span>
+            </button>
+          );
+        })}
         <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CareerContext" } })} disabled={!state.draftFranchiseId}>Confirm Franchise</button>
       </div>
     </div>
