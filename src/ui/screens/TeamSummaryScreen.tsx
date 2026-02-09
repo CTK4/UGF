@@ -1,6 +1,6 @@
 import React from "react";
 import type { ScreenProps } from "@/ui/types";
-import { TeamIcon } from "@/ui/components/TeamIcon";
+import { TeamLogo } from "@/ui/components/TeamLogo";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { getFranchise } from "@/ui/data/franchises";
 import { SegmentedTabs } from "@/ui/components/SegmentedTabs";
@@ -31,7 +31,7 @@ export function TeamSummaryScreen({ ui }: ScreenProps) {
         <div className="ugf-card__header">
           <h2 className="ugf-card__title">Team Summary</h2>
           <div className="ugf-card__right">
-            <TeamIcon teamKey={teamKey} size={56} variant="square" />
+            <TeamLogo teamKey={teamKey} variant="header" />
           </div>
         </div>
         <div className="ugf-card__body" style={{ display: "grid", gap: 12 }}>

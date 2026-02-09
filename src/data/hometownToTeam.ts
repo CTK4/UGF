@@ -1,1 +1,1 @@
-export { HOMETOWN_CLOSEST_TEAM } from "./hometowns";
+export { HOMETOWN_CLOSEST_TEAM } from "@/data/hometowns";
