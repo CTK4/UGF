@@ -160,17 +160,12 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
   const franchise = getFranchise(franchiseId);
   if (!invite || !result) return null;
   const script = INTERVIEW_SCRIPTS[franchiseId] ?? INTERVIEW_SCRIPTS.ATLANTA_APEX;
-  const questions = script.questionIds.map((id) => INTERVIEW_QUESTION_BANK[id]);
-  const isDone = result.completed || result.answers.length >= questions.length;
-
-  useEffect(() => {
-    if (state.route.key === "OpeningInterview" && isDone) {
-      ui.dispatch({ type: "NAVIGATE", route: { key: "Interviews" } });
-    }
-  }, [isDone, state.route.key]);
-
   const questionIndex = result.answers.length;
-  const current = questions[questionIndex];
+  const questionId = script.questionIds[questionIndex];
+  const current = questionId ? INTERVIEW_QUESTION_BANK[questionId] : undefined;
+  const prompt = questionId ? script.phrasing?.[questionId] ?? current?.prompt : undefined;
+  const isDone = result.completed || questionIndex >= script.questionIds.length;
+
   if (!current && !isDone) {
     console.error("Opening interview question missing for index", questionIndex);
   }
@@ -181,7 +176,7 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
       <div className="ugf-card__header"><h2 className="ugf-card__title">Interview: {(() => { const name = franchise?.fullName ?? franchiseId; devGuardForbiddenTeamName(name); return name; })()}</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
         <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[invite.tier]} • {invite.summaryLine}</div>
-        {current ? <div><b>{current.label} Q{questionIndex + 1}.</b> {current.prompt}</div> : null}
+        {current ? <div><b>{current.label}</b> {prompt}</div> : null}
         {shouldRenderDoneState ? (
           <div className="ugf-card" style={{ marginTop: 8 }}>
             <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
@@ -194,13 +189,13 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
           </div>
         ) : (
           <div style={{ display: "grid", gap: 8 }}>
-            {[
-              { label: "A", text: "Set a firm, ambitious standard immediately." },
-              { label: "B", text: "Take a balanced approach with steady collaboration." },
-              { label: "C", text: "Keep flexibility and adapt after early evaluation." },
-            ].map((choice, choiceIndex) => (
-              <button key={`${current.label}-${choice.label}`} type="button" onClick={() => ui.dispatch({ type: "OPENING_ANSWER_INTERVIEW", franchiseId, answerIndex: choiceIndex })}>
-                {choice.label}) {choice.text}
+            {current.choices.map((choice, index) => (
+              <button
+                key={`${questionId}-${choice.id}`}
+                type="button"
+                onClick={() => ui.dispatch({ type: "OPENING_ANSWER_INTERVIEW", franchiseId, answerIndex: index })}
+              >
+                {choice.id}) {choice.text}
               </button>
             ))}
           </div>
