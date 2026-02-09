@@ -6,9 +6,7 @@ import { generateBeatTasks } from "@/engine/tasks";
 import { getScoutablePositions } from "@/engine/scouting";
 import { HOMETOWN_CLOSEST_TEAM } from "@/data/hometownToTeam";
 import { HOMETOWNS } from "@/data/hometowns";
-import { normalizeExcelTeamKey } from "@/data/teamMap";
-import { getOwnerProfile, shiftPressureDown, shiftPressureUp, type OwnerProfile, type OwnerTone } from "@/data/owners";
-import { getTeamSummaryRows } from "@/data/generatedData";
+import { getTeamIdByName, getTeamSummaryRows } from "@/data/generatedData";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
 import type { InterviewInvite, InterviewInviteTier, SaveData, UIAction, UIController, UIState } from "@/ui/types";
 
@@ -58,59 +56,79 @@ function sortedFranchises(): typeof FRANCHISES {
   return [...FRANCHISES].sort((a, b) => a.fullName.localeCompare(b.fullName));
 }
 
-type OfferPressure = OwnerTone;
-
-type OfferTerms = {
-  years: number;
-  pressure: OfferPressure;
-  mandate: string;
+type InterviewTierMetadata = {
+  descriptor: string;
+  pressureDescriptor: string;
 };
 
-const INTERVIEW_SUMMARY_BY_TIER: Record<InterviewInviteTier, string> = {
-  REBUILD: "Weak roster • Stabilize and build",
-  FRINGE: "Some talent • Compete and improve",
-  CONTENDER: "Strong roster • Win now",
+type TeamInviteMetrics = {
+  overall: number;
+  capSpace: number | null;
 };
 
-function deriveOfferTerms(tier: InterviewInviteTier, ownerProfile: OwnerProfile): OfferTerms {
-  const terms: OfferTerms =
-    tier === "REBUILD"
-      ? { years: 4, pressure: "LOW", mandate: "Stabilize and build" }
-      : tier === "FRINGE"
-        ? { years: 3, pressure: "MODERATE", mandate: "Compete and improve" }
-        : { years: 2, pressure: "HIGH", mandate: "Win now" };
+const INTERVIEW_SUMMARY_BY_TIER: Record<InterviewInviteTier, InterviewTierMetadata> = {
+  REBUILD: { descriptor: "Weak roster", pressureDescriptor: "Short patience risk" },
+  FRINGE: { descriptor: "Some talent", pressureDescriptor: "Clear gaps" },
+  CONTENDER: { descriptor: "Strong roster", pressureDescriptor: "Win-now pressure" },
+};
 
-  if (ownerProfile.patience === "LOW") {
-    terms.years = Math.max(2, terms.years - 1);
-    terms.pressure = shiftPressureUp(terms.pressure);
-  } else if (ownerProfile.patience === "HIGH") {
-    terms.years = Math.min(4, terms.years + 1);
-    terms.pressure = shiftPressureDown(terms.pressure);
-  }
-
-  if (ownerProfile.mediaSensitivity === "HIGH") {
-    terms.pressure = shiftPressureUp(terms.pressure);
-    terms.mandate = `${terms.mandate} • Public scrutiny`;
-  }
-
-  if (ownerProfile.budgetPosture === "CHEAP") {
-    terms.mandate = `${terms.mandate} • Value discipline`;
-  } else if (ownerProfile.budgetPosture === "PREMIUM") {
-    terms.mandate = `${terms.mandate} • Aggressive spending allowed`;
-  }
-
-  return terms;
+function parseCapSpaceValue(row: Record<string, unknown>): number | null {
+  const raw = row.capSpace ?? row.cap_room ?? row.capRoom ?? row["Cap Space"];
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
-function rankTeamsByOverall(): Array<{ franchiseId: string; overall: number; rank: number; tier: InterviewInviteTier }> {
-  const overallByTeam = new Map(
-    getTeamSummaryRows().map((row) => [row.Team, Number((row as { OVERALL?: number }).OVERALL ?? row.AvgRating ?? 0)]),
-  );
+function formatCapSpace(value: number | null): string {
+  if (value === null) return "N/A";
 
+  const abs = Math.abs(value);
+  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
+
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(0)}K`;
+  return `${sign}$${abs.toFixed(0)}`;
+}
+
+function buildSummaryLine(tier: InterviewInviteTier, capSpace: number | null): string {
+  const meta = INTERVIEW_SUMMARY_BY_TIER[tier];
+  return `${meta.descriptor} • Cap Space: ${formatCapSpace(capSpace)} • ${meta.pressureDescriptor}`;
+}
+
+function getOverallValue(row: Record<string, unknown>): number {
+  const overall = Number(row.OVERALL ?? row.AvgRating ?? row["Avg Rating"] ?? 0);
+  return Number.isFinite(overall) ? overall : 0;
+}
+
+function buildTeamInviteMetricsByFranchiseId(): Map<string, TeamInviteMetrics> {
+  const metricsByFranchiseId = new Map<string, TeamInviteMetrics>();
+
+  for (const row of getTeamSummaryRows() as unknown as Array<Record<string, unknown>>) {
+    const teamName = String(row.Team ?? "").trim();
+    if (!teamName) continue;
+    const franchiseId = getTeamIdByName(teamName);
+    if (!franchiseId) {
+      console.error("Unknown team name in teamSummary:", teamName);
+      continue;
+    }
+    if (metricsByFranchiseId.has(franchiseId)) {
+      console.warn("Duplicate teamSummary row for:", franchiseId, teamName);
+    }
+    metricsByFranchiseId.set(franchiseId, {
+      overall: getOverallValue(row),
+      capSpace: parseCapSpaceValue(row),
+    });
+  }
+
+  return metricsByFranchiseId;
+}
+
+function rankTeamsByOverall(
+  metricsByFranchiseId: Map<string, TeamInviteMetrics>,
+): Array<{ franchiseId: string; overall: number; rank: number; tier: InterviewInviteTier }> {
   const ranked = sortedFranchises()
     .map((franchise) => ({
       franchiseId: franchise.id,
-      overall: overallByTeam.get(franchise.fullName) ?? 0,
+      overall: metricsByFranchiseId.get(franchise.id)?.overall ?? 0,
     }))
     .sort((a, b) => a.overall - b.overall || a.franchiseId.localeCompare(b.franchiseId));
 
@@ -132,27 +150,32 @@ function pickFirstAvailable(
   return null;
 }
 
-function buildInvite(team: { franchiseId: string; overall: number; tier: InterviewInviteTier }): InterviewInvite {
-  const ownerProfile = getOwnerProfile(normalizeExcelTeamKey(team.franchiseId));
-  const terms = deriveOfferTerms(team.tier, ownerProfile);
+function buildInvite(
+  team: { franchiseId: string; overall: number; tier: InterviewInviteTier },
+  metricsByFranchiseId: Map<string, TeamInviteMetrics>,
+): InterviewInvite {
+  const capSpace = metricsByFranchiseId.get(team.franchiseId)?.capSpace ?? null;
 
   return {
     franchiseId: team.franchiseId,
     tier: team.tier,
     overall: team.overall,
-    summaryLine: `${INTERVIEW_SUMMARY_BY_TIER[team.tier]} • ${terms.years}y • ${terms.pressure} pressure • ${terms.mandate}`,
+    summaryLine: buildSummaryLine(team.tier, capSpace),
   };
 }
 
 function generateInterviewInvites(hometownTeamKey: string): InterviewInvite[] {
-  const ranked = rankTeamsByOverall();
+  const metricsByFranchiseId = buildTeamInviteMetricsByFranchiseId();
+  const ranked = rankTeamsByOverall(metricsByFranchiseId);
   if (!hometownTeamKey) {
     console.error("Missing hometownTeamKey for interview invites.");
   }
 
-  const rebuildTeams = ranked.filter((team) => team.tier === "REBUILD");
-  const fringeTeams = ranked.filter((team) => team.tier === "FRINGE");
-  const contenderTeams = ranked.filter((team) => team.tier === "CONTENDER");
+  const teamsByTier = {
+    REBUILD: ranked.filter((team) => team.tier === "REBUILD"),
+    FRINGE: ranked.filter((team) => team.tier === "FRINGE"),
+    CONTENDER: ranked.filter((team) => team.tier === "CONTENDER"),
+  } satisfies Record<InterviewInviteTier, Array<{ franchiseId: string; overall: number; rank: number; tier: InterviewInviteTier }>>;
 
   const selected = new Set<string>();
   const hometown = hometownTeamKey || "UNKNOWN_TEAM";
@@ -160,25 +183,25 @@ function generateInterviewInvites(hometownTeamKey: string): InterviewInvite[] {
 
   const hometownTeam = ranked.find((team) => team.franchiseId === hometown);
   const invites: InterviewInvite[] = hometownTeam
-    ? [buildInvite(hometownTeam)]
-    : [{ franchiseId: hometown, tier: "FRINGE", overall: 0, summaryLine: INTERVIEW_SUMMARY_BY_TIER.FRINGE }];
+    ? [buildInvite(hometownTeam, metricsByFranchiseId)]
+    : [{ franchiseId: hometown, tier: "FRINGE", overall: 0, summaryLine: buildSummaryLine("FRINGE", null) }];
 
-  const tierSlots = [rebuildTeams, fringeTeams, contenderTeams];
-  for (const tier of tierSlots) {
+  const representedTiers = new Set<InterviewInviteTier>(invites.map((invite) => invite.tier));
+  for (const tier of ["REBUILD", "FRINGE", "CONTENDER"] as const) {
     if (invites.length >= 3) break;
-    if (tier.some((team) => team.franchiseId === hometown)) continue;
-    const picked = pickFirstAvailable(tier, selected);
-    if (picked) {
-      selected.add(picked.franchiseId);
-      invites.push(buildInvite(picked));
-    }
+    if (representedTiers.has(tier)) continue;
+    const picked = pickFirstAvailable(teamsByTier[tier], selected);
+    if (!picked) continue;
+    selected.add(picked.franchiseId);
+    invites.push(buildInvite(picked, metricsByFranchiseId));
+    representedTiers.add(picked.tier);
   }
 
   while (invites.length < 3) {
     const fallback = pickFirstAvailable(ranked, selected);
     if (!fallback) break;
     selected.add(fallback.franchiseId);
-    invites.push(buildInvite(fallback));
+    invites.push(buildInvite(fallback, metricsByFranchiseId));
   }
 
   return invites.slice(0, 3);
