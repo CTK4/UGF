@@ -5,7 +5,7 @@ import type { ScreenProps } from "@/ui/types";
 import { HOMETOWNS } from "@/data/hometowns";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
-import { TeamIcon } from "@/ui/components/TeamIcon";
+import { TeamLogo } from "@/ui/components/TeamLogo";
 
 type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string };
 const personnel = personnelData as PersonnelRow[];
@@ -60,6 +60,7 @@ export function StartScreen({ ui }: ScreenProps) {
 
 export function ChooseFranchiseScreen({ ui }: ScreenProps) {
   const state = ui.getState();
+  const listLogoSize = 52;
   return (
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Choose Franchise</h2></div>
@@ -70,10 +71,10 @@ export function ChooseFranchiseScreen({ ui }: ScreenProps) {
             <button
               key={f.id}
               onClick={() => ui.dispatch({ type: "SET_DRAFT_FRANCHISE", franchiseId: f.id })}
-              style={{ display: "flex", alignItems: "center", gap: 10 }}
+              style={{ display: "flex", alignItems: "center", gap: 12 }}
             >
-              <span style={{ display: "inline-flex", width: 64, minWidth: 64, justifyContent: "center", alignItems: "center" }}>
-                <TeamIcon teamKey={teamKey} size={48} />
+              <span style={{ display: "inline-flex", width: listLogoSize + 12, minWidth: listLogoSize + 12, justifyContent: "center", alignItems: "center", flex: `0 0 ${listLogoSize + 12}px` }}>
+                <TeamLogo teamKey={teamKey} variant="list" size={listLogoSize} />
               </span>
               <span>{f.fullName}</span>
             </button>
