@@ -250,6 +250,65 @@ function generateInterviewInvites(hometownTeamKey: string): InterviewInvite[] {
   return invites.slice(0, 3);
 }
 
+function createInitialInterviewResult(franchiseId: string): InterviewResult {
+  return {
+    franchiseId,
+    answers: [],
+    ownerOpinion: 0,
+    gmOpinion: 0,
+    pressureHandling: 0,
+    toneFeedback: [],
+    complete: false,
+  };
+}
+
+function applyInterviewAnswer(result: InterviewResult, questionIndex: number, choice: InterviewAnswerChoice): InterviewResult {
+  const byQuestion = [
+    {
+      A: { owner: 2, gm: 1, pressure: 1, tone: "Owner appreciated your long-term vision." },
+      B: { owner: -1, gm: 0, pressure: 1, tone: "Owner heard confidence but questioned realism." },
+      C: { owner: 1, gm: 1, pressure: 0, tone: "Owner liked your collaborative tone." },
+    },
+    {
+      A: { owner: 0, gm: 2, pressure: 0, tone: "GM responded well to your process-oriented plan." },
+      B: { owner: 0, gm: -1, pressure: 1, tone: "GM bristled at the demand for full control." },
+      C: { owner: 1, gm: 1, pressure: 0, tone: "GM liked the balanced partnership message." },
+    },
+    {
+      A: { owner: 1, gm: 1, pressure: 2, tone: "Both owner and GM saw calm leadership under pressure." },
+      B: { owner: 0, gm: 0, pressure: 1, tone: "They noted urgency, but worried about volatility." },
+      C: { owner: 1, gm: 1, pressure: 1, tone: "They saw adaptable leadership and steady judgment." },
+    },
+  ] as const;
+
+  const deltas = byQuestion[questionIndex][choice];
+  const answers = [...result.answers, choice];
+  const toneFeedback = [...result.toneFeedback, deltas.tone];
+
+  return {
+    ...result,
+    answers,
+    ownerOpinion: result.ownerOpinion + deltas.owner,
+    gmOpinion: result.gmOpinion + deltas.gm,
+    pressureHandling: result.pressureHandling + deltas.pressure,
+    toneFeedback,
+    complete: answers.length >= 3,
+  };
+}
+
+function generateOffersFromInterviews(invites: InterviewInvite[], results: Record<string, InterviewResult>): InterviewInvite[] {
+  const scored = invites
+    .map((invite) => {
+      const result = results[invite.franchiseId];
+      const score = (result?.ownerOpinion ?? 0) + (result?.gmOpinion ?? 0) + (result?.pressureHandling ?? 0);
+      return { invite, score };
+    })
+    .sort((a, b) => b.score - a.score || a.invite.franchiseId.localeCompare(b.invite.franchiseId));
+
+  const count = Math.max(1, Math.min(3, scored.filter((row) => row.score >= 1).length || 1));
+  return scored.slice(0, count).map((row) => row.invite);
+}
+
 
 type CandidateRequirement = {
   minScheme?: number;
