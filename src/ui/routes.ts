@@ -5,7 +5,7 @@ import {
   StartScreen,
   CreateCoachScreen,
   CoachBackgroundScreen,
-  InterviewInvitationsScreen,
+  InterviewsScreen,
   OpeningInterviewScreen,
   OffersScreen,
   HireCoordinatorsScreen,
@@ -21,7 +21,7 @@ export type RouteKey =
   | "Start"
   | "CreateCoach"
   | "CoachBackground"
-  | "InterviewInvitations"
+  | "Interviews"
   | "OpeningInterview"
   | "Offers"
   | "HireCoordinators"
@@ -37,8 +37,8 @@ export type Route =
   | { key: "Start" }
   | { key: "CreateCoach" }
   | { key: "CoachBackground" }
-  | { key: "InterviewInvitations" }
-  | { key: "OpeningInterview" }
+  | { key: "Interviews" }
+  | { key: "OpeningInterview"; franchiseId: string }
   | { key: "Offers" }
   | { key: "HireCoordinators" }
   | { key: "StaffMeeting" }
@@ -53,7 +53,7 @@ export const RouteMap: Record<RouteKey, ComponentType<ScreenProps>> = {
   Start: StartScreen,
   CreateCoach: CreateCoachScreen,
   CoachBackground: CoachBackgroundScreen,
-  InterviewInvitations: InterviewInvitationsScreen,
+  Interviews: InterviewsScreen,
   OpeningInterview: OpeningInterviewScreen,
   Offers: OffersScreen,
   HireCoordinators: HireCoordinatorsScreen,

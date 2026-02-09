@@ -16,16 +16,14 @@ export type InterviewInvite = {
   summaryLine: string;
 };
 
-export type InterviewAnswerChoice = "A" | "B" | "C";
-
-export type InterviewResult = {
+export type OpeningInterviewResult = {
   franchiseId: string;
-  answers: InterviewAnswerChoice[];
+  answers: number[];
   ownerOpinion: number;
   gmOpinion: number;
-  pressureHandling: number;
-  toneFeedback: string[];
-  complete: boolean;
+  pressureTone: number;
+  completed: boolean;
+  lastToneFeedback: string;
 };
 
 export type ModalState = {
@@ -50,8 +48,7 @@ export type UIState = {
       hometownLabel: string;
       hometownTeamKey: string;
       interviewInvites: InterviewInvite[];
-      interviewResults: Record<string, InterviewResult>;
-      activeInterviewFranchiseId: string | null;
+      interviewResults: Record<string, OpeningInterviewResult>;
       offers: InterviewInvite[];
       coordinatorChoices: Partial<Record<"OC" | "DC" | "STC", string>>;
     };

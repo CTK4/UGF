@@ -9,8 +9,7 @@ import { HOMETOWN_CLOSEST_TEAM } from "@/data/hometownToTeam";
 import { HOMETOWNS } from "@/data/hometowns";
 import { getTeamIdByName, getTeamSummaryRows } from "@/data/generatedData";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
-import { normalizeExcelTeamKey } from "@/data/teamMap";
-import type { InterviewAnswerChoice, InterviewInvite, InterviewInviteTier, InterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
+import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
 
 const SAVE_KEY = "ugf.save.v1";
 
@@ -35,7 +34,6 @@ function openingState(): UIState["ui"]["opening"] {
     hometownTeamKey: "",
     interviewInvites: [],
     interviewResults: {},
-    activeInterviewFranchiseId: null,
     offers: [],
     coordinatorChoices: {},
   };
@@ -75,6 +73,54 @@ const INTERVIEW_SUMMARY_BY_TIER: Record<InterviewInviteTier, InterviewTierMetada
   FRINGE: { descriptor: "Some talent", pressureDescriptor: "Clear gaps" },
   CONTENDER: { descriptor: "Strong roster", pressureDescriptor: "Win-now pressure" },
 };
+
+type OpeningInterviewChoice = {
+  owner: number;
+  gm: number;
+  pressure: number;
+  tone: string;
+};
+
+const OPENING_INTERVIEW_QUESTIONS: Array<{ choices: OpeningInterviewChoice[] }> = [
+  {
+    choices: [
+      { owner: 6, gm: 2, pressure: 1, tone: "Confident and structured." },
+      { owner: 3, gm: 4, pressure: 0, tone: "Collaborative and steady." },
+      { owner: -2, gm: -1, pressure: -2, tone: "Too passive for ownership." },
+    ],
+  },
+  {
+    choices: [
+      { owner: 2, gm: 6, pressure: 1, tone: "Process-oriented and aligned." },
+      { owner: 1, gm: 3, pressure: 0, tone: "Reasonable but less collaborative." },
+      { owner: -2, gm: -4, pressure: -1, tone: "Power struggle concern." },
+    ],
+  },
+  {
+    choices: [
+      { owner: 3, gm: 2, pressure: 5, tone: "Strong leadership under pressure." },
+      { owner: 1, gm: 1, pressure: 2, tone: "Stable, if somewhat reserved." },
+      { owner: -2, gm: -1, pressure: -4, tone: "Risky tone for a volatile market." },
+    ],
+  },
+];
+
+function clampRating(value: number): number {
+  return Math.max(0, Math.min(100, value));
+}
+
+function generateOffersFromInterviewResults(interviewInvites: InterviewInvite[], interviewResults: Record<string, OpeningInterviewResult>): InterviewInvite[] {
+  const scored = interviewInvites
+    .map((invite) => {
+      const result = interviewResults[invite.franchiseId];
+      const score = (result?.ownerOpinion ?? 50) + (result?.gmOpinion ?? 50) + (result?.pressureTone ?? 50);
+      return { invite, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const offerCount = Math.max(1, Math.min(3, scored.filter((entry) => entry.score >= 150).length || 1));
+  return scored.slice(0, offerCount).map((entry) => entry.invite);
+}
 
 function parseCapSpaceValue(row: Record<string, unknown>): number | null {
   const raw = row.capSpace ?? row.cap_room ?? row.capRoom ?? row["Cap Space"];
@@ -401,10 +447,21 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           });
           return;
         }
-        case "OPENING_GENERATE_INVITES": {
+        case "RUN_INTERVIEWS": {
           const interviewInvites = generateInterviewInvites(state.ui.opening.hometownTeamKey);
           const interviewResults = Object.fromEntries(
-            interviewInvites.map((invite) => [invite.franchiseId, createInitialInterviewResult(invite.franchiseId)]),
+            interviewInvites.map((invite) => [
+              invite.franchiseId,
+              {
+                franchiseId: invite.franchiseId,
+                answers: [],
+                ownerOpinion: 50,
+                gmOpinion: 50,
+                pressureTone: 50,
+                completed: false,
+                lastToneFeedback: "",
+              } satisfies OpeningInterviewResult,
+            ]),
           );
           setState({
             ...state,
@@ -414,66 +471,91 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
                 ...state.ui.opening,
                 interviewInvites,
                 interviewResults,
-                activeInterviewFranchiseId: null,
                 offers: [],
               },
             },
-            route: { key: "InterviewInvitations" },
+            route: { key: "Interviews" },
           });
           return;
         }
         case "OPENING_START_INTERVIEW": {
           const franchiseId = String(action.franchiseId ?? "");
-          if (!state.ui.opening.interviewInvites.some((invite) => invite.franchiseId === franchiseId)) return;
-          const interviewResults = {
-            ...state.ui.opening.interviewResults,
-            [franchiseId]: state.ui.opening.interviewResults[franchiseId] ?? createInitialInterviewResult(franchiseId),
+          const invite = state.ui.opening.interviewInvites.find((item) => item.franchiseId === franchiseId);
+          if (!invite) return;
+          const existing = state.ui.opening.interviewResults[franchiseId] ?? {
+            franchiseId,
+            answers: [],
+            ownerOpinion: 50,
+            gmOpinion: 50,
+            pressureTone: 50,
+            completed: false,
+            lastToneFeedback: "",
           };
           setState({
             ...state,
             ui: {
               ...state.ui,
-              opening: { ...state.ui.opening, interviewResults, activeInterviewFranchiseId: franchiseId },
+              opening: {
+                ...state.ui.opening,
+                interviewResults: { ...state.ui.opening.interviewResults, [franchiseId]: existing },
+              },
             },
-            route: { key: "OpeningInterview" },
+            route: { key: "OpeningInterview", franchiseId },
           });
           return;
         }
-        case "OPENING_SUBMIT_INTERVIEW_ANSWER": {
+        case "OPENING_ANSWER_INTERVIEW": {
           const franchiseId = String(action.franchiseId ?? "");
-          const choice = String(action.choice ?? "") as InterviewAnswerChoice;
-          if (!["A", "B", "C"].includes(choice)) return;
-          const current = state.ui.opening.interviewResults[franchiseId] ?? createInitialInterviewResult(franchiseId);
-          if (current.complete) return;
-          const nextResult = applyInterviewAnswer(current, current.answers.length, choice);
+          const answerIndex = Number(action.answerIndex ?? -1);
+          const current = state.ui.opening.interviewResults[franchiseId];
+          if (!current || current.completed) return;
+          const question = OPENING_INTERVIEW_QUESTIONS[current.answers.length];
+          const choice = question?.choices[answerIndex];
+          if (!choice) return;
+
+          const nextResult: OpeningInterviewResult = {
+            ...current,
+            answers: [...current.answers, answerIndex],
+            ownerOpinion: clampRating(current.ownerOpinion + choice.owner),
+            gmOpinion: clampRating(current.gmOpinion + choice.gm),
+            pressureTone: clampRating(current.pressureTone + choice.pressure),
+            completed: current.answers.length + 1 >= 3,
+            lastToneFeedback: choice.tone,
+          };
+
           const interviewResults = { ...state.ui.opening.interviewResults, [franchiseId]: nextResult };
-          const allComplete = state.ui.opening.interviewInvites.every((invite) => interviewResults[invite.franchiseId]?.complete);
-          if (allComplete) {
-            const offers = generateOffersFromInterviews(state.ui.opening.interviewInvites, interviewResults);
+          const allDone = state.ui.opening.interviewInvites.every((invite) => interviewResults[invite.franchiseId]?.completed);
+          if (allDone) {
+            const offers = generateOffersFromInterviewResults(state.ui.opening.interviewInvites, interviewResults);
             setState({
               ...state,
-              ui: {
-                ...state.ui,
-                opening: { ...state.ui.opening, interviewResults, activeInterviewFranchiseId: null, offers },
-              },
+              ui: { ...state.ui, opening: { ...state.ui.opening, interviewResults, offers } },
               route: { key: "Offers" },
             });
             return;
           }
+
+          if (nextResult.completed) {
+            setState({
+              ...state,
+              ui: { ...state.ui, opening: { ...state.ui.opening, interviewResults } },
+              route: { key: "Interviews" },
+            });
+            return;
+          }
+
           setState({
             ...state,
-            ui: {
-              ...state.ui,
-              opening: { ...state.ui.opening, interviewResults, activeInterviewFranchiseId: null },
-            },
-            route: { key: "InterviewInvitations" },
+            ui: { ...state.ui, opening: { ...state.ui.opening, interviewResults } },
+            route: { key: "OpeningInterview", franchiseId },
           });
           return;
         }
         case "ACCEPT_OFFER": {
           const franchiseId = String(action.franchiseId);
           const f = getFranchise(franchiseId);
-          if (!f) return;
+          const isOffered = state.ui.opening.offers.some((offer) => offer.franchiseId === franchiseId);
+          if (!f || !isOffered) return;
           let gameState = reduceGameState(createNewGameState(1), gameActions.startNew(1));
           gameState = reduceGameState(
             gameState,
@@ -497,9 +579,8 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             tasks: [{ id: "task-1", type: "STAFF_MEETING", title: "Hire coordinators", description: "Fill OC/DC/STC positions.", status: "OPEN" }],
             draft: gameState.draft ?? { discovered: {}, watchlist: [] },
           };
-          const nextState = { ...state, save: { version: 1, gameState }, route: { key: "HireCoordinators" as const } };
-          setState(nextState);
-          localStorage.setItem(SAVE_KEY, JSON.stringify(nextState.save));
+          localStorage.setItem(SAVE_KEY, JSON.stringify({ version: 1, gameState }));
+          setState({ ...state, save: { version: 1, gameState }, route: { key: "HireCoordinators" } });
           return;
         }
         case "SET_COORDINATOR_CHOICE":

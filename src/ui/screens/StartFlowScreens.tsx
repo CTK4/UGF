@@ -4,6 +4,8 @@ import rosterData from "@/data/generated/rosters.json";
 import type { ScreenProps } from "@/ui/types";
 import { HOMETOWNS } from "@/data/hometowns";
 import { getFranchise } from "@/ui/data/franchises";
+import { normalizeExcelTeamKey } from "@/data/teamMap";
+import { TeamIcon } from "@/ui/components/TeamIcon";
 
 type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string };
 const personnel = personnelData as PersonnelRow[];
@@ -29,6 +31,42 @@ const offseasonPriorities = [
   "Get younger at key spots",
 ];
 
+const interviewQuestions = [
+  {
+    label: "Owner",
+    prompt: "How would you establish accountability in year one?",
+    choices: [
+      { label: "A", text: "Set measurable standards and review them every week.", owner: 6, gm: 2, pressure: 1, tone: "Confident and structured." },
+      { label: "B", text: "Empower leaders in the locker room first, then set standards.", owner: 3, gm: 4, pressure: 0, tone: "Collaborative and steady." },
+      { label: "C", text: "Keep things loose early and adjust once we see results.", owner: -2, gm: -1, pressure: -2, tone: "Too passive for ownership." },
+    ],
+  },
+  {
+    label: "GM",
+    prompt: "How do you partner with the front office on roster decisions?",
+    choices: [
+      { label: "A", text: "Align on a profile and let data drive final tie-breakers.", owner: 2, gm: 6, pressure: 1, tone: "Process-oriented and aligned." },
+      { label: "B", text: "I make scheme asks and trust scouting to execute.", owner: 1, gm: 3, pressure: 0, tone: "Reasonable but less collaborative." },
+      { label: "C", text: "I want final say on all roster moves.", owner: -2, gm: -4, pressure: -1, tone: "Power struggle concern." },
+    ],
+  },
+  {
+    label: "Pressure",
+    prompt: "How do you handle media pressure after a losing streak?",
+    choices: [
+      { label: "A", text: "Own the results publicly and protect the locker room.", owner: 3, gm: 2, pressure: 5, tone: "Strong leadership under pressure." },
+      { label: "B", text: "Stay even-keeled and focus only on internal messaging.", owner: 1, gm: 1, pressure: 2, tone: "Stable, if somewhat reserved." },
+      { label: "C", text: "Call out execution issues directly to force urgency.", owner: -2, gm: -1, pressure: -4, tone: "Risky tone for a volatile market." },
+    ],
+  },
+] as const;
+
+const tierLabelByCode = {
+  REBUILD: "Rebuild (Bottom-5)",
+  FRINGE: "Fringe (Middle)",
+  CONTENDER: "Contender (Top-10)",
+} as const;
+
 function toTeamKey(value: string) {
   return value.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 }
@@ -48,8 +86,8 @@ export function StartScreen({ ui }: ScreenProps) {
         {hasSave ? <div className="ugf-pill">Resume available: Week {state.save.gameState.time.beatIndex} • {state.save.gameState.phase}</div> : null}
         <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
           {hasSave ? <button onClick={() => ui.dispatch({ type: "LOAD_GAME" })}>Resume Career</button> : null}
-          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CreateCoach" } })}>Start New Career</button>
-          <button className="danger" onClick={() => ui.dispatch({ type: "RESET_SAVE" })}>Reset</button>
+          <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CreateCoach" } })}>Start New Career</button>
+          <button className="danger" type="button" onClick={() => ui.dispatch({ type: "RESET_SAVE" })}>Reset</button>
         </div>
       </div>
     </div>
@@ -79,6 +117,7 @@ export function CreateCoachScreen({ ui }: ScreenProps) {
           ))}
         </select>
         <button
+          type="button"
           onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CoachBackground" } })}
           disabled={!opening.coachName.trim() || !opening.hometownId}
         >
@@ -91,43 +130,33 @@ export function CreateCoachScreen({ ui }: ScreenProps) {
 
 export function CoachBackgroundScreen({ ui }: ScreenProps) {
   const selected = ui.getState().ui.opening.background;
-  return (
-    <div className="ugf-card">
-      <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
-        {backgrounds.map((b) => (
-          <button key={b} onClick={() => ui.dispatch({ type: "SET_BACKGROUND", background: b })}>{selected === b ? "✓ " : ""}{b}</button>
-        ))}
-        <button onClick={() => ui.dispatch({ type: "OPENING_GENERATE_INVITES" })}>Next</button>
-      </div>
-    </div>
-  );
+  return <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>{backgrounds.map((b) => <button key={b} type="button" onClick={() => ui.dispatch({ type: "SET_BACKGROUND", background: b })}>{selected === b ? "✓ " : ""}{b}</button>)}<button type="button" onClick={() => ui.dispatch({ type: "RUN_INTERVIEWS" })}>Continue to Invitations</button></div></div>;
 }
 
-export function InterviewInvitationsScreen({ ui }: ScreenProps) {
-  const { interviewInvites, interviewResults } = ui.getState().ui.opening;
-  const tierLabelByCode = {
-    REBUILD: "Rebuild (Bottom-5)",
-    FRINGE: "Fringe (Middle)",
-    CONTENDER: "Contender (Top-10)",
-  } as const;
-
+export function InterviewsScreen({ ui }: ScreenProps) {
+  const opening = ui.getState().ui.opening;
   return (
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Interview Invitations</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
-        {interviewInvites.map((invite) => {
-          const result = interviewResults[invite.franchiseId];
-          const status = result?.complete ? "Completed" : "Pending";
+        {opening.interviewInvites.map((invite) => {
+          const franchise = getFranchise(invite.franchiseId);
+          const result = opening.interviewResults[invite.franchiseId];
           return (
             <button
               key={invite.franchiseId}
               type="button"
               onClick={() => ui.dispatch({ type: "OPENING_START_INTERVIEW", franchiseId: invite.franchiseId })}
-              style={{ display: "grid", gap: 4, textAlign: "left" }}
+              style={{ display: "grid", gridTemplateColumns: "64px 1fr", alignItems: "center", gap: 10, textAlign: "left" }}
             >
-              <div><b>{getFranchise(invite.franchiseId)?.fullName ?? invite.franchiseId}</b> • {status}</div>
-              <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[invite.tier]}</div>
-              <div style={{ fontSize: 12, opacity: 0.9 }}>{invite.summaryLine}</div>
+              <span style={{ display: "inline-flex", width: 64, minWidth: 64, justifyContent: "center", alignItems: "center" }}>
+                <TeamIcon teamKey={invite.franchiseId} size={44} />
+              </span>
+              <span>
+                <div><b>{franchise?.fullName ?? invite.franchiseId}</b>{result?.completed ? " • Completed" : ""}</div>
+                <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[invite.tier]}</div>
+                <div style={{ fontSize: 12, opacity: 0.9 }}>{invite.summaryLine}</div>
+              </span>
             </button>
           );
         })}
@@ -137,62 +166,30 @@ export function InterviewInvitationsScreen({ ui }: ScreenProps) {
 }
 
 export function OpeningInterviewScreen({ ui }: ScreenProps) {
-  const opening = ui.getState().ui.opening;
-  const franchiseId = opening.activeInterviewFranchiseId;
-  if (!franchiseId) return null;
-
-  const invite = opening.interviewInvites.find((item) => item.franchiseId === franchiseId);
-  const result = opening.interviewResults[franchiseId];
+  const state = ui.getState();
+  if (state.route.key !== "OpeningInterview") return null;
+  const franchiseId = state.route.franchiseId;
+  const invite = state.ui.opening.interviewInvites.find((item) => item.franchiseId === franchiseId);
+  const result = state.ui.opening.interviewResults[franchiseId];
+  const franchise = getFranchise(franchiseId);
   if (!invite || !result) return null;
-
-  const questions = [
-    {
-      prompt: "Owner: Why should I trust you with this rebuild?",
-      choices: [
-        { key: "A", text: "I build a clear long-term identity and culture.", tone: "Measured confidence." },
-        { key: "B", text: "I can maximize this roster immediately.", tone: "Aggressive promise." },
-        { key: "C", text: "I will align with your expectations and timeline.", tone: "Collaborative approach." },
-      ],
-    },
-    {
-      prompt: "GM: How will you partner with personnel decisions?",
-      choices: [
-        { key: "A", text: "Data-first process with shared checkpoints.", tone: "Structured and analytic." },
-        { key: "B", text: "I need final say over football priorities.", tone: "Forceful and direct." },
-        { key: "C", text: "Let's build consensus around role fits.", tone: "Flexible and diplomatic." },
-      ],
-    },
-    {
-      prompt: "Pressure: What happens if year one starts 2-6?",
-      choices: [
-        { key: "A", text: "Stick to the plan and communicate progress.", tone: "Calm under pressure." },
-        { key: "B", text: "I'll make bold moves to flip momentum.", tone: "High urgency response." },
-        { key: "C", text: "Adapt weekly while protecting core standards.", tone: "Balanced response." },
-      ],
-    },
-  ] as const;
-
   const questionIndex = result.answers.length;
-  const question = questions[questionIndex];
+  const current = interviewQuestions[questionIndex] ?? interviewQuestions[interviewQuestions.length - 1];
 
   return (
     <div className="ugf-card">
-      <div className="ugf-card__header"><h2 className="ugf-card__title">{getFranchise(franchiseId)?.fullName ?? franchiseId}</h2></div>
+      <div className="ugf-card__header"><h2 className="ugf-card__title">Interview: {franchise?.fullName ?? franchiseId}</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
-        <div style={{ fontSize: 12, opacity: 0.9 }}>{invite.tier} • {invite.summaryLine}</div>
-        {question ? (
-          <>
-            <div><b>Question {questionIndex + 1} / 3:</b> {question.prompt}</div>
-            {question.choices.map((choice) => (
-              <button key={choice.key} type="button" onClick={() => ui.dispatch({ type: "OPENING_SUBMIT_INTERVIEW_ANSWER", franchiseId, choice: choice.key })}>
-                {choice.key}. {choice.text}
-              </button>
-            ))}
-          </>
-        ) : (
-          <div>Interview completed.</div>
-        )}
-        {result.toneFeedback.length ? <div className="ugf-pill">{result.toneFeedback[result.toneFeedback.length - 1]}</div> : null}
+        <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[invite.tier]} • {invite.summaryLine}</div>
+        <div><b>{current.label} Q{Math.min(questionIndex + 1, 3)}.</b> {current.prompt}</div>
+        <div style={{ display: "grid", gap: 8 }}>
+          {current.choices.map((choice, choiceIndex) => (
+            <button key={`${current.label}-${choice.label}`} type="button" onClick={() => ui.dispatch({ type: "OPENING_ANSWER_INTERVIEW", franchiseId, answerIndex: choiceIndex })}>
+              {choice.label}) {choice.text}
+            </button>
+          ))}
+        </div>
+        {result.lastToneFeedback ? <div className="ugf-pill">Tone: {result.lastToneFeedback}</div> : null}
       </div>
     </div>
   );
@@ -200,17 +197,12 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
 
 export function OffersScreen({ ui }: ScreenProps) {
   const offers = ui.getState().ui.opening.offers;
-  const tierLabelByCode = {
-    REBUILD: "Rebuild (Bottom-5)",
-    FRINGE: "Fringe (Middle)",
-    CONTENDER: "Contender (Top-10)",
-  } as const;
 
   return (
     <div className="ugf-card">
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
         {offers.map((offer) => (
-          <button key={offer.franchiseId} type="button" onClick={() => ui.dispatch({ type: "ACCEPT_OFFER", franchiseId: offer.franchiseId })}>
+          <button type="button" key={offer.franchiseId} onClick={() => ui.dispatch({ type: "ACCEPT_OFFER", franchiseId: offer.franchiseId })}>
             <div><b>{getFranchise(offer.franchiseId)?.fullName ?? offer.franchiseId}</b></div>
             <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[offer.tier]}</div>
             <div style={{ fontSize: 12, opacity: 0.9 }}>{offer.summaryLine}</div>
@@ -231,10 +223,10 @@ export function HireCoordinatorsScreen({ ui }: ScreenProps) {
         {roles.map(([role, pos]) => (
           <div key={role}>
             <b>{role}</b>
-            {rolePool(pos).map((c) => <button key={c.DisplayName} onClick={() => ui.dispatch({ type: "SET_COORDINATOR_CHOICE", role, candidateName: c.DisplayName })}>{picks[role] === c.DisplayName ? "✓ " : ""}{c.DisplayName}</button>)}
+            {rolePool(pos).map((c) => <button type="button" key={c.DisplayName} onClick={() => ui.dispatch({ type: "SET_COORDINATOR_CHOICE", role, candidateName: c.DisplayName })}>{picks[role] === c.DisplayName ? "✓ " : ""}{c.DisplayName}</button>)}
           </div>
         ))}
-        <button disabled={!picks.OC || !picks.DC || !picks.STC} onClick={() => ui.dispatch({ type: "FINALIZE_NEW_SAVE" })}>Finalize and Enter Hub</button>
+        <button type="button" disabled={!picks.OC || !picks.DC || !picks.STC} onClick={() => ui.dispatch({ type: "FINALIZE_NEW_SAVE" })}>Finalize and Enter Hub</button>
       </div>
     </div>
   );
