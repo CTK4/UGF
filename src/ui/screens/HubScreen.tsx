@@ -4,7 +4,7 @@ import { getProspectLabel } from "@/services/draftDiscovery";
 import { getSuggestedNeed } from "@/engine/scouting";
 import { FRANCHISES } from "@/ui/data/franchises";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
-import { TeamIcon } from "@/ui/components/TeamIcon";
+import { TeamLogo } from "@/ui/components/TeamLogo";
 
 export function HubScreen({ ui }: ScreenProps) {
   const save = ui.getState().save;
@@ -14,7 +14,8 @@ export function HubScreen({ ui }: ScreenProps) {
   const discoveredEntries = Object.entries(gs.draft.discovered).sort((a, b) => a[1].level - b[1].level || a[0].localeCompare(b[0]));
 
   const standingsRows = ui.selectors.table("Team Summary");
-  const standingsIconSize = typeof window !== "undefined" && window.matchMedia("(min-width: 900px)").matches ? 64 : 48;
+  const isMobile = typeof window !== "undefined" ? !window.matchMedia("(min-width: 900px)").matches : true;
+  const standingsIconSize = isMobile ? 44 : 56;
   const standingsSnapshot = FRANCHISES.map((franchise) => {
     const row = standingsRows.find((entry) => String(entry.Team ?? "").trim() === franchise.id) as Record<string, unknown> | undefined;
     const wins = Number(row?.Wins ?? row?.W ?? 0);
@@ -34,8 +35,8 @@ export function HubScreen({ ui }: ScreenProps) {
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Hub</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
-        <div className="ugf-pill">{gs.time.season} · {gs.time.label}</div>
-        <div className="ugf-pill">Week {gs.time.week} • Phase: {gs.phase}</div>
+        <div className="ugf-pill">{gs.time.season} · Week {gs.time.week}</div>
+        <div className="ugf-pill">Phase: {gs.phase} · {gs.time.label}</div>
         <div>Coach: <b>{gs.coach.name || "Unnamed"}</b></div>
         <div>Franchise: {gs.franchise.ugfTeamKey || "Not selected"}</div>
 
@@ -84,8 +85,8 @@ export function HubScreen({ ui }: ScreenProps) {
           <ul className="ugf-standings-list">
             {standingsSnapshot.map((team) => (
               <li key={team.id} className="ugf-standings-row">
-                <span className="ugf-standings-logoCol">
-                  <TeamIcon teamKey={team.teamKey} size={standingsIconSize} />
+                <span className="ugf-standings-logoCol" style={{ ["--logo-col-width" as string]: `${standingsIconSize + 12}px` }}>
+                  <TeamLogo teamKey={team.teamKey} variant="standings" size={standingsIconSize} />
                 </span>
                 <span><b>{team.name}</b> — {team.wins}-{team.losses}</span>
               </li>

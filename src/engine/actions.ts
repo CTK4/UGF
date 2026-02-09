@@ -26,8 +26,8 @@ export type GameAction =
   | { type: "SET_BACKGROUND"; payload: { backgroundKey: string } }
   | { type: "ACCEPT_OFFER"; payload: { ugfTeamKey: string; excelTeamKey: string } }
   | { type: "HIRE_COACH"; payload: { role: Role; assignment: StaffAssignment } }
-  | { type: "ENTER_JANUARY_OFFSEASON" }
   | { type: "SET_OFFSEASON_PLAN"; payload: OffseasonPlanPayload }
+  | { type: "ENTER_JANUARY_OFFSEASON" }
   | { type: "COMPLETE_TASK"; payload: { taskId: string; positions?: string[] } }
   | { type: "MARK_THREAD_READ"; payload: { threadId: string } }
   | { type: "ADVANCE_WEEK"; payload?: { label?: string } };
@@ -39,8 +39,8 @@ export const gameActions = {
   setBackground: (backgroundKey: string): GameAction => ({ type: "SET_BACKGROUND", payload: { backgroundKey } }),
   acceptOffer: (ugfTeamKey: string, excelTeamKey: string): GameAction => ({ type: "ACCEPT_OFFER", payload: { ugfTeamKey, excelTeamKey } }),
   hireCoach: (role: Role, assignment: StaffAssignment): GameAction => ({ type: "HIRE_COACH", payload: { role, assignment } }),
-  enterJanuaryOffseason: (): GameAction => ({ type: "ENTER_JANUARY_OFFSEASON" }),
   setOffseasonPlan: (payload: OffseasonPlanPayload): GameAction => ({ type: "SET_OFFSEASON_PLAN", payload }),
+  enterJanuaryOffseason: (): GameAction => ({ type: "ENTER_JANUARY_OFFSEASON" }),
   completeTask: (taskId: string, positions?: string[]): GameAction => ({ type: "COMPLETE_TASK", payload: { taskId, positions } }),
   markThreadRead: (threadId: string): GameAction => ({ type: "MARK_THREAD_READ", payload: { threadId } }),
   advanceWeek: (label?: string): GameAction => ({ type: "ADVANCE_WEEK", payload: { label } }),

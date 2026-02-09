@@ -2,8 +2,24 @@ import type { StaffRole } from "@/domain/staffRoles";
 
 export type GamePhase = "PRECAREER" | "INTERVIEWS" | "COORD_HIRING" | "JANUARY_OFFSEASON";
 export type Role = StaffRole;
+
+
 export type ControlAxis = "SCHEME" | "ASSISTANTS";
 export type ControlSide = "offense" | "defense" | "specialTeams";
+export type SideControl = {
+  schemeAuthority: number;
+  assistantsAuthority: number;
+  locked: boolean;
+  lockedBy?: {
+    role: "OC" | "DC" | "STC";
+    staffId: string;
+    staffName: string;
+    reason: string;
+    axes: ControlAxis[];
+  };
+};
+
+export type ProspectDiscovery = { level: 0 | 1 | 2 | 3; notes: string[] };
 
 export type StaffAssignment = {
   candidateId: string;
@@ -27,8 +43,6 @@ export type Task = {
   title: string;
   description: string;
   status: "OPEN" | "DONE";
-  gateId?: string;
-  routeHint?: string;
 };
 
 export type ThreadMessage = {
@@ -45,36 +59,10 @@ export type Thread = {
   messages: ThreadMessage[];
 };
 
-export type SideControl = {
-  schemeAuthority: number;
-  assistantsAuthority: number;
-  locked: boolean;
-  lockedBy?: {
-    role: "OC" | "DC" | "STC";
-    staffId: string;
-    staffName: string;
-    reason: string;
-    axes: ControlAxis[];
-  };
-};
-
-export type ProspectDiscovery = {
-  level: 0 | 1 | 2 | 3;
-  notes: string[];
-};
-
 export type GameState = {
   meta: { version: 1 };
   phase: GamePhase;
-  time: {
-    season: 2026;
-    week: number;
-    phaseVersion: number;
-    label: string;
-    // legacy compatibility
-    beatIndex?: number;
-    beatKey?: string;
-  };
+  time: { season: 2026; week: number; phaseVersion: number; label: string };
   coach: {
     name: string;
     age: number;
@@ -103,14 +91,9 @@ export type GameState = {
   } | null;
   tasks: Task[];
   inbox: Thread[];
-  checkpoints: { ts: number; label: string; week: number; phaseVersion: number; beatIndex?: number }[];
-
-  // legacy compatibility fields used by current UI
-  career?: { control: Record<ControlSide, SideControl> };
-  completedGates?: string[];
-  lastUiError?: string | null;
-  draft?: {
-    discovered: Record<string, ProspectDiscovery>;
-    watchlist: string[];
-  };
+  checkpoints: { ts: number; label: string; week: number; phaseVersion: number }[];
+  career: { control: Record<ControlSide, SideControl> };
+  draft: { discovered: Record<string, ProspectDiscovery>; watchlist: string[] };
+  completedGates: string[];
+  lastUiError: string | null;
 };

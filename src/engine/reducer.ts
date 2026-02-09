@@ -1,7 +1,7 @@
 import { STAFF_ROLES } from "@/domain/staffRoles";
 import type { GameAction } from "@/engine/actions";
-import { applyScoutingAction } from "@/engine/scouting";
 import type { GamePhase, GameState, Role } from "@/engine/gameState";
+import { applyScoutingAction } from "@/engine/scouting";
 
 function createDefaultSideControl() {
   return { schemeAuthority: 50, assistantsAuthority: 50, locked: false };
@@ -28,7 +28,12 @@ export function createNewGameState(): GameState {
   return {
     meta: { version: 1 },
     phase: "PRECAREER",
-    time: { season: 2026, week: 1, phaseVersion: 1, label: phaseLabel("PRECAREER"), beatIndex: 1 },
+    time: {
+      season: 2026,
+      week: 1,
+      phaseVersion: 1,
+      label: phaseLabel("PRECAREER"),
+    },
     coach: {
       name: "",
       age: 35,
@@ -54,34 +59,36 @@ export function createNewGameState(): GameState {
         specialTeams: createDefaultSideControl(),
       },
     },
+    draft: { discovered: {}, watchlist: [] },
     completedGates: [],
     lastUiError: null,
-    draft: { discovered: {}, watchlist: [] },
   };
 }
 
 export function reduceGameState(prev: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "LOAD_STATE": {
-      const loaded = action.payload.state as GameState;
-      const week = loaded.time?.week ?? loaded.time?.beatIndex ?? 1;
+      const loaded = action.payload.state as any;
       return {
         ...createNewGameState(),
         ...loaded,
+        meta: { version: 1 },
         time: {
           season: 2026,
-          week,
-          phaseVersion: loaded.time?.phaseVersion ?? 1,
-          label: loaded.time?.label ?? phaseLabel(loaded.phase ?? "PRECAREER"),
-          beatIndex: week,
-          beatKey: loaded.time?.beatKey,
+          week: Number(loaded?.time?.week ?? loaded?.time?.beatIndex ?? 1),
+          phaseVersion: Number(loaded?.time?.phaseVersion ?? 1),
+          label: String(loaded?.time?.label ?? phaseLabel((loaded?.phase as GamePhase) ?? "PRECAREER")),
         },
-        checkpoints: (loaded.checkpoints ?? []).map((cp) => ({
-          ts: cp.ts,
-          label: cp.label,
-          week: cp.week ?? cp.beatIndex ?? week,
-          beatIndex: cp.week ?? cp.beatIndex ?? week,
-          phaseVersion: cp.phaseVersion,
+        staff: { ...createNewGameState().staff, ...(loaded?.staff ?? {}) },
+        career: loaded?.career ?? createNewGameState().career,
+        draft: loaded?.draft ?? createNewGameState().draft,
+        completedGates: loaded?.completedGates ?? [],
+        lastUiError: loaded?.lastUiError ?? null,
+        checkpoints: (loaded?.checkpoints ?? []).map((cp: any) => ({
+          ts: Number(cp.ts ?? Date.now()),
+          label: String(cp.label ?? "Checkpoint"),
+          week: Number(cp.week ?? cp.beatIndex ?? loaded?.time?.week ?? 1),
+          phaseVersion: Number(cp.phaseVersion ?? 1),
         })),
       };
     }
@@ -95,7 +102,7 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
       return {
         ...prev,
         phase: "COORD_HIRING",
-        time: { ...prev.time, label: phaseLabel("COORD_HIRING") },
+        time: { ...prev.time, label: phaseLabel("COORD_HIRING"), phaseVersion: prev.time.phaseVersion + 1 },
         franchise: { ugfTeamKey: action.payload.ugfTeamKey, excelTeamKey: action.payload.excelTeamKey },
       };
     case "HIRE_COACH": {
@@ -117,21 +124,21 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
           blockedHireAttemptsRecent: 0,
           assignments: { ...prev.staff.assignments, [role]: assignment },
         },
-        lastUiError: null,
       };
     }
     case "ENTER_JANUARY_OFFSEASON":
       return {
         ...prev,
         phase: "JANUARY_OFFSEASON",
-        time: { ...prev.time, label: phaseLabel("JANUARY_OFFSEASON") },
+        time: { ...prev.time, label: phaseLabel("JANUARY_OFFSEASON"), phaseVersion: prev.time.phaseVersion + 1 },
       };
     case "SET_OFFSEASON_PLAN":
       return {
         ...prev,
         phase: "JANUARY_OFFSEASON",
-        time: { ...prev.time, label: phaseLabel("JANUARY_OFFSEASON") },
+        time: { ...prev.time, label: phaseLabel("JANUARY_OFFSEASON"), phaseVersion: prev.time.phaseVersion + 1 },
         offseasonPlan: action.payload,
+        lastUiError: null,
       };
     case "COMPLETE_TASK": {
       const completedTask = prev.tasks.find((task) => task.id === action.payload.taskId);
@@ -155,8 +162,8 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
       const label = action.payload?.label ?? `Week ${week}`;
       return {
         ...prev,
-        time: { ...prev.time, week, beatIndex: week, phaseVersion, label },
-        checkpoints: [...prev.checkpoints, { ts: Date.now(), label, week, beatIndex: week, phaseVersion }],
+        time: { ...prev.time, week, phaseVersion, label },
+        checkpoints: [...prev.checkpoints, { ts: Date.now(), label, week, phaseVersion }],
         lastUiError: null,
       };
     }

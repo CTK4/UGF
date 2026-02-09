@@ -4,11 +4,10 @@ type TaskTemplate = {
   type: TaskType;
   title: string;
   description: string;
-  gateId?: string;
 };
 
 const TASKS_BY_WEEK: Record<number, TaskTemplate[]> = {
-  1: [{ type: "STAFF_MEETING", title: "Staff Meeting", description: "Meet with your staff and lock offseason priorities.", gateId: "GATE.STAFF_MEETING_DONE" }],
+  1: [{ type: "STAFF_MEETING", title: "Staff Meeting", description: "Meet with your staff and lock offseason priorities." }],
   2: [{ type: "SCOUT_POSITION", title: "Scout Position Group", description: "Select one position and scout three prospects." }],
 };
 
@@ -20,6 +19,5 @@ export function generateBeatTasks(state: GameState): Task[] {
     title: template.title,
     description: template.description,
     status: "OPEN",
-    gateId: template.gateId,
   }));
 }
