@@ -7,8 +7,9 @@ import { getScoutablePositions } from "@/engine/scouting";
 import { HOMETOWN_CLOSEST_TEAM } from "@/data/hometownToTeam";
 import { HOMETOWNS } from "@/data/hometowns";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
+import { getTeamSummaryRows } from "@/data/generatedData";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
-import type { SaveData, UIAction, UIController, UIState } from "@/ui/types";
+import type { InterviewInvite, InterviewInviteTier, SaveData, UIAction, UIController, UIState } from "@/ui/types";
 
 const SAVE_KEY = "ugf.save.v1";
 
@@ -56,45 +57,89 @@ function sortedFranchises(): typeof FRANCHISES {
   return [...FRANCHISES].sort((a, b) => a.fullName.localeCompare(b.fullName));
 }
 
+const INTERVIEW_SUMMARY_BY_TIER: Record<InterviewInviteTier, string> = {
+  REBUILD: "Weak roster • Short patience risk",
+  FRINGE: "Some talent • Clear gaps",
+  CONTENDER: "Strong roster • Win-now pressure",
+};
+
+function rankTeamsByOverall(): Array<{ franchiseId: string; overall: number; rank: number; tier: InterviewInviteTier }> {
+  const overallByTeam = new Map(
+    getTeamSummaryRows().map((row) => [row.Team, Number((row as { OVERALL?: number }).OVERALL ?? row.AvgRating ?? 0)]),
+  );
+
+  const ranked = sortedFranchises()
+    .map((franchise) => ({
+      franchiseId: franchise.id,
+      overall: overallByTeam.get(franchise.fullName) ?? 0,
+    }))
+    .sort((a, b) => a.overall - b.overall || a.franchiseId.localeCompare(b.franchiseId));
+
+  return ranked.map((team, index) => {
+    const isBottomFive = index < 5;
+    const isTopTen = index >= ranked.length - 10;
+    const tier: InterviewInviteTier = isBottomFive ? "REBUILD" : isTopTen ? "CONTENDER" : "FRINGE";
+    return { ...team, rank: index + 1, tier };
+  });
+}
+
 function pickFirstAvailable(
-  candidates: string[],
+  candidates: Array<{ franchiseId: string; overall: number; rank: number; tier: InterviewInviteTier }>,
   selected: Set<string>,
-): string | null {
+): { franchiseId: string; overall: number; rank: number; tier: InterviewInviteTier } | null {
   for (const candidate of candidates) {
-    if (!selected.has(candidate)) return candidate;
+    if (!selected.has(candidate.franchiseId)) return candidate;
   }
   return null;
 }
 
-function generateInterviewInvites(hometownTeamKey: string): string[] {
-  const ranked = sortedFranchises().map((franchise) => franchise.id);
+function buildInvite(team: { franchiseId: string; overall: number; tier: InterviewInviteTier }): InterviewInvite {
+  return {
+    franchiseId: team.franchiseId,
+    tier: team.tier,
+    overall: team.overall,
+    summaryLine: INTERVIEW_SUMMARY_BY_TIER[team.tier],
+  };
+}
+
+function generateInterviewInvites(hometownTeamKey: string): InterviewInvite[] {
+  const ranked = rankTeamsByOverall();
   if (!hometownTeamKey) {
     console.error("Missing hometownTeamKey for interview invites.");
   }
 
-  const bottomFive = ranked.slice(-5);
-  const topTen = ranked.slice(0, 10);
-  const middleTier = ranked.filter((team) => !bottomFive.includes(team) && !topTen.includes(team));
+  const rebuildTeams = ranked.filter((team) => team.tier === "REBUILD");
+  const fringeTeams = ranked.filter((team) => team.tier === "FRINGE");
+  const contenderTeams = ranked.filter((team) => team.tier === "CONTENDER");
 
   const selected = new Set<string>();
   const hometown = hometownTeamKey || "UNKNOWN_TEAM";
   selected.add(hometown);
 
-  const tierSlots = [bottomFive, middleTier, topTen];
+  const hometownTeam = ranked.find((team) => team.franchiseId === hometown);
+  const invites: InterviewInvite[] = hometownTeam
+    ? [buildInvite(hometownTeam)]
+    : [{ franchiseId: hometown, tier: "FRINGE", overall: 0, summaryLine: INTERVIEW_SUMMARY_BY_TIER.FRINGE }];
+
+  const tierSlots = [rebuildTeams, fringeTeams, contenderTeams];
   for (const tier of tierSlots) {
-    if (selected.size >= 3) break;
-    if (tier.includes(hometown)) continue;
+    if (invites.length >= 3) break;
+    if (tier.some((team) => team.franchiseId === hometown)) continue;
     const picked = pickFirstAvailable(tier, selected);
-    if (picked) selected.add(picked);
+    if (picked) {
+      selected.add(picked.franchiseId);
+      invites.push(buildInvite(picked));
+    }
   }
 
-  while (selected.size < 3) {
+  while (invites.length < 3) {
     const fallback = pickFirstAvailable(ranked, selected);
     if (!fallback) break;
-    selected.add(fallback);
+    selected.add(fallback.franchiseId);
+    invites.push(buildInvite(fallback));
   }
 
-  return [...selected].slice(0, 3);
+  return invites.slice(0, 3);
 }
 
 function createCandidate(role: StaffRole, id: number) {

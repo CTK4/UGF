@@ -6,6 +6,15 @@ export type SaveData = {
   gameState: GameState;
 };
 
+export type InterviewInviteTier = "REBUILD" | "FRINGE" | "CONTENDER";
+
+export type InterviewInvite = {
+  franchiseId: string;
+  tier: InterviewInviteTier;
+  overall: number;
+  summaryLine: string;
+};
+
 export type ModalState = {
   title: string;
   message: string;
@@ -27,7 +36,7 @@ export type UIState = {
       hometownLabel: string;
       hometownTeamKey: string;
       interviewNotes: string[];
-      offers: string[];
+      offers: InterviewInvite[];
       coordinatorChoices: Partial<Record<"OC" | "DC" | "STC", string>>;
     };
   };
