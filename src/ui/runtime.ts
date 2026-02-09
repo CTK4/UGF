@@ -106,13 +106,6 @@ function buildTeamInviteMetricsByFranchiseId(): Map<string, TeamInviteMetrics> {
     const teamName = String(row.Team ?? "").trim();
     if (!teamName) continue;
     const franchiseId = getTeamIdByName(teamName);
-    if (!franchiseId) {
-      console.error("Unknown team name in teamSummary:", teamName);
-      continue;
-    }
-    if (metricsByFranchiseId.has(franchiseId)) {
-      console.warn("Duplicate teamSummary row for:", franchiseId, teamName);
-    }
     metricsByFranchiseId.set(franchiseId, {
       overall: getOverallValue(row),
       capSpace: parseCapSpaceValue(row),
