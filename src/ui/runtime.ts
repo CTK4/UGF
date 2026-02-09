@@ -380,7 +380,7 @@ function createCandidate(role: StaffRole, id: number) {
 export async function createUIRuntime(onChange: () => void): Promise<UIController> {
   const { save, corrupted } = loadSave();
   const loadedGameState = save?.gameState
-    ? reduceGameState(createNewGameState(1), gameActions.loadState(save.gameState))
+    ? reduceGameState(createNewGameState(), gameActions.loadState(save.gameState))
     : null;
 
   let state: UIState = {
@@ -598,7 +598,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
         case "FINALIZE_NEW_SAVE": {
           if (!state.save) return;
           let gameState = state.save.gameState;
-          const nowWeek = gameState.time.beatIndex;
+          const nowWeek = gameState.time.week;
           (["OC", "DC", "STC"] as const).forEach((role) => {
             const pick = state.ui.opening.coordinatorChoices[role];
             if (!pick) return;
@@ -632,7 +632,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
         case "TRY_HIRE": {
           if (!state.save) return;
           const role = action.role as StaffRole;
-          const session = marketByWeekFor(state.save.gameState)[`${state.save.gameState.time.season}-${state.save.gameState.time.beatIndex}:${role}`];
+          const session = marketByWeekFor(state.save.gameState)[`${state.save.gameState.time.season}-${state.save.gameState.time.week}:${role}`];
           const candidate = session.candidates.find((c) => c.id === action.candidateId);
           if (!candidate) return;
           const requirement = candidate.requirement ?? {};
@@ -675,7 +675,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           if (!state.save) return;
           const role = action.role as StaffRole;
           const candidateId = String(action.candidateId);
-          const session = marketByWeekFor(state.save.gameState)[`${state.save.gameState.time.season}-${state.save.gameState.time.beatIndex}:${role}`];
+          const session = marketByWeekFor(state.save.gameState)[`${state.save.gameState.time.season}-${state.save.gameState.time.week}:${role}`];
           const candidate = session.candidates.find((c) => c.id === candidateId);
           const coachName = candidate?.name ?? candidateId;
           const side = sideByRole(role);
@@ -709,7 +709,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             };
           }
 
-          const assignment: StaffAssignment = { candidateId, coachName, salary: candidate?.salaryDemand ?? 1_300_000, years: candidate?.defaultContractYears ?? 3, hiredWeek: nextGameState.time.beatIndex };
+          const assignment: StaffAssignment = { candidateId, coachName, salary: candidate?.salaryDemand ?? 1_300_000, years: candidate?.defaultContractYears ?? 3, hiredWeek: nextGameState.time.week };
           nextGameState = reduceGameState(nextGameState, gameActions.hireCoach(role, assignment));
 
           if (side && requirement.locksOnHire) {
@@ -718,7 +718,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             const cpLabel = `Locked ${sideLabel(role)} ${labels} by hiring ${role}: ${coachName}`;
             nextGameState = {
               ...nextGameState,
-              checkpoints: [...nextGameState.checkpoints, { ts: Date.now(), label: cpLabel, beatIndex: nextGameState.time.beatIndex, phaseVersion: nextGameState.time.phaseVersion }],
+              checkpoints: [...nextGameState.checkpoints, { ts: Date.now(), label: cpLabel, week: nextGameState.time.week, phaseVersion: nextGameState.time.phaseVersion }],
             };
             const messages = generateImmediateMessagesFromEvent(nextGameState, { type: "COORDINATOR_LOCK_HIRED", side, role: role as "OC" | "DC" | "STC", name: coachName, axes: lockAxes });
             const inbox = nextGameState.inbox.map((thread) => ({ ...thread, messages: [...thread.messages] }));
@@ -849,6 +849,6 @@ export function buildMarketForRole(role: StaffRole) {
 }
 
 export function marketByWeekFor(state: GameState) {
-  const weekKey = `${state.time.season}-${state.time.beatIndex}`;
+  const weekKey = `${state.time.season}-${state.time.week}`;
   return Object.fromEntries(STAFF_ROLES.map((role) => [`${weekKey}:${role}`, buildMarketForRole(role)]));
 }
