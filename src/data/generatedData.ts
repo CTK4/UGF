@@ -64,7 +64,14 @@ const personnelIdLookup = personnelIdLookupData as PersonnelIdLookupRow[];
 const proTraits = proTraitsData as ProTraitRow[];
 const positionSkills = positionSkillsData as PositionSkillRow[];
 
-const teamNames = [...new Set(teamSummary.map((row) => row.Team).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+function canonicalTeamName(teamName: string): string {
+  if (teamName === "New Orleans Voodoo") return "New Orleans Hex";
+  if (teamName === "New York Gotham Guardians") return "New York Gothic Guardians";
+  return teamName;
+}
+
+const teamNames = [...new Set(teamSummary.map((row) => canonicalTeamName(row.Team)).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
 function toTeamId(teamName: string): string {
   return teamName.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -99,13 +106,14 @@ export function getAllTeamNames(): string[] {
 }
 
 export function getTeamDisplayName(teamKey: string): string {
-  return teamIdToName.get(teamKey) ?? teamKey;
+  return canonicalTeamName(teamIdToName.get(teamKey) ?? teamKey);
 }
 
 export function getTeamIdByName(teamName: string): string {
-  return teamNameToId.get(teamName) ?? toTeamId(teamName);
+  const canonical = canonicalTeamName(teamName);
+  return teamNameToId.get(canonical) ?? toTeamId(canonical);
 }
 
 export function getTeamNameById(teamId: string): string {
-  return teamIdToName.get(teamId) ?? teamId;
+  return canonicalTeamName(teamIdToName.get(teamId) ?? teamId);
 }

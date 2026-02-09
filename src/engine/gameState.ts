@@ -64,6 +64,9 @@ export type GameState = {
     name: string;
     age: number;
     hometown: string;
+    hometownId: string;
+    hometownLabel: string;
+    hometownTeamKey: string;
     backgroundKey: string;
     reputation: number;
     mediaStyle: string;

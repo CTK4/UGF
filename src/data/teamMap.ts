@@ -8,11 +8,11 @@ const KNOWN_ALIASES: Record<string, string> = {
   TB: "ST_PETERSBURG_PELICANS",
   IND: "INDIANAPOLIS_CROSSROADS",
   PHI: "PHILADELPHIA_FOUNDERS",
-  NYG: "NEW_YORK_GOTHAM_GUARDIANS",
+  NYG: "NEW_YORK_GOTHIC_GUARDIANS",
   HOU: "HOUSTON_LAUNCH",
   DET: "DETROIT_ASSEMBLY",
   STL: "ST_LOUIS_ARCHONS",
-  NO: "NEW_ORLEANS_VOODOO",
+  NO: "NEW_ORLEANS_HEX",
   CAR: "CHARLOTTE_CROWN",
   TEN: "NASHVILLE_SOUND",
   SEA: "SEATTLE_EVERGREENS",
@@ -33,8 +33,7 @@ const KNOWN_ALIASES: Record<string, string> = {
   PIT: "PITTSBURGH_IRONCLADS",
   WAS: "WASHINGTON_SENTINELS",
   MEM: "MEMPHIS_BLUES",
-  NEW_YORK_GOTHIC_GUARDIANS: "NEW_YORK_GOTHAM_GUARDIANS",
-  SEATTLE_EVERGREEN: "SEATTLE_EVERGREENS",
+    SEATTLE_EVERGREEN: "SEATTLE_EVERGREENS",
   TAMPA_BAY_BUCCANEERS: "ST_PETERSBURG_PELICANS",
   HOUSTON_TEXANS: "HOUSTON_LAUNCH",
   DALLAS_COWBOYS: "DALLAS_IMPERIALS",
@@ -68,7 +67,11 @@ export function getUgfTeamByExcelKey(excelTeam: string): UgfTeam | null {
 }
 
 export function getDisplayTeamName(excelTeam: string): string {
-  return getUgfTeamByExcelKey(excelTeam)?.team ?? "Unknown Team";
+  const displayName = getUgfTeamByExcelKey(excelTeam)?.team ?? "Unknown Team";
+  if (import.meta.env.DEV && displayName.includes("Voodoo")) {
+    console.error("Forbidden team name leaked:", displayName);
+  }
+  return displayName;
 }
 
 export { UGF_TEAMS };

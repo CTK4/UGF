@@ -23,6 +23,9 @@ export type UIState = {
     opening: {
       coachName: string;
       background: string;
+      hometownId: string;
+      hometownLabel: string;
+      hometownTeamKey: string;
       interviewNotes: string[];
       offers: string[];
       coordinatorChoices: Partial<Record<"OC" | "DC" | "STC", string>>;
