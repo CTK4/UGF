@@ -4,6 +4,9 @@ export type SetCoachProfilePayload = {
   name: string;
   age: number;
   hometown: string;
+  hometownId: string;
+  hometownLabel: string;
+  hometownTeamKey: string;
   reputation: number;
   mediaStyle: string;
   personalityBaseline: string;

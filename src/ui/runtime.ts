@@ -4,6 +4,8 @@ import type { GameState, StaffAssignment, Thread } from "@/engine/gameState";
 import { createNewGameState, reduceGameState } from "@/engine/reducer";
 import { generateBeatTasks } from "@/engine/tasks";
 import { getScoutablePositions } from "@/engine/scouting";
+import { HOMETOWN_CLOSEST_TEAM } from "@/data/hometownToTeam";
+import { HOMETOWNS } from "@/data/hometowns";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
 import type { SaveData, UIAction, UIController, UIState } from "@/ui/types";
@@ -23,7 +25,16 @@ function loadSave(): { save: SaveData | null; corrupted: boolean } {
 }
 
 function openingState(): UIState["ui"]["opening"] {
-  return { coachName: "", background: "Former QB", interviewNotes: [], offers: [], coordinatorChoices: {} };
+  return {
+    coachName: "",
+    background: "Former QB",
+    hometownId: "",
+    hometownLabel: "",
+    hometownTeamKey: "",
+    interviewNotes: [],
+    offers: [],
+    coordinatorChoices: {},
+  };
 }
 
 function initialRoute(save: SaveData | null): UIState["route"] {
@@ -37,6 +48,53 @@ function ensureThreads(state: GameState): Thread[] {
     { id: "owner", title: "Owner", unreadCount: 1, messages: [{ id: "owner-1", from: "Owner", text: "Welcome to the job. Set your offseason priorities.", ts: new Date().toISOString() }] },
     { id: "gm", title: "GM", unreadCount: 1, messages: [{ id: "gm-1", from: "GM", text: "Let me know which coordinators you want to target.", ts: new Date().toISOString() }] },
   ];
+}
+
+
+
+function sortedFranchises(): typeof FRANCHISES {
+  return [...FRANCHISES].sort((a, b) => a.fullName.localeCompare(b.fullName));
+}
+
+function pickFirstAvailable(
+  candidates: string[],
+  selected: Set<string>,
+): string | null {
+  for (const candidate of candidates) {
+    if (!selected.has(candidate)) return candidate;
+  }
+  return null;
+}
+
+function generateInterviewInvites(hometownTeamKey: string): string[] {
+  const ranked = sortedFranchises().map((franchise) => franchise.id);
+  if (!hometownTeamKey) {
+    console.error("Missing hometownTeamKey for interview invites.");
+  }
+
+  const bottomFive = ranked.slice(-5);
+  const topTen = ranked.slice(0, 10);
+  const middleTier = ranked.filter((team) => !bottomFive.includes(team) && !topTen.includes(team));
+
+  const selected = new Set<string>();
+  const hometown = hometownTeamKey || "UNKNOWN_TEAM";
+  selected.add(hometown);
+
+  const tierSlots = [bottomFive, middleTier, topTen];
+  for (const tier of tierSlots) {
+    if (selected.size >= 3) break;
+    if (tier.includes(hometown)) continue;
+    const picked = pickFirstAvailable(tier, selected);
+    if (picked) selected.add(picked);
+  }
+
+  while (selected.size < 3) {
+    const fallback = pickFirstAvailable(ranked, selected);
+    if (!fallback) break;
+    selected.add(fallback);
+  }
+
+  return [...selected].slice(0, 3);
 }
 
 function createCandidate(role: StaffRole, id: number) {
@@ -113,8 +171,26 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
         case "SET_BACKGROUND":
           setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, background: String(action.background ?? "") } } });
           return;
+        case "SET_HOMETOWN": {
+          const hometownId = String(action.hometownId ?? "");
+          const hometown = HOMETOWNS.find((item) => item.id === hometownId);
+          const hometownLabel = hometown?.label ?? "";
+          let hometownTeamKey = HOMETOWN_CLOSEST_TEAM[hometownId];
+          if (!hometownTeamKey) {
+            console.error("Missing HOMETOWN_CLOSEST_TEAM entry for", hometownId);
+            hometownTeamKey = "UNKNOWN_TEAM";
+          }
+          setState({
+            ...state,
+            ui: {
+              ...state.ui,
+              opening: { ...state.ui.opening, hometownId, hometownLabel, hometownTeamKey },
+            },
+          });
+          return;
+        }
         case "RUN_INTERVIEWS": {
-          const offers = FRANCHISES.slice(0, 3).map((f) => f.id);
+          const offers = generateInterviewInvites(state.ui.opening.hometownTeamKey);
           setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, interviewNotes: ["Interview cycle complete"], offers } }, route: { key: "Offers" } });
           return;
         }
@@ -128,7 +204,10 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             gameActions.setCoachProfile({
               name: state.ui.opening.coachName || "You",
               age: 35,
-              hometown: "Unknown",
+              hometown: state.ui.opening.hometownLabel || "Unknown",
+              hometownId: state.ui.opening.hometownId,
+              hometownLabel: state.ui.opening.hometownLabel,
+              hometownTeamKey: state.ui.opening.hometownTeamKey || "UNKNOWN_TEAM",
               reputation: 50,
               mediaStyle: "Balanced",
               personalityBaseline: "Balanced",

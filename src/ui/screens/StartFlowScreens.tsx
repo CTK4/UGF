@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import personnelData from "@/data/generated/personnel.json";
 import rosterData from "@/data/generated/rosters.json";
 import type { ScreenProps } from "@/ui/types";
+import { HOMETOWNS } from "@/data/hometowns";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
 
 type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string };
@@ -75,8 +76,36 @@ export function CareerContextScreen({ ui }: ScreenProps) {
 }
 
 export function CreateCoachScreen({ ui }: ScreenProps) {
-  const name = ui.getState().ui.opening.coachName;
-  return <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}><input value={name} placeholder="Coach name" onChange={(e) => ui.dispatch({ type: "SET_COACH_NAME", coachName: e.target.value })} /><button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CoachBackground" } })} disabled={!name.trim()}>Next</button></div></div>;
+  const opening = ui.getState().ui.opening;
+  const statesInOrder = [...new Set(HOMETOWNS.map((hometown) => hometown.state))];
+
+  return (
+    <div className="ugf-card">
+      <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+        <input
+          value={opening.coachName}
+          placeholder="Coach name"
+          onChange={(e) => ui.dispatch({ type: "SET_COACH_NAME", coachName: e.target.value })}
+        />
+        <select value={opening.hometownId} onChange={(e) => ui.dispatch({ type: "SET_HOMETOWN", hometownId: e.target.value })}>
+          <option value="">Select hometown…</option>
+          {statesInOrder.map((state) => (
+            <optgroup key={state} label={state}>
+              {HOMETOWNS.filter((h) => h.state === state).map((h) => (
+                <option key={h.id} value={h.id}>{h.label}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <button
+          onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CoachBackground" } })}
+          disabled={!opening.coachName.trim() || !opening.hometownId}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export function CoachBackgroundScreen({ ui }: ScreenProps) {

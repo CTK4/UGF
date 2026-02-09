@@ -37,6 +37,7 @@ function parsePersonnelByTeam() {
 
 const personnelByTeam = parsePersonnelByTeam();
 
+
 // Keep save compatibility with older ugf.save.v1 files that stored legacy NFL-style
 // franchise IDs (e.g. ARI, DAL, PIT) before we switched to generated UGF IDs.
 const LEGACY_ID_BY_TEAM_NAME: Record<string, string> = {
@@ -56,7 +57,7 @@ const LEGACY_ID_BY_TEAM_NAME: Record<string, string> = {
   "Las Vegas Syndicate": "LV",
   "Los Angeles Stars": "LAR",
   "Miami Tide": "MIA",
-  "New Orleans Voodoo": "NO",
+  "New Orleans Hex": "NO",
   "Pittsburgh Ironclads": "PIT",
   "Seattle Evergreens": "SEA",
   "Washington Sentinels": "WAS",

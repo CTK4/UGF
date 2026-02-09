@@ -28,6 +28,9 @@ export function createNewGameState(beatIndex = 1): GameState {
       name: "",
       age: 35,
       hometown: "",
+      hometownId: "",
+      hometownLabel: "",
+      hometownTeamKey: "",
       backgroundKey: "",
       reputation: 50,
       mediaStyle: "Balanced",
@@ -75,6 +78,12 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
             ]),
           ),
           watchlist: loaded.draft?.watchlist ?? [],
+        },
+        coach: {
+          ...loaded.coach,
+          hometownId: loaded.coach?.hometownId ?? "",
+          hometownLabel: loaded.coach?.hometownLabel ?? loaded.coach?.hometown ?? "",
+          hometownTeamKey: loaded.coach?.hometownTeamKey ?? "",
         },
         staff: {
           ...loaded.staff,
