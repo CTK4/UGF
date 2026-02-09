@@ -16,6 +16,16 @@ export type InterviewInvite = {
   summaryLine: string;
 };
 
+export type OpeningInterviewResult = {
+  franchiseId: string;
+  answers: number[];
+  ownerOpinion: number;
+  gmOpinion: number;
+  pressureTone: number;
+  completed: boolean;
+  lastToneFeedback: string;
+};
+
 export type ModalState = {
   title: string;
   message: ReactNode;
@@ -27,7 +37,6 @@ export type ModalState = {
 export type UIState = {
   route: Route;
   save: SaveData | null;
-  draftFranchiseId: string | null;
   corruptedSave: boolean;
   ui: {
     activeModal: ModalState | null;
@@ -38,7 +47,8 @@ export type UIState = {
       hometownId: string;
       hometownLabel: string;
       hometownTeamKey: string;
-      interviewNotes: string[];
+      interviewInvites: InterviewInvite[];
+      interviewResults: Record<string, OpeningInterviewResult>;
       offers: InterviewInvite[];
       coordinatorChoices: Partial<Record<"OC" | "DC" | "STC", string>>;
     };
