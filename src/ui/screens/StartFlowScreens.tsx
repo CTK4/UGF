@@ -5,7 +5,7 @@ import type { ScreenProps } from "@/ui/types";
 import { HOMETOWNS } from "@/data/hometowns";
 import { getFranchise } from "@/ui/data/franchises";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
-import { TeamIcon } from "@/ui/components/TeamIcon";
+import { TeamLogo } from "@/ui/components/TeamLogo";
 
 type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string };
 const personnel = personnelData as PersonnelRow[];
