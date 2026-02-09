@@ -7,6 +7,7 @@ import { generateImmediateMessagesFromEvent } from "@/engine/phone";
 import { getScoutablePositions } from "@/engine/scouting";
 import { HOMETOWN_CLOSEST_TEAM } from "@/data/hometownToTeam";
 import { HOMETOWNS } from "@/data/hometowns";
+import { OPENING_INTERVIEW_QUESTIONS } from "@/data/interviewQuestions";
 import { getTeamIdByName, getTeamSummaryRows } from "@/data/generatedData";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
 import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
@@ -74,39 +75,12 @@ const INTERVIEW_SUMMARY_BY_TIER: Record<InterviewInviteTier, InterviewTierMetada
   CONTENDER: { descriptor: "Strong roster", pressureDescriptor: "Win-now pressure" },
 };
 
-type OpeningInterviewChoice = {
-  owner: number;
-  gm: number;
-  pressure: number;
-  tone: string;
-};
-
-const OPENING_INTERVIEW_QUESTIONS: Array<{ choices: OpeningInterviewChoice[] }> = [
-  {
-    choices: [
-      { owner: 6, gm: 2, pressure: 1, tone: "Confident and structured." },
-      { owner: 3, gm: 4, pressure: 0, tone: "Collaborative and steady." },
-      { owner: -2, gm: -1, pressure: -2, tone: "Too passive for ownership." },
-    ],
-  },
-  {
-    choices: [
-      { owner: 2, gm: 6, pressure: 1, tone: "Process-oriented and aligned." },
-      { owner: 1, gm: 3, pressure: 0, tone: "Reasonable but less collaborative." },
-      { owner: -2, gm: -4, pressure: -1, tone: "Power struggle concern." },
-    ],
-  },
-  {
-    choices: [
-      { owner: 3, gm: 2, pressure: 5, tone: "Strong leadership under pressure." },
-      { owner: 1, gm: 1, pressure: 2, tone: "Stable, if somewhat reserved." },
-      { owner: -2, gm: -1, pressure: -4, tone: "Risky tone for a volatile market." },
-    ],
-  },
-];
-
 function clampRating(value: number): number {
   return Math.max(0, Math.min(100, value));
+}
+
+if (import.meta.env.DEV && OPENING_INTERVIEW_QUESTIONS.length !== 3) {
+  console.error(`OPENING_INTERVIEW_QUESTIONS must contain exactly 3 items. Received ${OPENING_INTERVIEW_QUESTIONS.length}.`);
 }
 
 function generateOffersFromInterviewResults(interviewInvites: InterviewInvite[], interviewResults: Record<string, OpeningInterviewResult>): InterviewInvite[] {
@@ -519,7 +493,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             ownerOpinion: clampRating(current.ownerOpinion + choice.owner),
             gmOpinion: clampRating(current.gmOpinion + choice.gm),
             pressureTone: clampRating(current.pressureTone + choice.pressure),
-            completed: current.answers.length + 1 >= 3,
+            completed: current.answers.length + 1 >= OPENING_INTERVIEW_QUESTIONS.length,
             lastToneFeedback: choice.tone,
           };
 

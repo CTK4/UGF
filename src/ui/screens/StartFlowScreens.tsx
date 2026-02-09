@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import personnelData from "@/data/generated/personnel.json";
 import rosterData from "@/data/generated/rosters.json";
 import type { ScreenProps } from "@/ui/types";
@@ -6,6 +6,8 @@ import { HOMETOWNS } from "@/data/hometowns";
 import { getFranchise } from "@/ui/data/franchises";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { TeamLogo } from "@/ui/components/TeamLogo";
+import { TeamIcon } from "@/ui/components/TeamIcon";
+import { OPENING_INTERVIEW_QUESTIONS } from "@/data/interviewQuestions";
 
 type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string };
 const personnel = personnelData as PersonnelRow[];
@@ -30,36 +32,6 @@ const offseasonPriorities = [
   "Create cap flexibility",
   "Get younger at key spots",
 ];
-
-const interviewQuestions = [
-  {
-    label: "Owner",
-    prompt: "How would you establish accountability in year one?",
-    choices: [
-      { label: "A", text: "Set measurable standards and review them every week.", owner: 6, gm: 2, pressure: 1, tone: "Confident and structured." },
-      { label: "B", text: "Empower leaders in the locker room first, then set standards.", owner: 3, gm: 4, pressure: 0, tone: "Collaborative and steady." },
-      { label: "C", text: "Keep things loose early and adjust once we see results.", owner: -2, gm: -1, pressure: -2, tone: "Too passive for ownership." },
-    ],
-  },
-  {
-    label: "GM",
-    prompt: "How do you partner with the front office on roster decisions?",
-    choices: [
-      { label: "A", text: "Align on a profile and let data drive final tie-breakers.", owner: 2, gm: 6, pressure: 1, tone: "Process-oriented and aligned." },
-      { label: "B", text: "I make scheme asks and trust scouting to execute.", owner: 1, gm: 3, pressure: 0, tone: "Reasonable but less collaborative." },
-      { label: "C", text: "I want final say on all roster moves.", owner: -2, gm: -4, pressure: -1, tone: "Power struggle concern." },
-    ],
-  },
-  {
-    label: "Pressure",
-    prompt: "How do you handle media pressure after a losing streak?",
-    choices: [
-      { label: "A", text: "Own the results publicly and protect the locker room.", owner: 3, gm: 2, pressure: 5, tone: "Strong leadership under pressure." },
-      { label: "B", text: "Stay even-keeled and focus only on internal messaging.", owner: 1, gm: 1, pressure: 2, tone: "Stable, if somewhat reserved." },
-      { label: "C", text: "Call out execution issues directly to force urgency.", owner: -2, gm: -1, pressure: -4, tone: "Risky tone for a volatile market." },
-    ],
-  },
-] as const;
 
 const tierLabelByCode = {
   REBUILD: "Rebuild (Bottom-5)",
@@ -135,11 +107,13 @@ export function CoachBackgroundScreen({ ui }: ScreenProps) {
 
 export function InterviewsScreen({ ui }: ScreenProps) {
   const opening = ui.getState().ui.opening;
+  const { interviewInvites, interviewResults } = opening;
+  const allDone = interviewInvites.length > 0 && interviewInvites.every((invite) => interviewResults[invite.franchiseId]?.completed);
   return (
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Interview Invitations</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
-        {opening.interviewInvites.map((invite) => {
+        {interviewInvites.map((invite) => {
           const franchise = getFranchise(invite.franchiseId);
           const result = opening.interviewResults[invite.franchiseId];
           return (
@@ -160,6 +134,11 @@ export function InterviewsScreen({ ui }: ScreenProps) {
             </button>
           );
         })}
+        {allDone ? (
+          <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Offers" } })}>
+            View Offers
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -173,22 +152,50 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
   const result = state.ui.opening.interviewResults[franchiseId];
   const franchise = getFranchise(franchiseId);
   if (!invite || !result) return null;
+  const questions = OPENING_INTERVIEW_QUESTIONS;
+  if (import.meta.env.DEV && questions.length !== 3) {
+    console.error(`OPENING_INTERVIEW_QUESTIONS must contain exactly 3 items. Received ${questions.length}.`);
+  }
+  const isDone = result.completed || result.answers.length >= questions.length;
+
+  useEffect(() => {
+    if (state.route.key === "OpeningInterview" && isDone) {
+      ui.dispatch({ type: "NAVIGATE", route: { key: "Interviews" } });
+    }
+  }, [isDone, state.route.key]);
+
   const questionIndex = result.answers.length;
-  const current = interviewQuestions[questionIndex] ?? interviewQuestions[interviewQuestions.length - 1];
+  const current = questions[questionIndex];
+  if (!current && !isDone) {
+    console.error("Opening interview question missing for index", questionIndex);
+  }
+  const shouldRenderDoneState = isDone || !current;
 
   return (
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Interview: {franchise?.fullName ?? franchiseId}</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
         <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[invite.tier]} • {invite.summaryLine}</div>
-        <div><b>{current.label} Q{Math.min(questionIndex + 1, 3)}.</b> {current.prompt}</div>
-        <div style={{ display: "grid", gap: 8 }}>
-          {current.choices.map((choice, choiceIndex) => (
-            <button key={`${current.label}-${choice.label}`} type="button" onClick={() => ui.dispatch({ type: "OPENING_ANSWER_INTERVIEW", franchiseId, answerIndex: choiceIndex })}>
-              {choice.label}) {choice.text}
-            </button>
-          ))}
-        </div>
+        {current ? <div><b>{current.label} Q{questionIndex + 1}.</b> {current.prompt}</div> : null}
+        {shouldRenderDoneState ? (
+          <div className="ugf-card" style={{ marginTop: 8 }}>
+            <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+              <div><b>Interview Complete</b></div>
+              <div style={{ fontSize: 12, opacity: 0.9 }}>Interview recorded.</div>
+              <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Interviews" } })}>
+                Back to Invitations
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 8 }}>
+            {current.choices.map((choice, choiceIndex) => (
+              <button key={`${current.label}-${choice.label}`} type="button" onClick={() => ui.dispatch({ type: "OPENING_ANSWER_INTERVIEW", franchiseId, answerIndex: choiceIndex })}>
+                {choice.label}) {choice.text}
+              </button>
+            ))}
+          </div>
+        )}
         {result.lastToneFeedback ? <div className="ugf-pill">Tone: {result.lastToneFeedback}</div> : null}
       </div>
     </div>
@@ -197,6 +204,18 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
 
 export function OffersScreen({ ui }: ScreenProps) {
   const offers = ui.getState().ui.opening.offers;
+
+  if (!offers.length) {
+    console.error("No offers generated (dev error)");
+    return (
+      <div className="ugf-card">
+        <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+          <div>No offers generated (dev error)</div>
+          <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Interviews" } })}>Return to Interviews</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="ugf-card">
