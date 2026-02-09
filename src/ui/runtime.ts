@@ -8,7 +8,10 @@ import { getScoutablePositions } from "@/engine/scouting";
 import { HOMETOWN_CLOSEST_TEAM } from "@/data/hometownToTeam";
 import { HOMETOWNS } from "@/data/hometowns";
 import { OPENING_INTERVIEW_QUESTIONS } from "@/data/interviewQuestions";
+import { getOwnerProfile } from "@/data/owners";
 import { getTeamIdByName, getTeamSummaryRows } from "@/data/generatedData";
+import { computeTeamWeightedDelta } from "@/engine/interviews";
+import { deriveOfferTerms } from "@/engine/offers";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
 import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
 
@@ -113,9 +116,11 @@ function formatCapSpace(value: number | null): string {
   return `${sign}$${abs.toFixed(0)}`;
 }
 
-function buildSummaryLine(tier: InterviewInviteTier, capSpace: number | null): string {
+function buildSummaryLine(franchiseId: string, tier: InterviewInviteTier, capSpace: number | null): string {
   const meta = INTERVIEW_SUMMARY_BY_TIER[tier];
-  return `${meta.descriptor} • Cap Space: ${formatCapSpace(capSpace)} • ${meta.pressureDescriptor}`;
+  const owner = getOwnerProfile(franchiseId);
+  const terms = deriveOfferTerms(tier, owner);
+  return `${meta.descriptor} • Cap Space: ${formatCapSpace(capSpace)} • ${terms.years}y • ${terms.pressure} pressure • ${terms.mandate}`;
 }
 
 function getOverallValue(row: Record<string, unknown>): number {
@@ -177,7 +182,7 @@ function buildInvite(
     franchiseId: team.franchiseId,
     tier: team.tier,
     overall: team.overall,
-    summaryLine: buildSummaryLine(team.tier, capSpace),
+    summaryLine: buildSummaryLine(team.franchiseId, team.tier, capSpace),
   };
 }
 
@@ -201,7 +206,7 @@ function generateInterviewInvites(hometownTeamKey: string): InterviewInvite[] {
   const hometownTeam = ranked.find((team) => team.franchiseId === hometown);
   const invites: InterviewInvite[] = hometownTeam
     ? [buildInvite(hometownTeam, metricsByFranchiseId)]
-    : [{ franchiseId: hometown, tier: "FRINGE", overall: 0, summaryLine: buildSummaryLine("FRINGE", null) }];
+    : [{ franchiseId: hometown, tier: "FRINGE", overall: 0, summaryLine: buildSummaryLine(hometown, "FRINGE", null) }];
 
   const representedTiers = new Set<InterviewInviteTier>(invites.map((invite) => invite.tier));
   for (const tier of ["REBUILD", "FRINGE", "CONTENDER"] as const) {
@@ -390,9 +395,25 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
     getState: () => state,
     dispatch: (action: UIAction) => {
       switch (action.type) {
-        case "NAVIGATE":
-          setState({ ...state, route: action.route as UIState["route"], ui: { ...state.ui, activeModal: null } });
+        case "NAVIGATE": {
+          const nextRoute = action.route as UIState["route"];
+          if (nextRoute.key === "Offers") {
+            const allDone =
+              state.ui.opening.interviewInvites.length > 0 &&
+              state.ui.opening.interviewInvites.every((invite) => state.ui.opening.interviewResults[invite.franchiseId]?.completed);
+            if (allDone && state.ui.opening.offers.length === 0) {
+              const offers = generateOffersFromInterviewResults(state.ui.opening.interviewInvites, state.ui.opening.interviewResults);
+              setState({
+                ...state,
+                route: nextRoute,
+                ui: { ...state.ui, activeModal: null, opening: { ...state.ui.opening, offers } },
+              });
+              return;
+            }
+          }
+          setState({ ...state, route: nextRoute, ui: { ...state.ui, activeModal: null } });
           return;
+        }
         case "RESET_SAVE":
           localStorage.removeItem(SAVE_KEY);
           setState({ ...state, save: null, route: { key: "Start" }, corruptedSave: false, ui: { ...state.ui, opening: openingState() } });
@@ -486,15 +507,21 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           const question = OPENING_INTERVIEW_QUESTIONS[current.answers.length];
           const choice = question?.choices[answerIndex];
           if (!choice) return;
+          const weightedDelta = computeTeamWeightedDelta({
+            teamKey: franchiseId,
+            questionIndex: current.answers.length,
+            choiceIndex: answerIndex,
+            base: choice,
+          });
 
           const nextResult: OpeningInterviewResult = {
             ...current,
             answers: [...current.answers, answerIndex],
-            ownerOpinion: clampRating(current.ownerOpinion + choice.owner),
-            gmOpinion: clampRating(current.gmOpinion + choice.gm),
-            pressureTone: clampRating(current.pressureTone + choice.pressure),
+            ownerOpinion: clampRating(current.ownerOpinion + weightedDelta.owner),
+            gmOpinion: clampRating(current.gmOpinion + weightedDelta.gm),
+            pressureTone: clampRating(current.pressureTone + weightedDelta.pressure),
             completed: current.answers.length + 1 >= OPENING_INTERVIEW_QUESTIONS.length,
-            lastToneFeedback: choice.tone,
+            lastToneFeedback: weightedDelta.tone,
           };
 
           const interviewResults = { ...state.ui.opening.interviewResults, [franchiseId]: nextResult };
