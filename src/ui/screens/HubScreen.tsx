@@ -2,6 +2,9 @@ import React from "react";
 import type { ScreenProps } from "@/ui/types";
 import { getProspectLabel } from "@/services/draftDiscovery";
 import { getSuggestedNeed } from "@/engine/scouting";
+import { FRANCHISES } from "@/ui/data/franchises";
+import { normalizeExcelTeamKey } from "@/data/teamMap";
+import { TeamIcon } from "@/ui/components/TeamLogo";
 
 export function HubScreen({ ui }: ScreenProps) {
   const save = ui.getState().save;
@@ -9,6 +12,23 @@ export function HubScreen({ ui }: ScreenProps) {
   const gs = save.gameState;
 
   const discoveredEntries = Object.entries(gs.draft.discovered).sort((a, b) => a[1].level - b[1].level || a[0].localeCompare(b[0]));
+
+  const standingsRows = ui.selectors.table("Team Summary");
+  const standingsIconSize = typeof window !== "undefined" && window.matchMedia("(min-width: 900px)").matches ? 64 : 48;
+  const standingsSnapshot = FRANCHISES.map((franchise) => {
+    const row = standingsRows.find((entry) => String(entry.Team ?? "").trim() === franchise.id) as Record<string, unknown> | undefined;
+    const wins = Number(row?.Wins ?? row?.W ?? 0);
+    const losses = Number(row?.Losses ?? row?.L ?? 0);
+    return {
+      id: franchise.id,
+      teamKey: normalizeExcelTeamKey(franchise.fullName),
+      name: franchise.fullName,
+      wins,
+      losses,
+      winPct: wins + losses > 0 ? wins / (wins + losses) : 0,
+    };
+  }).sort((a, b) => b.winPct - a.winPct || b.wins - a.wins || a.name.localeCompare(b.name)).slice(0, 8);
+
 
   return (
     <div className="ugf-card">
@@ -57,6 +77,20 @@ export function HubScreen({ ui }: ScreenProps) {
               </div>
             </div>
           ))}
+        </div></div>
+
+        <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+          <b>Standings Snapshot</b>
+          <ul className="ugf-standings-list">
+            {standingsSnapshot.map((team) => (
+              <li key={team.id} className="ugf-standings-row">
+                <span className="ugf-standings-logoCol">
+                  <TeamIcon teamKey={team.teamKey} size={standingsIconSize} />
+                </span>
+                <span><b>{team.name}</b> — {team.wins}-{team.losses}</span>
+              </li>
+            ))}
+          </ul>
         </div></div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

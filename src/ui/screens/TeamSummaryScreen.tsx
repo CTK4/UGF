@@ -1,6 +1,6 @@
 import React from "react";
 import type { ScreenProps } from "@/ui/types";
-import { TeamLogo } from "@/ui/components/TeamLogo";
+import { TeamIcon } from "@/ui/components/TeamLogo";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { getFranchise } from "@/ui/data/franchises";
 import { SegmentedTabs } from "@/ui/components/SegmentedTabs";
@@ -13,7 +13,7 @@ export function TeamSummaryScreen({ ui }: ScreenProps) {
   const first = (rows[0] ?? {}) as Record<string, unknown>;
   const franchise = getFranchise(teamId);
   const displayName = franchise?.fullName ?? teamId;
-  const ugfTeamKey = normalizeExcelTeamKey(displayName);
+  const teamKey = state.save?.gameState.franchise.ugfTeamKey || normalizeExcelTeamKey(displayName);
 
   const wins = Number(first.Wins ?? first.W ?? 0);
   const losses = Number(first.Losses ?? first.L ?? 0);
@@ -31,7 +31,7 @@ export function TeamSummaryScreen({ ui }: ScreenProps) {
         <div className="ugf-card__header">
           <h2 className="ugf-card__title">Team Summary</h2>
           <div className="ugf-card__right">
-            <TeamLogo ugfTeamKey={ugfTeamKey} displayName={displayName} />
+            <TeamIcon teamKey={teamKey} size={56} variant="square" />
           </div>
         </div>
         <div className="ugf-card__body" style={{ display: "grid", gap: 12 }}>
