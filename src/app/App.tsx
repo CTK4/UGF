@@ -43,9 +43,15 @@ export function App() {
           <div className="modal">
             <h3 className="modalTitle">{state.ui.activeModal.title}</h3>
             <div style={{ marginBottom: 12 }}>{state.ui.activeModal.message}</div>
+            {state.ui.activeModal.lines?.length ? <div style={{ marginBottom: 12 }}>{state.ui.activeModal.lines.map((line) => <div key={line}>{line}</div>)}</div> : null}
+            {state.ui.activeModal.warning ? (
+              <div style={{ background: "rgba(255,170,0,0.10)", border: "1px solid rgba(255,170,0,0.35)", padding: "8px 10px", borderRadius: 8, fontWeight: 600, marginBottom: 12 }}>
+                {state.ui.activeModal.warning}
+              </div>
+            ) : null}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {(state.ui.activeModal.actions ?? [{ label: "Close", action: { type: "CLOSE_MODAL" } }]).map((a, i) => (
-                <button key={i} onClick={() => ui.dispatch(a.action)}>{a.label}</button>
+                <button key={i} className={i === 0 ? "primary" : undefined} onClick={() => ui.dispatch(a.action)}>{a.label}</button>
               ))}
             </div>
           </div>

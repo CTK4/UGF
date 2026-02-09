@@ -1,6 +1,6 @@
 import React from "react";
 import type { ScreenProps } from "@/ui/types";
-import { TeamIcon } from "@/ui/components/TeamLogo";
+import { TeamIcon } from "@/ui/components/TeamIcon";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { getFranchise } from "@/ui/data/franchises";
 import { SegmentedTabs } from "@/ui/components/SegmentedTabs";

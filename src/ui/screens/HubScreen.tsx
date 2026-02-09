@@ -4,7 +4,7 @@ import { getProspectLabel } from "@/services/draftDiscovery";
 import { getSuggestedNeed } from "@/engine/scouting";
 import { FRANCHISES } from "@/ui/data/franchises";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
-import { TeamIcon } from "@/ui/components/TeamLogo";
+import { TeamIcon } from "@/ui/components/TeamIcon";
 
 export function HubScreen({ ui }: ScreenProps) {
   const save = ui.getState().save;

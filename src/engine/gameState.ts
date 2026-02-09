@@ -3,6 +3,23 @@ import type { BeatKey, PhaseKey } from "@/engine/calendar";
 
 export type GamePhase = "PRECAREER" | "INTERVIEWS" | "COORD_HIRING" | "JANUARY_OFFSEASON";
 export type Role = StaffRole;
+export type ControlAxis = "SCHEME" | "ASSISTANTS";
+export type ControlSide = "offense" | "defense" | "specialTeams";
+
+export type ControlLockRole = "OC" | "DC" | "STC";
+
+export type SideControl = {
+  schemeAuthority: number;
+  assistantsAuthority: number;
+  locked: boolean;
+  lockedBy?: {
+    role: ControlLockRole;
+    staffId: string;
+    staffName: string;
+    reason: string;
+    axes: ControlAxis[];
+  };
+};
 
 export type StaffAssignment = {
   candidateId: string;
@@ -73,6 +90,9 @@ export type GameState = {
     personalityBaseline: string;
   };
   franchise: { ugfTeamKey: string; excelTeamKey: string };
+  career: {
+    control: Record<ControlSide, SideControl>;
+  };
   staff: {
     assignments: Record<Role, StaffAssignment | null>;
     budgetTotal: number;

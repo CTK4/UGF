@@ -7,6 +7,41 @@ import { appendWeeklyMessages } from "@/engine/phone";
 import { applyScoutingAction } from "@/engine/scouting";
 import { generateBeatTasks } from "@/engine/tasks";
 
+
+function createDefaultSideControl() {
+  return { schemeAuthority: 50, assistantsAuthority: 50, locked: false };
+}
+
+function migrateCareerControl(loaded: any) {
+  const base = {
+    offense: createDefaultSideControl(),
+    defense: createDefaultSideControl(),
+    specialTeams: createDefaultSideControl(),
+  };
+  const current = loaded?.career?.control ?? {};
+
+  const migrateSide = (sideKey: "offense" | "defense" | "specialTeams", legacyKeys: string[]) => {
+    const side = current?.[sideKey] ?? {};
+    const legacyAuthority = legacyKeys.map((k) => Number(loaded?.career?.[k])).find((n) => Number.isFinite(n));
+    const existingScheme = Number(side.schemeAuthority);
+    const existingAssistants = Number(side.assistantsAuthority);
+    return {
+      ...base[sideKey],
+      ...side,
+      schemeAuthority: Number.isFinite(existingScheme) ? existingScheme : (Number.isFinite(legacyAuthority) ? legacyAuthority : base[sideKey].schemeAuthority),
+      assistantsAuthority: Number.isFinite(existingAssistants) ? existingAssistants : (Number.isFinite(legacyAuthority) ? legacyAuthority : base[sideKey].assistantsAuthority),
+      locked: Boolean(side.locked),
+      lockedBy: side.lockedBy,
+    };
+  };
+
+  return {
+    offense: migrateSide("offense", ["authorityOffense", "offenseAuthority"]),
+    defense: migrateSide("defense", ["authorityDefense", "defenseAuthority"]),
+    specialTeams: migrateSide("specialTeams", ["authoritySpecialTeams", "specialTeamsAuthority", "authorityST"]),
+  };
+}
+
 function emptyAssignments() {
   return Object.fromEntries(STAFF_ROLES.map((role) => [role, null])) as Record<Role, null>;
 }
@@ -37,6 +72,13 @@ export function createNewGameState(beatIndex = 1): GameState {
       personalityBaseline: "Balanced",
     },
     franchise: { ugfTeamKey: "", excelTeamKey: "" },
+    career: {
+      control: {
+        offense: createDefaultSideControl(),
+        defense: createDefaultSideControl(),
+        specialTeams: createDefaultSideControl(),
+      },
+    },
     staff: { assignments: emptyAssignments(), budgetTotal: 18_000_000, budgetUsed: 0, blockedHireAttemptsRecent: 0 },
     offseasonPlan: null,
     tasks: [],
@@ -88,6 +130,9 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
         staff: {
           ...loaded.staff,
           blockedHireAttemptsRecent: loaded.staff?.blockedHireAttemptsRecent ?? 0,
+        },
+        career: {
+          control: migrateCareerControl(loaded),
         },
         time: {
           season,
