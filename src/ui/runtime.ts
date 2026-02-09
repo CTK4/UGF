@@ -42,6 +42,7 @@ function openingState(): UIState["ui"]["opening"] {
     interviewInvites: [],
     interviewResults: {},
     offers: [],
+    lastOfferError: undefined,
     coordinatorChoices: {},
   };
 }
@@ -507,6 +508,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
                 interviewInvites,
                 interviewResults,
                 offers: [],
+                lastOfferError: undefined,
               },
             },
             route: { key: "Interviews" },
@@ -612,11 +614,13 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "ACCEPT_OFFER": {
+          const franchiseId = String(action.franchiseId);
+          const franchise = getFranchise(franchiseId);
+          const isOffered = state.ui.opening.offers.some((offer) => offer.franchiseId === franchiseId);
+          if (!franchise || !isOffered) return;
+          const excelTeamKey = normalizeExcelTeamKey(franchise.fullName);
+
           const runAcceptOfferFlow = () => {
-            const franchiseId = String(action.franchiseId);
-            const franchise = getFranchise(franchiseId);
-            const isOffered = state.ui.opening.offers.some((offer) => offer.franchiseId === franchiseId);
-            if (!franchise || !isOffered) return;
             let gameState = reduceGameState(createNewGameState(1), gameActions.startNew(1));
             gameState = reduceGameState(
               gameState,
@@ -633,7 +637,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               }),
             );
             gameState = reduceGameState(gameState, gameActions.setBackground(state.ui.opening.background));
-            gameState = reduceGameState(gameState, gameActions.acceptOffer(franchiseId, normalizeExcelTeamKey(franchiseId)));
+            gameState = reduceGameState(gameState, gameActions.acceptOffer(franchiseId, excelTeamKey));
             gameState = {
               ...gameState,
               inbox: ensureThreads(gameState),
@@ -641,19 +645,32 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               draft: gameState.draft ?? { discovered: {}, watchlist: [] },
             };
             localStorage.setItem(SAVE_KEY, JSON.stringify({ version: 1, gameState }));
-            setState({ ...state, save: { version: 1, gameState }, route: { key: "HireCoordinators" } });
+            setState({
+              ...state,
+              save: { version: 1, gameState },
+              route: { key: "HireCoordinators" },
+              ui: { ...state.ui, opening: { ...state.ui.opening, lastOfferError: undefined } },
+            });
           };
 
-          if (import.meta.env.DEV) {
-            try {
-              runAcceptOfferFlow();
-            } catch (error) {
-              console.error("[runtime] ACCEPT_OFFER failed", error);
+          try {
+            runAcceptOfferFlow();
+          } catch (error) {
+            if (import.meta.env.DEV) {
+              console.error("[runtime] ACCEPT_OFFER failed", error, { franchiseId, fullName: franchise.fullName, excelTeamKey });
             }
-            return;
+            setState({
+              ...state,
+              route: { key: "Offers" },
+              ui: {
+                ...state.ui,
+                opening: {
+                  ...state.ui.opening,
+                  lastOfferError: `Could not accept ${franchise.fullName}. Please try again.`,
+                },
+              },
+            });
           }
-
-          runAcceptOfferFlow();
           return;
         }
         case "SET_COORDINATOR_CHOICE":
