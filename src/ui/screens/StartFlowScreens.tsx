@@ -119,7 +119,25 @@ export function InterviewsScreen({ ui }: ScreenProps) {
 
 export function OffersScreen({ ui }: ScreenProps) {
   const offers = ui.getState().ui.opening.offers;
-  return <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>{offers.map((id) => <button key={id} onClick={() => ui.dispatch({ type: "ACCEPT_OFFER", franchiseId: id })}>Accept {getFranchise(id)?.fullName ?? id}</button>)}</div></div>;
+  const tierLabelByCode = {
+    REBUILD: "Rebuild (Bottom-5)",
+    FRINGE: "Fringe (Middle)",
+    CONTENDER: "Contender (Top-10)",
+  } as const;
+
+  return (
+    <div className="ugf-card">
+      <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+        {offers.map((offer) => (
+          <button key={offer.franchiseId} onClick={() => ui.dispatch({ type: "ACCEPT_OFFER", franchiseId: offer.franchiseId })}>
+            <div><b>{getFranchise(offer.franchiseId)?.fullName ?? offer.franchiseId}</b></div>
+            <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[offer.tier]}</div>
+            <div style={{ fontSize: 12, opacity: 0.9 }}>{offer.summaryLine}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function HireCoordinatorsScreen({ ui }: ScreenProps) {
