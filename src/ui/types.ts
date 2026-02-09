@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { GameState } from "@/engine/gameState";
 import type { Route } from "@/ui/routes";
 
@@ -17,7 +18,9 @@ export type InterviewInvite = {
 
 export type ModalState = {
   title: string;
-  message: string;
+  message: ReactNode;
+  lines?: string[];
+  warning?: string;
   actions?: Array<{ label: string; action: UIAction }>;
 };
 

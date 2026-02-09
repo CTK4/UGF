@@ -12,7 +12,7 @@ const FILLER_WORDS = new Set(["OF", "THE"]);
 export function resolveTeamIconCandidates(teamKey: string): string[] {
   const cleaned = String(teamKey ?? "").trim();
   if (!cleaned) return [];
-  return [`/icons/${cleaned}.png`, `/icons/${cleaned}.svg`];
+  return [`/icons/${cleaned}.png`, "/icons/placeholder.png"];
 }
 
 export function getTeamInitials(teamKey: string): string {
@@ -108,5 +108,4 @@ export function TeamIcon({ teamKey, size = 40, className, variant = "square" }: 
   );
 }
 
-// Backwards-compatible export while callers migrate.
 export const TeamLogo = TeamIcon;

@@ -1,4 +1,43 @@
-import type { GameState, Thread, ThreadMessage } from "@/engine/gameState";
+import { getOwnerProfileByTeamKey, type OwnerArchetype } from "@/data/ownerProfiles";
+import type { ControlAxis, GameState, Thread, ThreadMessage } from "@/engine/gameState";
+
+export type PhoneEvent = {
+  type: "COORDINATOR_LOCK_HIRED";
+  side: "offense" | "defense" | "specialTeams";
+  role: "OC" | "DC" | "STC";
+  name: string;
+  axes: ControlAxis[];
+};
+
+const axisLabel = (axes: ControlAxis[]) => {
+  const hasScheme = axes.includes("SCHEME");
+  const hasAssistants = axes.includes("ASSISTANTS");
+  if (hasScheme && hasAssistants) return "Scheme + Assistants";
+  if (hasScheme) return "Scheme";
+  if (hasAssistants) return "Assistants";
+  return "Scheme";
+};
+
+function ownerLockMessage(archetype: OwnerArchetype | undefined, axesText: string, name: string): string {
+  if (!archetype) return `Noted. Control is locked (${axesText}). Make it work.`;
+  if (["impatient", "demanding", "dominant"].includes(archetype)) return `I approved the hire. Control is locked (${axesText}). Results, fast.`;
+  if (["patient", "institutional", "measured"].includes(archetype)) return `Understood. Control is locked (${axesText}) with ${name}. Stay aligned.`;
+  if (["volatile", "image_focused"].includes(archetype)) return `Be careful. Control is locked (${axesText}). Don't let it get messy.`;
+  if (["analytical", "process_oriented", "pragmatic"].includes(archetype)) return `Logged. Control lock (${axesText}) increases coordination risk. Mitigate it.`;
+  if (["ambitious", "opportunistic"].includes(archetype)) return `Fine. If it gives us an edge, do it. Control is locked (${axesText}).`;
+  return `Noted. Control is locked (${axesText}). Make it work.`;
+}
+
+export function generateImmediateMessagesFromEvent(state: GameState, event: PhoneEvent): Array<{ threadId: "owner" | "gm"; from: string; text: string }> {
+  if (event.type !== "COORDINATOR_LOCK_HIRED") return [];
+  const axesText = axisLabel(event.axes);
+  const profile = getOwnerProfileByTeamKey(state.franchise.ugfTeamKey);
+
+  return [
+    { threadId: "owner", from: profile?.ownerName ?? "Owner", text: ownerLockMessage(profile?.archetype, axesText, event.name) },
+    { threadId: "gm", from: "GM", text: `FYI: ${event.name} requires locked control (${axesText}). I'll route staffing + installs accordingly.` },
+  ];
+}
 
 export function generateWeeklyMessages(state: GameState): Array<{ threadId: "owner" | "gm"; from: string; text: string }> {
   const messages: Array<{ threadId: "owner" | "gm"; from: string; text: string }> = [];
