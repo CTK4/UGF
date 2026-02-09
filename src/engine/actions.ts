@@ -4,12 +4,12 @@ export type SetCoachProfilePayload = {
   name: string;
   age: number;
   hometown: string;
-  hometownId: string;
-  hometownLabel: string;
-  hometownTeamKey: string;
   reputation: number;
   mediaStyle: string;
   personalityBaseline: string;
+  hometownId?: string;
+  hometownLabel?: string;
+  hometownTeamKey?: string;
 };
 
 export type OffseasonPlanPayload = {
@@ -21,7 +21,7 @@ export type OffseasonPlanPayload = {
 
 export type GameAction =
   | { type: "LOAD_STATE"; payload: { state: GameState } }
-  | { type: "START_NEW"; payload?: { beatIndex?: number } }
+  | { type: "START_NEW" }
   | { type: "SET_COACH_PROFILE"; payload: SetCoachProfilePayload }
   | { type: "SET_BACKGROUND"; payload: { backgroundKey: string } }
   | { type: "ACCEPT_OFFER"; payload: { ugfTeamKey: string; excelTeamKey: string } }
@@ -34,7 +34,7 @@ export type GameAction =
 
 export const gameActions = {
   loadState: (state: GameState): GameAction => ({ type: "LOAD_STATE", payload: { state } }),
-  startNew: (beatIndex = 1): GameAction => ({ type: "START_NEW", payload: { beatIndex } }),
+  startNew: (): GameAction => ({ type: "START_NEW" }),
   setCoachProfile: (payload: SetCoachProfilePayload): GameAction => ({ type: "SET_COACH_PROFILE", payload }),
   setBackground: (backgroundKey: string): GameAction => ({ type: "SET_BACKGROUND", payload: { backgroundKey } }),
   acceptOffer: (ugfTeamKey: string, excelTeamKey: string): GameAction => ({ type: "ACCEPT_OFFER", payload: { ugfTeamKey, excelTeamKey } }),

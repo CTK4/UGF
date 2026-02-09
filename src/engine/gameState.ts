@@ -1,25 +1,9 @@
 import type { StaffRole } from "@/domain/staffRoles";
-import type { BeatKey, PhaseKey } from "@/engine/calendar";
 
 export type GamePhase = "PRECAREER" | "INTERVIEWS" | "COORD_HIRING" | "JANUARY_OFFSEASON";
 export type Role = StaffRole;
 export type ControlAxis = "SCHEME" | "ASSISTANTS";
 export type ControlSide = "offense" | "defense" | "specialTeams";
-
-export type ControlLockRole = "OC" | "DC" | "STC";
-
-export type SideControl = {
-  schemeAuthority: number;
-  assistantsAuthority: number;
-  locked: boolean;
-  lockedBy?: {
-    role: ControlLockRole;
-    staffId: string;
-    staffName: string;
-    reason: string;
-    axes: ControlAxis[];
-  };
-};
 
 export type StaffAssignment = {
   candidateId: string;
@@ -61,6 +45,19 @@ export type Thread = {
   messages: ThreadMessage[];
 };
 
+export type SideControl = {
+  schemeAuthority: number;
+  assistantsAuthority: number;
+  locked: boolean;
+  lockedBy?: {
+    role: "OC" | "DC" | "STC";
+    staffId: string;
+    staffName: string;
+    reason: string;
+    axes: ControlAxis[];
+  };
+};
+
 export type ProspectDiscovery = {
   level: 0 | 1 | 2 | 3;
   notes: string[];
@@ -70,34 +67,33 @@ export type GameState = {
   meta: { version: 1 };
   phase: GamePhase;
   time: {
-    season: number;
-    beatIndex: number;
-    beatKey: BeatKey;
-    label: string;
-    phase: PhaseKey;
+    season: 2026;
+    week: number;
     phaseVersion: number;
+    label: string;
+    // legacy compatibility
+    beatIndex?: number;
+    beatKey?: string;
   };
   coach: {
     name: string;
     age: number;
     hometown: string;
-    hometownId: string;
-    hometownLabel: string;
-    hometownTeamKey: string;
     backgroundKey: string;
     reputation: number;
     mediaStyle: string;
     personalityBaseline: string;
+    // legacy compatibility
+    hometownId?: string;
+    hometownLabel?: string;
+    hometownTeamKey?: string;
   };
   franchise: { ugfTeamKey: string; excelTeamKey: string };
-  career: {
-    control: Record<ControlSide, SideControl>;
-  };
   staff: {
     assignments: Record<Role, StaffAssignment | null>;
     budgetTotal: number;
     budgetUsed: number;
-    blockedHireAttemptsRecent: number;
+    blockedHireAttemptsRecent?: number;
   };
   offseasonPlan: {
     priorities: string[];
@@ -106,11 +102,14 @@ export type GameState = {
     tradeNotes: string;
   } | null;
   tasks: Task[];
-  completedGates: string[];
-  lastUiError: string | null;
   inbox: Thread[];
-  checkpoints: { ts: number; label: string; beatIndex: number; phaseVersion: number }[];
-  draft: {
+  checkpoints: { ts: number; label: string; week: number; phaseVersion: number; beatIndex?: number }[];
+
+  // legacy compatibility fields used by current UI
+  career?: { control: Record<ControlSide, SideControl> };
+  completedGates?: string[];
+  lastUiError?: string | null;
+  draft?: {
     discovered: Record<string, ProspectDiscovery>;
     watchlist: string[];
   };

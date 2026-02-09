@@ -53,7 +53,7 @@ export function generateWeeklyMessages(state: GameState): Array<{ threadId: "own
 
   const openTasks = state.tasks.filter((task) => task.status === "OPEN").length;
   if (openTasks > 0) {
-    messages.push({ threadId: "gm", from: "GM", text: `${openTasks} task(s) are still open after this beat. Let's close them next week.` });
+    messages.push({ threadId: "gm", from: "GM", text: `${openTasks} task(s) are still open after this week. Let's close them next week.` });
   }
 
   if (messages.length === 0) {
@@ -79,7 +79,7 @@ export function appendWeeklyMessages(state: GameState): Thread[] {
   for (const item of messages) {
     const thread = upsertThread(inbox, item.threadId, item.threadId === "owner" ? "Owner" : "GM");
     const message: ThreadMessage = {
-      id: `${item.threadId}-${state.time.season}-${state.time.beatIndex}-${thread.messages.length + 1}`,
+      id: `${item.threadId}-${state.time.season}-${state.time.week}-${thread.messages.length + 1}`,
       from: item.from,
       text: item.text,
       ts: new Date().toISOString(),

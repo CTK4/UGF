@@ -35,7 +35,7 @@ export function HubScreen({ ui }: ScreenProps) {
       <div className="ugf-card__header"><h2 className="ugf-card__title">Hub</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
         <div className="ugf-pill">{gs.time.season} · {gs.time.label}</div>
-        <div className="ugf-pill">Beat: {gs.time.beatKey}</div>
+        <div className="ugf-pill">Week {gs.time.week} • Phase: {gs.phase}</div>
         <div>Coach: <b>{gs.coach.name || "Unnamed"}</b></div>
         <div>Franchise: {gs.franchise.ugfTeamKey || "Not selected"}</div>
 

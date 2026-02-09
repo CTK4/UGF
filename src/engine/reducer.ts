@@ -1,93 +1,14 @@
 import { STAFF_ROLES } from "@/domain/staffRoles";
 import type { GameAction } from "@/engine/actions";
-import { getBeat, getNextBeat } from "@/engine/calendar";
-import { validateBeatGates } from "@/engine/gates";
-import type { GamePhase, GameState, Role } from "@/engine/gameState";
-import { appendWeeklyMessages } from "@/engine/phone";
 import { applyScoutingAction } from "@/engine/scouting";
-import { generateBeatTasks } from "@/engine/tasks";
-
+import type { GamePhase, GameState, Role } from "@/engine/gameState";
 
 function createDefaultSideControl() {
   return { schemeAuthority: 50, assistantsAuthority: 50, locked: false };
 }
 
-function migrateCareerControl(loaded: any) {
-  const base = {
-    offense: createDefaultSideControl(),
-    defense: createDefaultSideControl(),
-    specialTeams: createDefaultSideControl(),
-  };
-  const current = loaded?.career?.control ?? {};
-
-  const migrateSide = (sideKey: "offense" | "defense" | "specialTeams", legacyKeys: string[]) => {
-    const side = current?.[sideKey] ?? {};
-    const legacyAuthority = legacyKeys.map((k) => Number(loaded?.career?.[k])).find((n) => Number.isFinite(n));
-    const existingScheme = Number(side.schemeAuthority);
-    const existingAssistants = Number(side.assistantsAuthority);
-    return {
-      ...base[sideKey],
-      ...side,
-      schemeAuthority: Number.isFinite(existingScheme) ? existingScheme : (Number.isFinite(legacyAuthority) ? legacyAuthority : base[sideKey].schemeAuthority),
-      assistantsAuthority: Number.isFinite(existingAssistants) ? existingAssistants : (Number.isFinite(legacyAuthority) ? legacyAuthority : base[sideKey].assistantsAuthority),
-      locked: Boolean(side.locked),
-      lockedBy: side.lockedBy,
-    };
-  };
-
-  return {
-    offense: migrateSide("offense", ["authorityOffense", "offenseAuthority"]),
-    defense: migrateSide("defense", ["authorityDefense", "defenseAuthority"]),
-    specialTeams: migrateSide("specialTeams", ["authoritySpecialTeams", "specialTeamsAuthority", "authorityST"]),
-  };
-}
-
 function emptyAssignments() {
   return Object.fromEntries(STAFF_ROLES.map((role) => [role, null])) as Record<Role, null>;
-}
-
-export function createNewGameState(beatIndex = 1): GameState {
-  const beat = getBeat(2026, beatIndex);
-  return {
-    meta: { version: 1 },
-    phase: "PRECAREER",
-    time: {
-      season: 2026,
-      beatIndex,
-      beatKey: beat.key,
-      label: beat.label,
-      phase: beat.phase,
-      phaseVersion: 1,
-    },
-    coach: {
-      name: "",
-      age: 35,
-      hometown: "",
-      hometownId: "",
-      hometownLabel: "",
-      hometownTeamKey: "",
-      backgroundKey: "",
-      reputation: 50,
-      mediaStyle: "Balanced",
-      personalityBaseline: "Balanced",
-    },
-    franchise: { ugfTeamKey: "", excelTeamKey: "" },
-    career: {
-      control: {
-        offense: createDefaultSideControl(),
-        defense: createDefaultSideControl(),
-        specialTeams: createDefaultSideControl(),
-      },
-    },
-    staff: { assignments: emptyAssignments(), budgetTotal: 18_000_000, budgetUsed: 0, blockedHireAttemptsRecent: 0 },
-    offseasonPlan: null,
-    tasks: [],
-    completedGates: [],
-    lastUiError: null,
-    inbox: [],
-    checkpoints: [],
-    draft: { discovered: {}, watchlist: [] },
-  };
 }
 
 function phaseLabel(phase: GamePhase): string {
@@ -103,56 +24,69 @@ function phaseLabel(phase: GamePhase): string {
   }
 }
 
+export function createNewGameState(): GameState {
+  return {
+    meta: { version: 1 },
+    phase: "PRECAREER",
+    time: { season: 2026, week: 1, phaseVersion: 1, label: phaseLabel("PRECAREER"), beatIndex: 1 },
+    coach: {
+      name: "",
+      age: 35,
+      hometown: "",
+      backgroundKey: "",
+      reputation: 50,
+      mediaStyle: "Balanced",
+      personalityBaseline: "Balanced",
+      hometownId: "",
+      hometownLabel: "",
+      hometownTeamKey: "",
+    },
+    franchise: { ugfTeamKey: "", excelTeamKey: "" },
+    staff: { assignments: emptyAssignments(), budgetTotal: 18_000_000, budgetUsed: 0, blockedHireAttemptsRecent: 0 },
+    offseasonPlan: null,
+    tasks: [],
+    inbox: [],
+    checkpoints: [],
+    career: {
+      control: {
+        offense: createDefaultSideControl(),
+        defense: createDefaultSideControl(),
+        specialTeams: createDefaultSideControl(),
+      },
+    },
+    completedGates: [],
+    lastUiError: null,
+    draft: { discovered: {}, watchlist: [] },
+  };
+}
+
 export function reduceGameState(prev: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "LOAD_STATE": {
-      const loaded = action.payload.state as any;
-      const season = loaded.time?.season ?? 2026;
-      const beatIndex = loaded.time?.beatIndex ?? loaded.time?.week ?? 1;
-      const beat = getBeat(season, beatIndex);
+      const loaded = action.payload.state as GameState;
+      const week = loaded.time?.week ?? loaded.time?.beatIndex ?? 1;
       return {
+        ...createNewGameState(),
         ...loaded,
-        draft: {
-          discovered: Object.fromEntries(
-            Object.entries(loaded.draft?.discovered ?? {}).map(([id, report]: [string, any]) => [
-              id,
-              { level: report.level ?? 0, notes: Array.isArray(report.notes) ? report.notes : report.notes ? [String(report.notes)] : [] },
-            ]),
-          ),
-          watchlist: loaded.draft?.watchlist ?? [],
-        },
-        coach: {
-          ...loaded.coach,
-          hometownId: loaded.coach?.hometownId ?? "",
-          hometownLabel: loaded.coach?.hometownLabel ?? loaded.coach?.hometown ?? "",
-          hometownTeamKey: loaded.coach?.hometownTeamKey ?? "",
-        },
-        staff: {
-          ...loaded.staff,
-          blockedHireAttemptsRecent: loaded.staff?.blockedHireAttemptsRecent ?? 0,
-        },
-        career: {
-          control: migrateCareerControl(loaded),
-        },
         time: {
-          season,
-          beatIndex,
-          beatKey: loaded.time?.beatKey ?? beat.key,
-          label: loaded.time?.label ?? beat.label,
-          phase: loaded.time?.phase ?? beat.phase,
+          season: 2026,
+          week,
           phaseVersion: loaded.time?.phaseVersion ?? 1,
+          label: loaded.time?.label ?? phaseLabel(loaded.phase ?? "PRECAREER"),
+          beatIndex: week,
+          beatKey: loaded.time?.beatKey,
         },
-        completedGates: loaded.completedGates ?? [],
-        checkpoints: (loaded.checkpoints ?? []).map((cp: any) => ({
+        checkpoints: (loaded.checkpoints ?? []).map((cp) => ({
           ts: cp.ts,
           label: cp.label,
-          beatIndex: cp.beatIndex ?? cp.week ?? beatIndex,
+          week: cp.week ?? cp.beatIndex ?? week,
+          beatIndex: cp.week ?? cp.beatIndex ?? week,
           phaseVersion: cp.phaseVersion,
         })),
       };
     }
     case "START_NEW":
-      return createNewGameState(action.payload?.beatIndex ?? 1);
+      return createNewGameState();
     case "SET_COACH_PROFILE":
       return { ...prev, coach: { ...prev.coach, ...action.payload } };
     case "SET_BACKGROUND":
@@ -163,7 +97,6 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
         phase: "COORD_HIRING",
         time: { ...prev.time, label: phaseLabel("COORD_HIRING") },
         franchise: { ugfTeamKey: action.payload.ugfTeamKey, excelTeamKey: action.payload.excelTeamKey },
-        lastUiError: null,
       };
     case "HIRE_COACH": {
       const { role, assignment } = action.payload;
@@ -172,7 +105,7 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
       if (budgetUsed > prev.staff.budgetTotal) {
         return {
           ...prev,
-          staff: { ...prev.staff, blockedHireAttemptsRecent: prev.staff.blockedHireAttemptsRecent + 1 },
+          staff: { ...prev.staff, blockedHireAttemptsRecent: (prev.staff.blockedHireAttemptsRecent ?? 0) + 1 },
           lastUiError: "Hire blocked: staff budget limit exceeded.",
         };
       }
@@ -184,82 +117,47 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
           blockedHireAttemptsRecent: 0,
           assignments: { ...prev.staff.assignments, [role]: assignment },
         },
-        completedGates: [
-          ...new Set([
-            ...prev.completedGates,
-            ...(["OC", "DC", "STC"].every((r) => (r === role ? assignment : prev.staff.assignments[r as Role])) ? ["GATE.COORDINATORS_HIRED"] : []),
-          ]),
-        ],
         lastUiError: null,
       };
     }
-    case "ENTER_JANUARY_OFFSEASON": {
-      const next = {
+    case "ENTER_JANUARY_OFFSEASON":
+      return {
         ...prev,
-        phase: "JANUARY_OFFSEASON" as const,
-        time: { ...prev.time, label: getBeat(prev.time.season, prev.time.beatIndex).label },
-        lastUiError: null,
+        phase: "JANUARY_OFFSEASON",
+        time: { ...prev.time, label: phaseLabel("JANUARY_OFFSEASON") },
       };
-      return { ...next, tasks: generateBeatTasks(next) };
-    }
-    case "SET_OFFSEASON_PLAN": {
-      const next = {
+    case "SET_OFFSEASON_PLAN":
+      return {
         ...prev,
-        phase: "JANUARY_OFFSEASON" as const,
-        time: { ...prev.time, label: getBeat(prev.time.season, prev.time.beatIndex).label },
+        phase: "JANUARY_OFFSEASON",
+        time: { ...prev.time, label: phaseLabel("JANUARY_OFFSEASON") },
         offseasonPlan: action.payload,
-        lastUiError: null,
-        completedGates: [...new Set([...prev.completedGates, "GATE.STAFF_MEETING_DONE"])],
       };
-      return next;
-    }
     case "COMPLETE_TASK": {
       const completedTask = prev.tasks.find((task) => task.id === action.payload.taskId);
       let next: GameState = {
         ...prev,
         tasks: prev.tasks.map((task) => (task.id === action.payload.taskId ? { ...task, status: "DONE" } : task)),
       };
-      if (completedTask?.gateId) {
-        next = { ...next, completedGates: [...new Set([...next.completedGates, completedTask.gateId])] };
-      }
       if (completedTask?.type === "SCOUT_POSITION") {
         next = applyScoutingAction(next, { positions: action.payload.positions ?? [] });
       }
       return next;
     }
-    case "MARK_THREAD_READ": {
+    case "MARK_THREAD_READ":
       return {
         ...prev,
         inbox: prev.inbox.map((thread) => (thread.id === action.payload.threadId ? { ...thread, unreadCount: 0 } : thread)),
       };
-    }
     case "ADVANCE_WEEK": {
-      const currentBeat = getBeat(prev.time.season, prev.time.beatIndex);
-      const gateBlock = validateBeatGates(prev, currentBeat.gates);
-      if (gateBlock) {
-        return { ...prev, lastUiError: gateBlock.message };
-      }
-
-      const nextBeat = getNextBeat(prev.time.season, prev.time.beatIndex);
+      const week = prev.time.week + 1;
       const phaseVersion = prev.time.phaseVersion + 1;
-      const nextState: GameState = {
-        ...prev,
-        time: {
-          season: prev.time.season,
-          beatIndex: nextBeat.index,
-          beatKey: nextBeat.key,
-          label: nextBeat.label,
-          phase: nextBeat.phase,
-          phaseVersion,
-        },
-        checkpoints: [...prev.checkpoints, { ts: Date.now(), label: nextBeat.label, beatIndex: nextBeat.index, phaseVersion }],
-        lastUiError: null,
-      };
-
+      const label = action.payload?.label ?? `Week ${week}`;
       return {
-        ...nextState,
-        tasks: generateBeatTasks(nextState),
-        inbox: appendWeeklyMessages(nextState),
+        ...prev,
+        time: { ...prev.time, week, beatIndex: week, phaseVersion, label },
+        checkpoints: [...prev.checkpoints, { ts: Date.now(), label, week, beatIndex: week, phaseVersion }],
+        lastUiError: null,
       };
     }
     default:

@@ -47,7 +47,7 @@ export function StartScreen({ ui }: ScreenProps) {
     <div className="ugf-card" style={{ minHeight: "70vh", display: "grid", placeItems: "center" }}>
       <div className="ugf-card__body" style={{ display: "grid", gap: 12, textAlign: "center", maxWidth: 640 }}>
         <h2 className="ugf-card__title" style={{ fontSize: 24 }}>Start Your Career</h2>
-        {hasSave ? <div className="ugf-pill">Resume available: Week {state.save.gameState.time.beatIndex} • {state.save.gameState.phase}</div> : null}
+        {hasSave ? <div className="ugf-pill">Resume available: Week {state.save.gameState.time.week} • {state.save.gameState.phase}</div> : null}
         <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
           {hasSave ? <button onClick={() => ui.dispatch({ type: "LOAD_GAME" })}>Resume Career</button> : null}
           <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "ChooseFranchise" } })}>Start New Career</button>
