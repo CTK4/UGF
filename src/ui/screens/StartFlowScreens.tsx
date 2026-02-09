@@ -212,7 +212,9 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
 }
 
 export function OffersScreen({ ui }: ScreenProps) {
-  const offers = ui.getState().ui.opening.offers;
+  const opening = ui.getState().ui.opening;
+  const offers = opening.offers;
+  const lastOfferError = opening.lastOfferError;
 
   if (!offers.length) {
     console.error("No offers generated (dev error)");
@@ -229,6 +231,7 @@ export function OffersScreen({ ui }: ScreenProps) {
   return (
     <div className="ugf-card">
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+        {lastOfferError ? <div className="ugf-pill" style={{ color: "#ffd7d7", borderColor: "#b04545" }}>{lastOfferError}</div> : null}
         {offers.map((offer) => (
           <button type="button" key={offer.franchiseId} onClick={() => ui.dispatch({ type: "ACCEPT_OFFER", franchiseId: offer.franchiseId })}>
             <div><b>{(() => { const name = getFranchise(offer.franchiseId)?.fullName ?? offer.franchiseId; devGuardForbiddenTeamName(name); return name; })()}</b></div>
