@@ -12,6 +12,7 @@ import { INTERVIEW_SCRIPTS } from "@/data/interviewScripts";
 import { deriveGmProfile } from "@/data/gmDerivation";
 import { OWNER_PROFILES } from "@/data/ownerProfiles";
 import { getOwnerProfile } from "@/data/owners";
+import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { getTeamIdByName, getTeamSummaryRows } from "@/data/generatedData";
 import { deriveOfferTerms } from "@/engine/offers";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
@@ -611,35 +612,48 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "ACCEPT_OFFER": {
-          const franchiseId = String(action.franchiseId);
-          const f = getFranchise(franchiseId);
-          const isOffered = state.ui.opening.offers.some((offer) => offer.franchiseId === franchiseId);
-          if (!f || !isOffered) return;
-          let gameState = reduceGameState(createNewGameState(1), gameActions.startNew(1));
-          gameState = reduceGameState(
-            gameState,
-            gameActions.setCoachProfile({
-              name: state.ui.opening.coachName || "You",
-              age: 35,
-              hometown: state.ui.opening.hometownLabel || "Unknown",
-              hometownId: state.ui.opening.hometownId,
-              hometownLabel: state.ui.opening.hometownLabel,
-              hometownTeamKey: state.ui.opening.hometownTeamKey || "UNKNOWN_TEAM",
-              reputation: 50,
-              mediaStyle: "Balanced",
-              personalityBaseline: "Balanced",
-            }),
-          );
-          gameState = reduceGameState(gameState, gameActions.setBackground(state.ui.opening.background));
-          gameState = reduceGameState(gameState, gameActions.acceptOffer(franchiseId, normalizeExcelTeamKey(f.fullName)));
-          gameState = {
-            ...gameState,
-            inbox: ensureThreads(gameState),
-            tasks: [{ id: "task-1", type: "STAFF_MEETING", title: "Hire coordinators", description: "Fill OC/DC/STC positions.", status: "OPEN" }],
-            draft: gameState.draft ?? { discovered: {}, watchlist: [] },
+          const runAcceptOfferFlow = () => {
+            const franchiseId = String(action.franchiseId);
+            const franchise = getFranchise(franchiseId);
+            const isOffered = state.ui.opening.offers.some((offer) => offer.franchiseId === franchiseId);
+            if (!franchise || !isOffered) return;
+            let gameState = reduceGameState(createNewGameState(1), gameActions.startNew(1));
+            gameState = reduceGameState(
+              gameState,
+              gameActions.setCoachProfile({
+                name: state.ui.opening.coachName || "You",
+                age: 35,
+                hometown: state.ui.opening.hometownLabel || "Unknown",
+                hometownId: state.ui.opening.hometownId,
+                hometownLabel: state.ui.opening.hometownLabel,
+                hometownTeamKey: state.ui.opening.hometownTeamKey || "UNKNOWN_TEAM",
+                reputation: 50,
+                mediaStyle: "Balanced",
+                personalityBaseline: "Balanced",
+              }),
+            );
+            gameState = reduceGameState(gameState, gameActions.setBackground(state.ui.opening.background));
+            gameState = reduceGameState(gameState, gameActions.acceptOffer(franchiseId, normalizeExcelTeamKey(franchiseId)));
+            gameState = {
+              ...gameState,
+              inbox: ensureThreads(gameState),
+              tasks: [{ id: "task-1", type: "STAFF_MEETING", title: "Hire coordinators", description: "Fill OC/DC/STC positions.", status: "OPEN" }],
+              draft: gameState.draft ?? { discovered: {}, watchlist: [] },
+            };
+            localStorage.setItem(SAVE_KEY, JSON.stringify({ version: 1, gameState }));
+            setState({ ...state, save: { version: 1, gameState }, route: { key: "HireCoordinators" } });
           };
-          localStorage.setItem(SAVE_KEY, JSON.stringify({ version: 1, gameState }));
-          setState({ ...state, save: { version: 1, gameState }, route: { key: "HireCoordinators" } });
+
+          if (import.meta.env.DEV) {
+            try {
+              runAcceptOfferFlow();
+            } catch (error) {
+              console.error("[runtime] ACCEPT_OFFER failed", error);
+            }
+            return;
+          }
+
+          runAcceptOfferFlow();
           return;
         }
         case "SET_COORDINATOR_CHOICE":
