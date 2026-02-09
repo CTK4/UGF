@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "packageManager": "npm@10.8.1",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "description": "UGF Coach RPG prototype",
   "main": "index.js",
   "scripts": {
