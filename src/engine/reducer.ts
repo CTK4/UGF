@@ -42,6 +42,9 @@ export function createNewGameState(): GameState {
       reputation: 50,
       mediaStyle: "Balanced",
       personalityBaseline: "Balanced",
+      hometownId: "",
+      hometownLabel: "",
+      hometownTeamKey: "",
     },
     franchise: { ugfTeamKey: "", excelTeamKey: "" },
     staff: { assignments: emptyAssignments(), budgetTotal: 18_000_000, budgetUsed: 0, blockedHireAttemptsRecent: 0 },
@@ -109,7 +112,7 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
       if (budgetUsed > prev.staff.budgetTotal) {
         return {
           ...prev,
-          staff: { ...prev.staff, blockedHireAttemptsRecent: prev.staff.blockedHireAttemptsRecent + 1 },
+          staff: { ...prev.staff, blockedHireAttemptsRecent: (prev.staff.blockedHireAttemptsRecent ?? 0) + 1 },
           lastUiError: "Hire blocked: staff budget limit exceeded.",
         };
       }

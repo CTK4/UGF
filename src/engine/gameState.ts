@@ -71,13 +71,17 @@ export type GameState = {
     reputation: number;
     mediaStyle: string;
     personalityBaseline: string;
+    // legacy compatibility
+    hometownId?: string;
+    hometownLabel?: string;
+    hometownTeamKey?: string;
   };
   franchise: { ugfTeamKey: string; excelTeamKey: string };
   staff: {
     assignments: Record<Role, StaffAssignment | null>;
     budgetTotal: number;
     budgetUsed: number;
-    blockedHireAttemptsRecent: number;
+    blockedHireAttemptsRecent?: number;
   };
   offseasonPlan: {
     priorities: string[];

@@ -8,7 +8,7 @@ export function HireMarketScreen({ ui }: ScreenProps) {
   const save = state.save;
   if (!save || state.route.key !== "HireMarket") return null;
   const role = state.route.role;
-  const session = marketByWeekFor(save.gameState)[`${save.gameState.time.season}-${save.gameState.time.beatIndex}:${role}`];
+  const session = marketByWeekFor(save.gameState)[`${save.gameState.time.season}-${save.gameState.time.week}:${role}`];
 
   return (
     <div className="ugf-card">

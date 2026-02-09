@@ -7,6 +7,9 @@ export type SetCoachProfilePayload = {
   reputation: number;
   mediaStyle: string;
   personalityBaseline: string;
+  hometownId?: string;
+  hometownLabel?: string;
+  hometownTeamKey?: string;
 };
 
 export type OffseasonPlanPayload = {
