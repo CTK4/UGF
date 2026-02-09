@@ -3,9 +3,7 @@ import personnelData from "@/data/generated/personnel.json";
 import rosterData from "@/data/generated/rosters.json";
 import type { ScreenProps } from "@/ui/types";
 import { HOMETOWNS } from "@/data/hometowns";
-import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
-import { normalizeExcelTeamKey } from "@/data/teamMap";
-import { TeamIcon } from "@/ui/components/TeamIcon";
+import { getFranchise } from "@/ui/data/franchises";
 
 type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string };
 const personnel = personnelData as PersonnelRow[];
@@ -50,45 +48,12 @@ export function StartScreen({ ui }: ScreenProps) {
         {hasSave ? <div className="ugf-pill">Resume available: Week {state.save.gameState.time.beatIndex} • {state.save.gameState.phase}</div> : null}
         <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
           {hasSave ? <button onClick={() => ui.dispatch({ type: "LOAD_GAME" })}>Resume Career</button> : null}
-          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "ChooseFranchise" } })}>Start New Career</button>
+          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CreateCoach" } })}>Start New Career</button>
           <button className="danger" onClick={() => ui.dispatch({ type: "RESET_SAVE" })}>Reset</button>
         </div>
       </div>
     </div>
   );
-}
-
-export function ChooseFranchiseScreen({ ui }: ScreenProps) {
-  const state = ui.getState();
-  return (
-    <div className="ugf-card">
-      <div className="ugf-card__header"><h2 className="ugf-card__title">Choose Franchise</h2></div>
-      <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
-        {FRANCHISES.map((f) => {
-          const teamKey = normalizeExcelTeamKey(f.fullName);
-          return (
-            <button
-              key={f.id}
-              onClick={() => ui.dispatch({ type: "SET_DRAFT_FRANCHISE", franchiseId: f.id })}
-              style={{ display: "flex", alignItems: "center", gap: 10 }}
-            >
-              <span style={{ display: "inline-flex", width: 64, minWidth: 64, justifyContent: "center", alignItems: "center" }}>
-                <TeamIcon teamKey={teamKey} size={48} />
-              </span>
-              <span>{f.fullName}</span>
-            </button>
-          );
-        })}
-        <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CareerContext" } })} disabled={!state.draftFranchiseId}>Confirm Franchise</button>
-      </div>
-    </div>
-  );
-}
-
-export function CareerContextScreen({ ui }: ScreenProps) {
-  const selected = getFranchise(ui.getState().draftFranchiseId ?? "");
-  if (!selected) return null;
-  return <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}><div>Interviewing for <b>{selected.fullName}</b>.</div><button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CreateCoach" } })}>Continue</button></div></div>;
 }
 
 export function CreateCoachScreen({ ui }: ScreenProps) {
@@ -126,11 +91,111 @@ export function CreateCoachScreen({ ui }: ScreenProps) {
 
 export function CoachBackgroundScreen({ ui }: ScreenProps) {
   const selected = ui.getState().ui.opening.background;
-  return <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>{backgrounds.map((b) => <button key={b} onClick={() => ui.dispatch({ type: "SET_BACKGROUND", background: b })}>{selected === b ? "✓ " : ""}{b}</button>)}<button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Interviews" } })}>Next</button></div></div>;
+  return (
+    <div className="ugf-card">
+      <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+        {backgrounds.map((b) => (
+          <button key={b} onClick={() => ui.dispatch({ type: "SET_BACKGROUND", background: b })}>{selected === b ? "✓ " : ""}{b}</button>
+        ))}
+        <button onClick={() => ui.dispatch({ type: "OPENING_GENERATE_INVITES" })}>Next</button>
+      </div>
+    </div>
+  );
 }
 
-export function InterviewsScreen({ ui }: ScreenProps) {
-  return <div className="ugf-card"><div className="ugf-card__body"><button onClick={() => ui.dispatch({ type: "RUN_INTERVIEWS" })}>Run Interviews</button></div></div>;
+export function InterviewInvitationsScreen({ ui }: ScreenProps) {
+  const { interviewInvites, interviewResults } = ui.getState().ui.opening;
+  const tierLabelByCode = {
+    REBUILD: "Rebuild (Bottom-5)",
+    FRINGE: "Fringe (Middle)",
+    CONTENDER: "Contender (Top-10)",
+  } as const;
+
+  return (
+    <div className="ugf-card">
+      <div className="ugf-card__header"><h2 className="ugf-card__title">Interview Invitations</h2></div>
+      <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+        {interviewInvites.map((invite) => {
+          const result = interviewResults[invite.franchiseId];
+          const status = result?.complete ? "Completed" : "Pending";
+          return (
+            <button
+              key={invite.franchiseId}
+              type="button"
+              onClick={() => ui.dispatch({ type: "OPENING_START_INTERVIEW", franchiseId: invite.franchiseId })}
+              style={{ display: "grid", gap: 4, textAlign: "left" }}
+            >
+              <div><b>{getFranchise(invite.franchiseId)?.fullName ?? invite.franchiseId}</b> • {status}</div>
+              <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[invite.tier]}</div>
+              <div style={{ fontSize: 12, opacity: 0.9 }}>{invite.summaryLine}</div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function OpeningInterviewScreen({ ui }: ScreenProps) {
+  const opening = ui.getState().ui.opening;
+  const franchiseId = opening.activeInterviewFranchiseId;
+  if (!franchiseId) return null;
+
+  const invite = opening.interviewInvites.find((item) => item.franchiseId === franchiseId);
+  const result = opening.interviewResults[franchiseId];
+  if (!invite || !result) return null;
+
+  const questions = [
+    {
+      prompt: "Owner: Why should I trust you with this rebuild?",
+      choices: [
+        { key: "A", text: "I build a clear long-term identity and culture.", tone: "Measured confidence." },
+        { key: "B", text: "I can maximize this roster immediately.", tone: "Aggressive promise." },
+        { key: "C", text: "I will align with your expectations and timeline.", tone: "Collaborative approach." },
+      ],
+    },
+    {
+      prompt: "GM: How will you partner with personnel decisions?",
+      choices: [
+        { key: "A", text: "Data-first process with shared checkpoints.", tone: "Structured and analytic." },
+        { key: "B", text: "I need final say over football priorities.", tone: "Forceful and direct." },
+        { key: "C", text: "Let's build consensus around role fits.", tone: "Flexible and diplomatic." },
+      ],
+    },
+    {
+      prompt: "Pressure: What happens if year one starts 2-6?",
+      choices: [
+        { key: "A", text: "Stick to the plan and communicate progress.", tone: "Calm under pressure." },
+        { key: "B", text: "I'll make bold moves to flip momentum.", tone: "High urgency response." },
+        { key: "C", text: "Adapt weekly while protecting core standards.", tone: "Balanced response." },
+      ],
+    },
+  ] as const;
+
+  const questionIndex = result.answers.length;
+  const question = questions[questionIndex];
+
+  return (
+    <div className="ugf-card">
+      <div className="ugf-card__header"><h2 className="ugf-card__title">{getFranchise(franchiseId)?.fullName ?? franchiseId}</h2></div>
+      <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
+        <div style={{ fontSize: 12, opacity: 0.9 }}>{invite.tier} • {invite.summaryLine}</div>
+        {question ? (
+          <>
+            <div><b>Question {questionIndex + 1} / 3:</b> {question.prompt}</div>
+            {question.choices.map((choice) => (
+              <button key={choice.key} type="button" onClick={() => ui.dispatch({ type: "OPENING_SUBMIT_INTERVIEW_ANSWER", franchiseId, choice: choice.key })}>
+                {choice.key}. {choice.text}
+              </button>
+            ))}
+          </>
+        ) : (
+          <div>Interview completed.</div>
+        )}
+        {result.toneFeedback.length ? <div className="ugf-pill">{result.toneFeedback[result.toneFeedback.length - 1]}</div> : null}
+      </div>
+    </div>
+  );
 }
 
 export function OffersScreen({ ui }: ScreenProps) {
@@ -145,7 +210,7 @@ export function OffersScreen({ ui }: ScreenProps) {
     <div className="ugf-card">
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
         {offers.map((offer) => (
-          <button key={offer.franchiseId} onClick={() => ui.dispatch({ type: "ACCEPT_OFFER", franchiseId: offer.franchiseId })}>
+          <button key={offer.franchiseId} type="button" onClick={() => ui.dispatch({ type: "ACCEPT_OFFER", franchiseId: offer.franchiseId })}>
             <div><b>{getFranchise(offer.franchiseId)?.fullName ?? offer.franchiseId}</b></div>
             <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[offer.tier]}</div>
             <div style={{ fontSize: 12, opacity: 0.9 }}>{offer.summaryLine}</div>

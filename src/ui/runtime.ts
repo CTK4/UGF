@@ -9,7 +9,8 @@ import { HOMETOWN_CLOSEST_TEAM } from "@/data/hometownToTeam";
 import { HOMETOWNS } from "@/data/hometowns";
 import { getTeamIdByName, getTeamSummaryRows } from "@/data/generatedData";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
-import type { InterviewInvite, InterviewInviteTier, SaveData, UIAction, UIController, UIState } from "@/ui/types";
+import { normalizeExcelTeamKey } from "@/data/teamMap";
+import type { InterviewAnswerChoice, InterviewInvite, InterviewInviteTier, InterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
 
 const SAVE_KEY = "ugf.save.v1";
 
@@ -32,7 +33,9 @@ function openingState(): UIState["ui"]["opening"] {
     hometownId: "",
     hometownLabel: "",
     hometownTeamKey: "",
-    interviewNotes: [],
+    interviewInvites: [],
+    interviewResults: {},
+    activeInterviewFranchiseId: null,
     offers: [],
     coordinatorChoices: {},
   };
@@ -201,6 +204,65 @@ function generateInterviewInvites(hometownTeamKey: string): InterviewInvite[] {
   return invites.slice(0, 3);
 }
 
+function createInitialInterviewResult(franchiseId: string): InterviewResult {
+  return {
+    franchiseId,
+    answers: [],
+    ownerOpinion: 0,
+    gmOpinion: 0,
+    pressureHandling: 0,
+    toneFeedback: [],
+    complete: false,
+  };
+}
+
+function applyInterviewAnswer(result: InterviewResult, questionIndex: number, choice: InterviewAnswerChoice): InterviewResult {
+  const byQuestion = [
+    {
+      A: { owner: 2, gm: 1, pressure: 1, tone: "Owner appreciated your long-term vision." },
+      B: { owner: -1, gm: 0, pressure: 1, tone: "Owner heard confidence but questioned realism." },
+      C: { owner: 1, gm: 1, pressure: 0, tone: "Owner liked your collaborative tone." },
+    },
+    {
+      A: { owner: 0, gm: 2, pressure: 0, tone: "GM responded well to your process-oriented plan." },
+      B: { owner: 0, gm: -1, pressure: 1, tone: "GM bristled at the demand for full control." },
+      C: { owner: 1, gm: 1, pressure: 0, tone: "GM liked the balanced partnership message." },
+    },
+    {
+      A: { owner: 1, gm: 1, pressure: 2, tone: "Both owner and GM saw calm leadership under pressure." },
+      B: { owner: 0, gm: 0, pressure: 1, tone: "They noted urgency, but worried about volatility." },
+      C: { owner: 1, gm: 1, pressure: 1, tone: "They saw adaptable leadership and steady judgment." },
+    },
+  ] as const;
+
+  const deltas = byQuestion[questionIndex][choice];
+  const answers = [...result.answers, choice];
+  const toneFeedback = [...result.toneFeedback, deltas.tone];
+
+  return {
+    ...result,
+    answers,
+    ownerOpinion: result.ownerOpinion + deltas.owner,
+    gmOpinion: result.gmOpinion + deltas.gm,
+    pressureHandling: result.pressureHandling + deltas.pressure,
+    toneFeedback,
+    complete: answers.length >= 3,
+  };
+}
+
+function generateOffersFromInterviews(invites: InterviewInvite[], results: Record<string, InterviewResult>): InterviewInvite[] {
+  const scored = invites
+    .map((invite) => {
+      const result = results[invite.franchiseId];
+      const score = (result?.ownerOpinion ?? 0) + (result?.gmOpinion ?? 0) + (result?.pressureHandling ?? 0);
+      return { invite, score };
+    })
+    .sort((a, b) => b.score - a.score || a.invite.franchiseId.localeCompare(b.invite.franchiseId));
+
+  const count = Math.max(1, Math.min(3, scored.filter((row) => row.score >= 1).length || 1));
+  return scored.slice(0, count).map((row) => row.invite);
+}
+
 
 type CandidateRequirement = {
   minScheme?: number;
@@ -278,7 +340,6 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
   let state: UIState = {
     route: initialRoute(loadedGameState ? { version: 1, gameState: loadedGameState } : null),
     save: loadedGameState ? { version: 1, gameState: loadedGameState } : null,
-    draftFranchiseId: FRANCHISES[0]?.id ?? null,
     corruptedSave: corrupted,
     ui: { activeModal: null, notifications: [], opening: openingState() },
   };
@@ -316,9 +377,6 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           localStorage.removeItem(SAVE_KEY);
           setState({ ...state, save: null, route: { key: "Start" }, corruptedSave: false, ui: { ...state.ui, opening: openingState() } });
           return;
-        case "SET_DRAFT_FRANCHISE":
-          setState({ ...state, draftFranchiseId: String(action.franchiseId) });
-          return;
         case "SET_COACH_NAME":
           setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachName: String(action.coachName ?? "") } } });
           return;
@@ -343,9 +401,73 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           });
           return;
         }
-        case "RUN_INTERVIEWS": {
-          const offers = generateInterviewInvites(state.ui.opening.hometownTeamKey);
-          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, interviewNotes: ["Interview cycle complete"], offers } }, route: { key: "Offers" } });
+        case "OPENING_GENERATE_INVITES": {
+          const interviewInvites = generateInterviewInvites(state.ui.opening.hometownTeamKey);
+          const interviewResults = Object.fromEntries(
+            interviewInvites.map((invite) => [invite.franchiseId, createInitialInterviewResult(invite.franchiseId)]),
+          );
+          setState({
+            ...state,
+            ui: {
+              ...state.ui,
+              opening: {
+                ...state.ui.opening,
+                interviewInvites,
+                interviewResults,
+                activeInterviewFranchiseId: null,
+                offers: [],
+              },
+            },
+            route: { key: "InterviewInvitations" },
+          });
+          return;
+        }
+        case "OPENING_START_INTERVIEW": {
+          const franchiseId = String(action.franchiseId ?? "");
+          if (!state.ui.opening.interviewInvites.some((invite) => invite.franchiseId === franchiseId)) return;
+          const interviewResults = {
+            ...state.ui.opening.interviewResults,
+            [franchiseId]: state.ui.opening.interviewResults[franchiseId] ?? createInitialInterviewResult(franchiseId),
+          };
+          setState({
+            ...state,
+            ui: {
+              ...state.ui,
+              opening: { ...state.ui.opening, interviewResults, activeInterviewFranchiseId: franchiseId },
+            },
+            route: { key: "OpeningInterview" },
+          });
+          return;
+        }
+        case "OPENING_SUBMIT_INTERVIEW_ANSWER": {
+          const franchiseId = String(action.franchiseId ?? "");
+          const choice = String(action.choice ?? "") as InterviewAnswerChoice;
+          if (!["A", "B", "C"].includes(choice)) return;
+          const current = state.ui.opening.interviewResults[franchiseId] ?? createInitialInterviewResult(franchiseId);
+          if (current.complete) return;
+          const nextResult = applyInterviewAnswer(current, current.answers.length, choice);
+          const interviewResults = { ...state.ui.opening.interviewResults, [franchiseId]: nextResult };
+          const allComplete = state.ui.opening.interviewInvites.every((invite) => interviewResults[invite.franchiseId]?.complete);
+          if (allComplete) {
+            const offers = generateOffersFromInterviews(state.ui.opening.interviewInvites, interviewResults);
+            setState({
+              ...state,
+              ui: {
+                ...state.ui,
+                opening: { ...state.ui.opening, interviewResults, activeInterviewFranchiseId: null, offers },
+              },
+              route: { key: "Offers" },
+            });
+            return;
+          }
+          setState({
+            ...state,
+            ui: {
+              ...state.ui,
+              opening: { ...state.ui.opening, interviewResults, activeInterviewFranchiseId: null },
+            },
+            route: { key: "InterviewInvitations" },
+          });
           return;
         }
         case "ACCEPT_OFFER": {
@@ -375,7 +497,9 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             tasks: [{ id: "task-1", type: "STAFF_MEETING", title: "Hire coordinators", description: "Fill OC/DC/STC positions.", status: "OPEN" }],
             draft: gameState.draft ?? { discovered: {}, watchlist: [] },
           };
-          setState({ ...state, save: { version: 1, gameState }, route: { key: "HireCoordinators" } });
+          const nextState = { ...state, save: { version: 1, gameState }, route: { key: "HireCoordinators" as const } };
+          setState(nextState);
+          localStorage.setItem(SAVE_KEY, JSON.stringify(nextState.save));
           return;
         }
         case "SET_COORDINATOR_CHOICE":

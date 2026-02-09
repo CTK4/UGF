@@ -3,11 +3,10 @@ import type { ScreenProps } from "@/ui/types";
 import type { StaffRole } from "@/domain/staffRoles";
 import {
   StartScreen,
-  ChooseFranchiseScreen,
-  CareerContextScreen,
   CreateCoachScreen,
   CoachBackgroundScreen,
-  InterviewsScreen,
+  InterviewInvitationsScreen,
+  OpeningInterviewScreen,
   OffersScreen,
   HireCoordinatorsScreen,
   StaffMeetingScreen,
@@ -20,11 +19,10 @@ import { PhoneInboxScreen, PhoneThreadScreen } from "@/ui/screens/PhoneScreens";
 
 export type RouteKey =
   | "Start"
-  | "ChooseFranchise"
-  | "CareerContext"
   | "CreateCoach"
   | "CoachBackground"
-  | "Interviews"
+  | "InterviewInvitations"
+  | "OpeningInterview"
   | "Offers"
   | "HireCoordinators"
   | "StaffMeeting"
@@ -37,11 +35,10 @@ export type RouteKey =
 
 export type Route =
   | { key: "Start" }
-  | { key: "ChooseFranchise" }
-  | { key: "CareerContext" }
   | { key: "CreateCoach" }
   | { key: "CoachBackground" }
-  | { key: "Interviews" }
+  | { key: "InterviewInvitations" }
+  | { key: "OpeningInterview" }
   | { key: "Offers" }
   | { key: "HireCoordinators" }
   | { key: "StaffMeeting" }
@@ -54,11 +51,10 @@ export type Route =
 
 export const RouteMap: Record<RouteKey, ComponentType<ScreenProps>> = {
   Start: StartScreen,
-  ChooseFranchise: ChooseFranchiseScreen,
-  CareerContext: CareerContextScreen,
   CreateCoach: CreateCoachScreen,
   CoachBackground: CoachBackgroundScreen,
-  Interviews: InterviewsScreen,
+  InterviewInvitations: InterviewInvitationsScreen,
+  OpeningInterview: OpeningInterviewScreen,
   Offers: OffersScreen,
   HireCoordinators: HireCoordinatorsScreen,
   StaffMeeting: StaffMeetingScreen,
