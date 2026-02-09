@@ -18,10 +18,10 @@ export type InterviewInvite = {
 
 export type OpeningInterviewResult = {
   franchiseId: string;
-  answers: number[];
   ownerOpinion: number;
   gmOpinion: number;
-  pressureTone: number;
+  risk: number;
+  answers: { questionId: string; choiceId: "A" | "B" | "C" }[];
   completed: boolean;
   lastToneFeedback: string;
 };

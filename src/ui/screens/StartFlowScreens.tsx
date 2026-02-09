@@ -7,7 +7,8 @@ import { getFranchise } from "@/ui/data/franchises";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { TeamLogo } from "@/ui/components/TeamLogo";
 import { TeamIcon } from "@/ui/components/TeamIcon";
-import { OPENING_INTERVIEW_QUESTIONS } from "@/data/interviewQuestions";
+import { INTERVIEW_QUESTION_BANK } from "@/data/interviewBank";
+import { INTERVIEW_SCRIPTS } from "@/data/interviewScripts";
 
 type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string };
 const personnel = personnelData as PersonnelRow[];
@@ -45,6 +46,12 @@ function toTeamKey(value: string) {
 
 function rolePool(position: "OC" | "DC" | "ST Coordinator") {
   return personnel.filter((p) => p.Position === position).slice(0, 6);
+}
+
+function devGuardForbiddenTeamName(teamName: string) {
+  if (import.meta.env.DEV && (teamName.includes("Voodoo") || teamName.includes("Gotham"))) {
+    console.error(`Forbidden team naming detected in UI: ${teamName}`);
+  }
 }
 
 export function StartScreen({ ui }: ScreenProps) {
@@ -127,7 +134,7 @@ export function InterviewsScreen({ ui }: ScreenProps) {
                 <TeamIcon teamKey={invite.franchiseId} size={44} />
               </span>
               <span>
-                <div><b>{franchise?.fullName ?? invite.franchiseId}</b>{result?.completed ? " • Completed" : ""}</div>
+                <div><b>{(() => { const name = franchise?.fullName ?? invite.franchiseId; devGuardForbiddenTeamName(name); return name; })()}</b>{result?.completed ? " • Completed" : ""}</div>
                 <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[invite.tier]}</div>
                 <div style={{ fontSize: 12, opacity: 0.9 }}>{invite.summaryLine}</div>
               </span>
@@ -152,10 +159,8 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
   const result = state.ui.opening.interviewResults[franchiseId];
   const franchise = getFranchise(franchiseId);
   if (!invite || !result) return null;
-  const questions = OPENING_INTERVIEW_QUESTIONS;
-  if (import.meta.env.DEV && questions.length !== 3) {
-    console.error(`OPENING_INTERVIEW_QUESTIONS must contain exactly 3 items. Received ${questions.length}.`);
-  }
+  const script = INTERVIEW_SCRIPTS[franchiseId] ?? INTERVIEW_SCRIPTS.ATLANTA_APEX;
+  const questions = script.questionIds.map((id) => INTERVIEW_QUESTION_BANK[id]);
   const isDone = result.completed || result.answers.length >= questions.length;
 
   useEffect(() => {
@@ -173,7 +178,7 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
 
   return (
     <div className="ugf-card">
-      <div className="ugf-card__header"><h2 className="ugf-card__title">Interview: {franchise?.fullName ?? franchiseId}</h2></div>
+      <div className="ugf-card__header"><h2 className="ugf-card__title">Interview: {(() => { const name = franchise?.fullName ?? franchiseId; devGuardForbiddenTeamName(name); return name; })()}</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
         <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[invite.tier]} • {invite.summaryLine}</div>
         {current ? <div><b>{current.label} Q{questionIndex + 1}.</b> {current.prompt}</div> : null}
@@ -189,14 +194,18 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
           </div>
         ) : (
           <div style={{ display: "grid", gap: 8 }}>
-            {current.choices.map((choice, choiceIndex) => (
+            {[
+              { label: "A", text: "Set a firm, ambitious standard immediately." },
+              { label: "B", text: "Take a balanced approach with steady collaboration." },
+              { label: "C", text: "Keep flexibility and adapt after early evaluation." },
+            ].map((choice, choiceIndex) => (
               <button key={`${current.label}-${choice.label}`} type="button" onClick={() => ui.dispatch({ type: "OPENING_ANSWER_INTERVIEW", franchiseId, answerIndex: choiceIndex })}>
                 {choice.label}) {choice.text}
               </button>
             ))}
           </div>
         )}
-        {result.lastToneFeedback ? <div className="ugf-pill">Tone: {result.lastToneFeedback}</div> : null}
+        {result.lastToneFeedback ? <div className="ugf-pill">{result.lastToneFeedback}</div> : null}
       </div>
     </div>
   );
@@ -222,7 +231,7 @@ export function OffersScreen({ ui }: ScreenProps) {
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
         {offers.map((offer) => (
           <button type="button" key={offer.franchiseId} onClick={() => ui.dispatch({ type: "ACCEPT_OFFER", franchiseId: offer.franchiseId })}>
-            <div><b>{getFranchise(offer.franchiseId)?.fullName ?? offer.franchiseId}</b></div>
+            <div><b>{(() => { const name = getFranchise(offer.franchiseId)?.fullName ?? offer.franchiseId; devGuardForbiddenTeamName(name); return name; })()}</b></div>
             <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[offer.tier]}</div>
             <div style={{ fontSize: 12, opacity: 0.9 }}>{offer.summaryLine}</div>
           </button>

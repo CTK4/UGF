@@ -7,10 +7,12 @@ import { generateImmediateMessagesFromEvent } from "@/engine/phone";
 import { getScoutablePositions } from "@/engine/scouting";
 import { HOMETOWN_CLOSEST_TEAM } from "@/data/hometownToTeam";
 import { HOMETOWNS } from "@/data/hometowns";
-import { OPENING_INTERVIEW_QUESTIONS } from "@/data/interviewQuestions";
+import { INTERVIEW_QUESTION_BANK } from "@/data/interviewBank";
+import { INTERVIEW_SCRIPTS } from "@/data/interviewScripts";
+import { deriveGmProfile } from "@/data/gmDerivation";
+import { OWNER_PROFILES } from "@/data/ownerProfiles";
 import { getOwnerProfile } from "@/data/owners";
 import { getTeamIdByName, getTeamSummaryRows } from "@/data/generatedData";
-import { computeTeamWeightedDelta } from "@/engine/interviews";
 import { deriveOfferTerms } from "@/engine/offers";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
 import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
@@ -82,21 +84,58 @@ function clampRating(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
 
-if (import.meta.env.DEV && OPENING_INTERVIEW_QUESTIONS.length !== 3) {
-  console.error(`OPENING_INTERVIEW_QUESTIONS must contain exactly 3 items. Received ${OPENING_INTERVIEW_QUESTIONS.length}.`);
+const CHOICE_IDS = ["A", "B", "C"] as const;
+
+type ChoiceId = (typeof CHOICE_IDS)[number];
+
+type InterviewDelta = { owner: number; gm: number; risk: number };
+
+function getScriptForTeam(teamKey: string) {
+  return INTERVIEW_SCRIPTS[teamKey] ?? INTERVIEW_SCRIPTS.ATLANTA_APEX;
+}
+
+function getQuestionDeltas(base: { owner: number; gm: number; risk: number }, choiceId: ChoiceId): InterviewDelta {
+  if (choiceId === "A") return { ...base };
+  if (choiceId === "B") return { owner: Math.round(base.owner * 0.5), gm: Math.round(base.gm * 0.5), risk: Math.round(base.risk * 0.25) };
+  return { owner: -Math.round(base.owner * 0.5), gm: -Math.round(base.gm * 0.5), risk: -Math.round(base.risk * 0.5) };
+}
+
+function sumTraitMods(traits: string[], traitModifiers: Array<{ trait: string; delta: InterviewDelta }>): InterviewDelta {
+  return traitModifiers.reduce(
+    (acc, mod) => {
+      if (!traits.includes(mod.trait)) return acc;
+      return {
+        owner: acc.owner + mod.delta.owner,
+        gm: acc.gm + mod.delta.gm,
+        risk: acc.risk + mod.delta.risk,
+      };
+    },
+    { owner: 0, gm: 0, risk: 0 } satisfies InterviewDelta,
+  );
 }
 
 function generateOffersFromInterviewResults(interviewInvites: InterviewInvite[], interviewResults: Record<string, OpeningInterviewResult>): InterviewInvite[] {
   const scored = interviewInvites
     .map((invite) => {
       const result = interviewResults[invite.franchiseId];
-      const score = (result?.ownerOpinion ?? 50) + (result?.gmOpinion ?? 50) + (result?.pressureTone ?? 50);
-      return { invite, score };
+      const script = getScriptForTeam(invite.franchiseId);
+      const teamScore = (result?.ownerOpinion ?? 50) + (result?.gmOpinion ?? 50) - (result?.risk ?? 50);
+      const offerEligible =
+        (result?.ownerOpinion ?? 50) >= script.thresholds.ownerMin &&
+        (result?.gmOpinion ?? 50) >= script.thresholds.gmMin &&
+        (result?.risk ?? 50) <= script.thresholds.maxRisk;
+      return { invite, teamScore, offerEligible };
     })
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.teamScore - a.teamScore || a.invite.franchiseId.localeCompare(b.invite.franchiseId));
 
-  const offerCount = Math.max(1, Math.min(3, scored.filter((entry) => entry.score >= 150).length || 1));
-  return scored.slice(0, offerCount).map((entry) => entry.invite);
+  const eligible = scored.filter((entry) => entry.offerEligible);
+  const bestScore = scored[0]?.teamScore ?? 0;
+  let offerCount = 1;
+  if (eligible.length >= 3 && bestScore >= 140) offerCount = 3;
+  else if (eligible.length >= 2 && bestScore >= 120) offerCount = 2;
+
+  const prioritized = [...eligible, ...scored.filter((entry) => !entry.offerEligible)];
+  return prioritized.slice(0, offerCount).map((entry) => entry.invite);
 }
 
 function parseCapSpaceValue(row: Record<string, unknown>): number | null {
@@ -449,10 +488,10 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               invite.franchiseId,
               {
                 franchiseId: invite.franchiseId,
-                answers: [],
                 ownerOpinion: 50,
                 gmOpinion: 50,
-                pressureTone: 50,
+                risk: 50,
+                answers: [],
                 completed: false,
                 lastToneFeedback: "",
               } satisfies OpeningInterviewResult,
@@ -479,10 +518,10 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           if (!invite) return;
           const existing = state.ui.opening.interviewResults[franchiseId] ?? {
             franchiseId,
-            answers: [],
             ownerOpinion: 50,
             gmOpinion: 50,
-            pressureTone: 50,
+            risk: 50,
+            answers: [],
             completed: false,
             lastToneFeedback: "",
           };
@@ -504,24 +543,43 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           const answerIndex = Number(action.answerIndex ?? -1);
           const current = state.ui.opening.interviewResults[franchiseId];
           if (!current || current.completed) return;
-          const question = OPENING_INTERVIEW_QUESTIONS[current.answers.length];
-          const choice = question?.choices[answerIndex];
-          if (!choice) return;
-          const weightedDelta = computeTeamWeightedDelta({
-            teamKey: franchiseId,
-            questionIndex: current.answers.length,
-            choiceIndex: answerIndex,
-            base: choice,
-          });
 
+          const script = getScriptForTeam(franchiseId);
+          const questionId = script.questionIds[current.answers.length];
+          const question = INTERVIEW_QUESTION_BANK[questionId];
+          const choiceId = CHOICE_IDS[answerIndex];
+          if (!question || !choiceId) return;
+
+          const ownerProfile = (OWNER_PROFILES as Record<string, (typeof OWNER_PROFILES)[keyof typeof OWNER_PROFILES]>)[franchiseId] ?? OWNER_PROFILES.ATLANTA_APEX;
+          const teamMetrics = buildTeamInviteMetricsByFranchiseId().get(franchiseId) ?? { overall: 70, capSpace: 0 };
+          const gmProfile = deriveGmProfile({ overall: teamMetrics.overall, capSpace: teamMetrics.capSpace ?? 0 }, ownerProfile);
+
+          const baseDelta = getQuestionDeltas(question.baseEffects, choiceId);
+          const ownerTraitMods = sumTraitMods(ownerProfile.traits, question.traitModifiers as Array<{ trait: string; delta: InterviewDelta }>);
+          const gmTraitMods = sumTraitMods(gmProfile.traits, question.traitModifiers as Array<{ trait: string; delta: InterviewDelta }>);
+
+          let ownerDelta = baseDelta.owner + ownerTraitMods.owner + gmTraitMods.owner;
+          const gmDelta = baseDelta.gm + ownerTraitMods.gm + gmTraitMods.gm;
+          const riskDelta = baseDelta.risk + ownerTraitMods.risk + gmTraitMods.risk;
+
+          if (script.specialRules?.volatileOwnerSwing) {
+            ownerDelta += choiceId === "A" ? 1 : choiceId === "C" ? -1 : 0;
+          }
+
+          const nextRisk = clampRating(current.risk + riskDelta);
           const nextResult: OpeningInterviewResult = {
             ...current,
-            answers: [...current.answers, answerIndex],
-            ownerOpinion: clampRating(current.ownerOpinion + weightedDelta.owner),
-            gmOpinion: clampRating(current.gmOpinion + weightedDelta.gm),
-            pressureTone: clampRating(current.pressureTone + weightedDelta.pressure),
-            completed: current.answers.length + 1 >= OPENING_INTERVIEW_QUESTIONS.length,
-            lastToneFeedback: weightedDelta.tone,
+            ownerOpinion: clampRating(current.ownerOpinion + ownerDelta),
+            gmOpinion: clampRating(current.gmOpinion + gmDelta),
+            risk: nextRisk,
+            answers: [...current.answers, { questionId, choiceId }],
+            completed: current.answers.length + 1 >= script.questionIds.length,
+            lastToneFeedback:
+              riskDelta > 0
+                ? "Tone: Risk increased."
+                : ownerDelta >= gmDelta
+                  ? "Tone: Ownership receptive."
+                  : "Tone: GM receptive.",
           };
 
           const interviewResults = { ...state.ui.opening.interviewResults, [franchiseId]: nextResult };
