@@ -7,6 +7,7 @@ import { getScoutablePositions } from "@/engine/scouting";
 import { HOMETOWN_CLOSEST_TEAM } from "@/data/hometownToTeam";
 import { HOMETOWNS } from "@/data/hometowns";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
+import { getOwnerProfile, shiftPressureDown, shiftPressureUp, type OwnerProfile, type OwnerTone } from "@/data/owners";
 import { getTeamSummaryRows } from "@/data/generatedData";
 import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
 import type { InterviewInvite, InterviewInviteTier, SaveData, UIAction, UIController, UIState } from "@/ui/types";
@@ -57,11 +58,49 @@ function sortedFranchises(): typeof FRANCHISES {
   return [...FRANCHISES].sort((a, b) => a.fullName.localeCompare(b.fullName));
 }
 
-const INTERVIEW_SUMMARY_BY_TIER: Record<InterviewInviteTier, string> = {
-  REBUILD: "Weak roster • Short patience risk",
-  FRINGE: "Some talent • Clear gaps",
-  CONTENDER: "Strong roster • Win-now pressure",
+type OfferPressure = OwnerTone;
+
+type OfferTerms = {
+  years: number;
+  pressure: OfferPressure;
+  mandate: string;
 };
+
+const INTERVIEW_SUMMARY_BY_TIER: Record<InterviewInviteTier, string> = {
+  REBUILD: "Weak roster • Stabilize and build",
+  FRINGE: "Some talent • Compete and improve",
+  CONTENDER: "Strong roster • Win now",
+};
+
+function deriveOfferTerms(tier: InterviewInviteTier, ownerProfile: OwnerProfile): OfferTerms {
+  const terms: OfferTerms =
+    tier === "REBUILD"
+      ? { years: 4, pressure: "LOW", mandate: "Stabilize and build" }
+      : tier === "FRINGE"
+        ? { years: 3, pressure: "MODERATE", mandate: "Compete and improve" }
+        : { years: 2, pressure: "HIGH", mandate: "Win now" };
+
+  if (ownerProfile.patience === "LOW") {
+    terms.years = Math.max(2, terms.years - 1);
+    terms.pressure = shiftPressureUp(terms.pressure);
+  } else if (ownerProfile.patience === "HIGH") {
+    terms.years = Math.min(4, terms.years + 1);
+    terms.pressure = shiftPressureDown(terms.pressure);
+  }
+
+  if (ownerProfile.mediaSensitivity === "HIGH") {
+    terms.pressure = shiftPressureUp(terms.pressure);
+    terms.mandate = `${terms.mandate} • Public scrutiny`;
+  }
+
+  if (ownerProfile.budgetPosture === "CHEAP") {
+    terms.mandate = `${terms.mandate} • Value discipline`;
+  } else if (ownerProfile.budgetPosture === "PREMIUM") {
+    terms.mandate = `${terms.mandate} • Aggressive spending allowed`;
+  }
+
+  return terms;
+}
 
 function rankTeamsByOverall(): Array<{ franchiseId: string; overall: number; rank: number; tier: InterviewInviteTier }> {
   const overallByTeam = new Map(
@@ -94,11 +133,14 @@ function pickFirstAvailable(
 }
 
 function buildInvite(team: { franchiseId: string; overall: number; tier: InterviewInviteTier }): InterviewInvite {
+  const ownerProfile = getOwnerProfile(normalizeExcelTeamKey(team.franchiseId));
+  const terms = deriveOfferTerms(team.tier, ownerProfile);
+
   return {
     franchiseId: team.franchiseId,
     tier: team.tier,
     overall: team.overall,
-    summaryLine: INTERVIEW_SUMMARY_BY_TIER[team.tier],
+    summaryLine: `${INTERVIEW_SUMMARY_BY_TIER[team.tier]} • ${terms.years}y • ${terms.pressure} pressure • ${terms.mandate}`,
   };
 }
 
