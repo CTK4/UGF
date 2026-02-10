@@ -15,7 +15,7 @@ import { getOwnerProfile } from "@/data/owners";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { getTeamIdByName, getTeamSummaryRows } from "@/data/generatedData";
 import { deriveOfferTerms } from "@/engine/offers";
-import { FRANCHISES, getFranchise } from "@/ui/data/franchises";
+import { FRANCHISES, resolveFranchiseLike } from "@/ui/data/franchises";
 import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
 
 const SAVE_KEY = "ugf.save.v1";
@@ -90,7 +90,9 @@ type ChoiceId = "A" | "B" | "C";
 
 type InterviewDelta = { owner: number; gm: number; risk: number };
 
-function getScriptForTeam(teamKey: string) {
+function getScriptForTeam(teamLookup: string) {
+  const resolved = resolveFranchiseLike(teamLookup);
+  const teamKey = resolved?.teamKey ?? normalizeExcelTeamKey(teamLookup);
   return INTERVIEW_SCRIPTS[teamKey] ?? INTERVIEW_SCRIPTS.ATLANTA_APEX;
 }
 
@@ -136,6 +138,40 @@ function generateOffersFromInterviewResults(interviewInvites: InterviewInvite[],
 
   const prioritized = [...eligible, ...scored.filter((entry) => !entry.offerEligible)];
   return prioritized.slice(0, offerCount).map((entry) => entry.invite);
+}
+
+function generateOpeningOffersWithFallback(
+  interviewInvites: InterviewInvite[],
+  interviewResults: Record<string, OpeningInterviewResult>,
+): { offers: InterviewInvite[]; error?: string } {
+  if (!interviewInvites.length) {
+    return { offers: [], error: "No interview invites were found. Please return to interviews and try again." };
+  }
+
+  try {
+    const offers = generateOffersFromInterviewResults(interviewInvites, interviewResults);
+    if (offers.length > 0) return { offers };
+
+    const fallback = [...interviewInvites]
+      .map((invite) => {
+        const result = interviewResults[invite.franchiseId];
+        const teamScore = (result?.ownerOpinion ?? 50) + (result?.gmOpinion ?? 50) - (result?.risk ?? 50);
+        return { invite, teamScore };
+      })
+      .sort((a, b) => b.teamScore - a.teamScore || a.invite.franchiseId.localeCompare(b.invite.franchiseId))[0]?.invite;
+
+    if (fallback) {
+      return {
+        offers: [fallback],
+        error: "Offer generation fallback applied. Showing top team by interview score.",
+      };
+    }
+
+    return { offers: [], error: "Offer generation failed. No teams were available." };
+  } catch (error) {
+    console.error("[runtime] opening offer generation failed", error);
+    return { offers: [], error: "Offer generation failed due to a runtime error. Please return to interviews." };
+  }
 }
 
 function parseCapSpaceValue(row: Record<string, unknown>): number | null {
@@ -215,10 +251,12 @@ function buildInvite(
   team: { franchiseId: string; overall: number; tier: InterviewInviteTier },
   metricsByFranchiseId: Map<string, TeamInviteMetrics>,
 ): InterviewInvite {
+  const resolved = resolveFranchiseLike(team.franchiseId);
+  const franchiseId = resolved?.teamKey ?? normalizeExcelTeamKey(team.franchiseId);
   const capSpace = metricsByFranchiseId.get(team.franchiseId)?.capSpace ?? null;
 
   return {
-    franchiseId: team.franchiseId,
+    franchiseId,
     tier: team.tier,
     overall: team.overall,
     summaryLine: buildSummaryLine(team.franchiseId, team.tier, capSpace),
@@ -441,11 +479,11 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               state.ui.opening.interviewInvites.length > 0 &&
               state.ui.opening.interviewInvites.every((invite) => state.ui.opening.interviewResults[invite.franchiseId]?.completed);
             if (allDone && state.ui.opening.offers.length === 0) {
-              const offers = generateOffersFromInterviewResults(state.ui.opening.interviewInvites, state.ui.opening.interviewResults);
+              const { offers, error } = generateOpeningOffersWithFallback(state.ui.opening.interviewInvites, state.ui.opening.interviewResults);
               setState({
                 ...state,
                 route: nextRoute,
-                ui: { ...state.ui, activeModal: null, opening: { ...state.ui.opening, offers } },
+                ui: { ...state.ui, activeModal: null, opening: { ...state.ui.opening, offers, lastOfferError: error } },
               });
               return;
             }
@@ -566,7 +604,10 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           const choiceId = choice?.id;
           if (!question || !choice || !choiceId) return;
 
-          const ownerProfile = (OWNER_PROFILES as Record<string, (typeof OWNER_PROFILES)[keyof typeof OWNER_PROFILES]>)[franchiseId] ?? OWNER_PROFILES.ATLANTA_APEX;
+          const resolvedFranchise = resolveFranchiseLike(franchiseId);
+          const scriptTeamKey = resolvedFranchise?.teamKey ?? normalizeExcelTeamKey(franchiseId);
+          const ownerProfile =
+            (OWNER_PROFILES as Record<string, (typeof OWNER_PROFILES)[keyof typeof OWNER_PROFILES]>)[scriptTeamKey] ?? OWNER_PROFILES.ATLANTA_APEX;
           const teamMetrics = buildTeamInviteMetricsByFranchiseId().get(franchiseId) ?? { overall: 70, capSpace: 0 };
           const gmProfile = deriveGmProfile({ overall: teamMetrics.overall, capSpace: teamMetrics.capSpace ?? 0 }, ownerProfile);
 
@@ -599,12 +640,14 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           };
 
           const interviewResults = { ...state.ui.opening.interviewResults, [franchiseId]: nextResult };
-          const allDone = state.ui.opening.interviewInvites.every((invite) => interviewResults[invite.franchiseId]?.completed);
+          const allDone =
+            state.ui.opening.interviewInvites.length > 0 &&
+            state.ui.opening.interviewInvites.every((invite) => interviewResults[invite.franchiseId]?.completed);
           if (allDone) {
-            const offers = generateOffersFromInterviewResults(state.ui.opening.interviewInvites, interviewResults);
+            const { offers, error } = generateOpeningOffersWithFallback(state.ui.opening.interviewInvites, interviewResults);
             setState({
               ...state,
-              ui: { ...state.ui, opening: { ...state.ui.opening, interviewResults, offers } },
+              ui: { ...state.ui, opening: { ...state.ui.opening, interviewResults, offers, lastOfferError: error } },
               route: { key: "Offers" },
             });
             return;
@@ -628,8 +671,15 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
         }
         case "ACCEPT_OFFER": {
           const franchiseId = String(action.franchiseId);
-          const franchise = getFranchise(franchiseId);
-          const isOffered = state.ui.opening.offers.some((offer) => offer.franchiseId === franchiseId);
+          const offeredTeamKey = String(action.excelTeamKey ?? "");
+          const franchise = resolveFranchiseLike(franchiseId);
+          const offeredInvite = franchise
+            ? state.ui.opening.offers.find((offer) => {
+                const offeredFranchise = resolveFranchiseLike(offer.franchiseId);
+                return offeredFranchise?.teamKey === franchise.teamKey;
+              })
+            : state.ui.opening.offers.find((offer) => offer.franchiseId === franchiseId);
+          const isOffered = Boolean(offeredInvite);
           if (!franchise || !isOffered) {
             if (import.meta.env.DEV) {
               console.error("[runtime] ACCEPT_OFFER rejected before flow", {
@@ -653,6 +703,20 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             return;
           }
           const excelTeamKey = normalizeExcelTeamKey(franchise.fullName);
+          if (offeredTeamKey && offeredTeamKey !== excelTeamKey) {
+            setState({
+              ...state,
+              route: { key: "Offers" },
+              ui: {
+                ...state.ui,
+                opening: {
+                  ...state.ui.opening,
+                  lastOfferError: "Offer details were out of sync. Please pick your offer again.",
+                },
+              },
+            });
+            return;
+          }
 
           const runAcceptOfferFlow = () => {
             let gameState = reduceGameState(createNewGameState(1), gameActions.startNew(1));
