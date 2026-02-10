@@ -462,10 +462,15 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
         case "FORCE_SAVE":
           if (!state.save) return;
           try {
-            if (writeTimer) window.clearTimeout(writeTimer);
+            if (writeTimer) {
+              window.clearTimeout(writeTimer);
+              writeTimer = null;
+            }
             localStorage.setItem(SAVE_KEY, JSON.stringify(state.save));
           } catch (error) {
-            if (import.meta.env.DEV) console.error("FORCE_SAVE failed", error);
+            if (import.meta.env.DEV) {
+              console.error("[runtime] FORCE_SAVE failed", error);
+            }
           }
           return;
         case "SET_COACH_NAME":
