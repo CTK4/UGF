@@ -2,6 +2,7 @@ import { STAFF_ROLES } from "@/domain/staffRoles";
 import type { GameAction } from "@/engine/actions";
 import type { GamePhase, GameState, Role } from "@/engine/gameState";
 import { applyScoutingAction } from "@/engine/scouting";
+import { DEFAULT_SALARY_CAP, sumCapByTeam } from "@/engine/cap";
 
 function createDefaultSideControl() {
   return { schemeAuthority: 50, assistantsAuthority: 50, locked: false };
@@ -24,9 +25,20 @@ function phaseLabel(phase: GamePhase): string {
   }
 }
 
+function createEmptyLeagueState() {
+  return {
+    playersById: {},
+    teamRosters: {},
+    cap: {
+      salaryCap: DEFAULT_SALARY_CAP,
+      capUsedByTeam: {},
+    },
+  };
+}
+
 export function createNewGameState(): GameState {
   return {
-    meta: { version: 1 },
+    meta: { version: 2 },
     phase: "PRECAREER",
     time: {
       season: 2026,
@@ -60,6 +72,7 @@ export function createNewGameState(): GameState {
       },
     },
     draft: { discovered: {}, watchlist: [] },
+    league: createEmptyLeagueState(),
     completedGates: [],
     lastUiError: null,
   };
@@ -72,7 +85,7 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
       return {
         ...createNewGameState(),
         ...loaded,
-        meta: { version: 1 },
+        meta: { version: 2 },
         time: {
           season: 2026,
           week: Number(loaded?.time?.week ?? loaded?.time?.beatIndex ?? 1),
@@ -82,6 +95,14 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
         staff: { ...createNewGameState().staff, ...(loaded?.staff ?? {}) },
         career: loaded?.career ?? createNewGameState().career,
         draft: loaded?.draft ?? createNewGameState().draft,
+        league: {
+          ...createEmptyLeagueState(),
+          ...(loaded?.league ?? {}),
+          cap: {
+            salaryCap: Number(loaded?.league?.cap?.salaryCap ?? DEFAULT_SALARY_CAP),
+            capUsedByTeam: loaded?.league?.cap?.capUsedByTeam ?? sumCapByTeam(loaded?.league?.playersById ?? {}),
+          },
+        },
         completedGates: loaded?.completedGates ?? [],
         lastUiError: loaded?.lastUiError ?? null,
         checkpoints: (loaded?.checkpoints ?? []).map((cp: any) => ({
@@ -104,6 +125,17 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
         phase: "COORD_HIRING",
         time: { ...prev.time, label: phaseLabel("COORD_HIRING"), phaseVersion: prev.time.phaseVersion + 1 },
         franchise: { ugfTeamKey: action.payload.ugfTeamKey, excelTeamKey: action.payload.excelTeamKey },
+      };
+    case "HYDRATE_LEAGUE_ROSTER":
+      return {
+        ...prev,
+        league: {
+          ...action.payload,
+          cap: {
+            salaryCap: Number(action.payload.cap.salaryCap || DEFAULT_SALARY_CAP),
+            capUsedByTeam: { ...action.payload.cap.capUsedByTeam },
+          },
+        },
       };
     case "HIRE_COACH": {
       const { role, assignment } = action.payload;

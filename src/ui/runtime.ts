@@ -18,6 +18,7 @@ import { deriveOfferTerms } from "@/engine/offers";
 import { FRANCHISES, resolveFranchiseLike } from "@/ui/data/franchises";
 import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
 import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
+import { loadLeagueRosterForTeam } from "@/services/rosterImport";
 
 const SAVE_KEY = "ugf.save.v1";
 
@@ -716,7 +717,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             return;
           }
 
-          const runAcceptOfferFlow = () => {
+          const runAcceptOfferFlow = async () => {
             let gameState = reduceGameState(createNewGameState(1), gameActions.startNew(1));
             gameState = reduceGameState(
               gameState,
@@ -734,6 +735,12 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             );
             gameState = reduceGameState(gameState, gameActions.setBackground(state.ui.opening.background));
             gameState = reduceGameState(gameState, gameActions.acceptOffer(franchiseId, excelTeamKey));
+            const { league, warning } = await loadLeagueRosterForTeam({
+              teamKey: franchiseId,
+              excelTeamKey,
+              season: gameState.time.season,
+            });
+            gameState = reduceGameState(gameState, gameActions.hydrateLeagueRoster(league));
             gameState = {
               ...gameState,
               inbox: ensureThreads(gameState),
@@ -748,13 +755,22 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               // Always persist + set state in one branch so clicks deterministically advance.
               save,
               route: { key: "HireCoordinators" },
-              ui: { ...state.ui, opening: { ...state.ui.opening, lastOfferError: undefined } },
+              ui: {
+                ...state.ui,
+                opening: { ...state.ui.opening, lastOfferError: undefined },
+                activeModal: warning
+                  ? {
+                      title: "Roster import warning",
+                      message: warning,
+                      warning,
+                      actions: [{ label: "Continue", action: { type: "CLOSE_MODAL" } }],
+                    }
+                  : null,
+              },
             });
           };
 
-          try {
-            runAcceptOfferFlow();
-          } catch (error) {
+          void runAcceptOfferFlow().catch((error: unknown) => {
             const stack = error instanceof Error ? error.stack : undefined;
             console.error("[runtime] ACCEPT_OFFER failed", {
               franchiseId,
@@ -774,7 +790,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
                 },
               },
             });
-          }
+          });
           return;
         }
         case "SET_COORDINATOR_CHOICE":
