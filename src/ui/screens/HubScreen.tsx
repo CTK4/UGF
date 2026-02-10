@@ -103,6 +103,7 @@ export function HubScreen({ ui }: ScreenProps) {
 
         <div className="ugf-pill">Cap Used: {money(capUsed)} / {money(gs.league.cap.salaryCap)} · Cap Space: <b>{money(capSpace)}</b></div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Roster" } })}>Open Roster</button>
           <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "FreeAgency" } })}>Open Free Agency</button>
         </div>
 
@@ -119,7 +120,7 @@ export function HubScreen({ ui }: ScreenProps) {
                   <div>Age {player.age ?? "—"}</div>
                   <div>{player.contract.yearsLeft} yrs</div>
                   <div>{money(player.contract.amount)}</div>
-                  <button className="danger" onClick={() => ui.dispatch({ type: "RELEASE_PLAYER", playerId: player.id })}>Release</button>
+                  <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Roster" } })}>Manage</button>
                 </div>
               </div>
             ))}
