@@ -191,7 +191,7 @@ case "APP_BOOT":
         return dispatchAction(ctx, { type: "NAVIGATE", route: { key: "TeamSummary", teamId: action.teamId } });
 
       case "OPEN_TEAM_ROSTER":
-        return dispatchAction(ctx, { type: "NAVIGATE", route: { key: "TeamRoster", teamId: action.teamId } });
+        return dispatchAction(ctx, { type: "NAVIGATE", route: { key: "Hub", tab: "roster" } });
 
       case "OPEN_DEPTH_CHART": {
         let next = state0;
@@ -267,7 +267,7 @@ const staff = hireIntoRole(state.save.staff!, teamId, role, action.personId);
       }
 
       case "OPEN_CONTRACTS":
-        return dispatchAction(ctx, { type: "NAVIGATE", route: { key: "Contracts", teamId: action.teamId ?? state0.save.franchiseTeamId ?? "Unknown Team" } });
+        return dispatchAction(ctx, { type: "NAVIGATE", route: { key: "Hub", tab: "contracts" } });
 
       case "OPEN_PLAYER_CONTRACT":
         return dispatchAction(ctx, { type: "NAVIGATE", route: { key: "PlayerContract", personId: action.personId } });
