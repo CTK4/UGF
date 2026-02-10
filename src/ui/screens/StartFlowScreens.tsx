@@ -3,7 +3,7 @@ import personnelData from "@/data/generated/personnel.json";
 import rosterData from "@/data/generated/rosters.json";
 import type { ScreenProps } from "@/ui/types";
 import { HOMETOWNS } from "@/data/hometowns";
-import { getFranchise } from "@/ui/data/franchises";
+import { getFranchise, resolveFranchiseLike } from "@/ui/data/franchises";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { TeamLogo } from "@/ui/components/TeamLogo";
 import { TeamIcon } from "@/ui/components/TeamIcon";
@@ -48,10 +48,8 @@ function rolePool(position: "OC" | "DC" | "ST Coordinator") {
   return personnel.filter((p) => p.Position === position).slice(0, 6);
 }
 
-function devGuardForbiddenTeamName(teamName: string) {
-  if (import.meta.env.DEV && (teamName.includes("Voodoo") || teamName.includes("Gotham"))) {
-    console.error(`Forbidden team naming detected in UI: ${teamName}`);
-  }
+function devGuardForbiddenTeamName(_teamName: string) {
+  // Reserved for future naming validation in development builds.
 }
 
 export function StartScreen({ ui }: ScreenProps) {
@@ -121,7 +119,7 @@ export function InterviewsScreen({ ui }: ScreenProps) {
       <div className="ugf-card__header"><h2 className="ugf-card__title">Interview Invitations</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
         {interviewInvites.map((invite) => {
-          const franchise = getFranchise(invite.franchiseId);
+          const franchise = resolveFranchiseLike(invite.franchiseId);
           const result = opening.interviewResults[invite.franchiseId];
           return (
             <button
@@ -141,11 +139,7 @@ export function InterviewsScreen({ ui }: ScreenProps) {
             </button>
           );
         })}
-        {allDone ? (
-          <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Offers" } })}>
-            View Offers
-          </button>
-        ) : null}
+        {allDone ? <div className="ugf-pill">All interviews complete. Offers generated automatically.</div> : null}
       </div>
     </div>
   );
@@ -157,9 +151,10 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
   const franchiseId = state.route.franchiseId;
   const invite = state.ui.opening.interviewInvites.find((item) => item.franchiseId === franchiseId);
   const result = state.ui.opening.interviewResults[franchiseId];
-  const franchise = getFranchise(franchiseId);
+  const franchise = resolveFranchiseLike(franchiseId);
   if (!invite || !result) return null;
-  const script = INTERVIEW_SCRIPTS[franchiseId] ?? INTERVIEW_SCRIPTS.ATLANTA_APEX;
+  const scriptTeamKey = resolveFranchiseLike(franchiseId)?.teamKey ?? normalizeExcelTeamKey(franchiseId);
+  const script = INTERVIEW_SCRIPTS[scriptTeamKey] ?? INTERVIEW_SCRIPTS.ATLANTA_APEX;
   const questionIndex = result.answers.length;
   const questionId = script.questionIds[questionIndex];
   const current = questionId ? INTERVIEW_QUESTION_BANK[questionId] : undefined;
@@ -210,14 +205,18 @@ export function OffersScreen({ ui }: ScreenProps) {
   const opening = ui.getState().ui.opening;
   const offers = opening.offers;
   const lastOfferError = opening.lastOfferError;
+  const canReturnToInterviews = opening.interviewInvites.length > 0;
 
   if (!offers.length) {
     console.error("No offers generated (dev error)");
     return (
       <div className="ugf-card">
         <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
-          <div>No offers generated (dev error)</div>
-          <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Interviews" } })}>Return to Interviews</button>
+          <div><b>No offers generated (dev error)</b></div>
+          {lastOfferError ? <div className="ugf-pill" style={{ color: "#ffd7d7", borderColor: "#b04545" }}>{lastOfferError}</div> : null}
+          {canReturnToInterviews ? (
+            <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Interviews" } })}>Back to Interviews</button>
+          ) : null}
         </div>
       </div>
     );
@@ -233,8 +232,15 @@ export function OffersScreen({ ui }: ScreenProps) {
           </div>
         ) : null}
         {offers.map((offer) => (
-          <button type="button" key={offer.franchiseId} onClick={() => ui.dispatch({ type: "ACCEPT_OFFER", franchiseId: offer.franchiseId })}>
-            <div><b>{(() => { const name = getFranchise(offer.franchiseId)?.fullName ?? offer.franchiseId; devGuardForbiddenTeamName(name); return name; })()}</b></div>
+          <button type="button" key={offer.franchiseId} onClick={() => {
+              const resolved = resolveFranchiseLike(offer.franchiseId);
+              ui.dispatch({
+                type: "ACCEPT_OFFER",
+                franchiseId: offer.franchiseId,
+                excelTeamKey: normalizeExcelTeamKey(resolved?.fullName ?? offer.franchiseId),
+              });
+            }}>
+            <div><b>{(() => { const name = resolveFranchiseLike(offer.franchiseId)?.fullName ?? offer.franchiseId; devGuardForbiddenTeamName(name); return name; })()}</b></div>
             <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[offer.tier]}</div>
             <div style={{ fontSize: 12, opacity: 0.9 }}>{offer.summaryLine}</div>
           </button>

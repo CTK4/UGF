@@ -1,5 +1,5 @@
 import { getAllTeamNames, getTeamIdByName, getTeamPersonnelRows } from "@/data/generatedData";
-import { getUgfTeamByExcelKey } from "@/data/teamMap";
+import { getUgfTeamByExcelKey, normalizeExcelTeamKey } from "@/data/teamMap";
 
 export type Franchise = {
   id: string;
@@ -12,6 +12,11 @@ export type Franchise = {
   gmPhilosophy: string;
   hcArchetype: string;
   expectation: string;
+};
+
+export type FranchiseLookup = Franchise & {
+  teamKey: string;
+  lookupValue: string;
 };
 
 function splitCityName(fullName: string): { city: string; name: string } {
@@ -36,7 +41,6 @@ function parsePersonnelByTeam() {
 }
 
 const personnelByTeam = parsePersonnelByTeam();
-
 
 // Keep save compatibility with older ugf.save.v1 files that stored legacy NFL-style
 // franchise IDs (e.g. ARI, DAL, PIT) before we switched to generated UGF IDs.
@@ -84,22 +88,58 @@ export const FRANCHISES: Franchise[] = getAllTeamNames().map((teamName, i) => {
   };
 });
 
-export function getFranchise(id: string): Franchise | undefined {
-  const found = FRANCHISES.find((f) => f.id === id);
-  if (found) return found;
-  const ugf = getUgfTeamByExcelKey(id);
-  if (!ugf) return undefined;
-  const [city, ...rest] = ugf.team.split(" ");
+const FRANCHISE_BY_ID = new Map(FRANCHISES.map((franchise) => [franchise.id, franchise]));
+const FRANCHISE_BY_TEAM_KEY = new Map(
+  FRANCHISES.map((franchise) => [normalizeExcelTeamKey(franchise.fullName), franchise]),
+);
+const FRANCHISE_BY_FULL_NAME = new Map(
+  FRANCHISES.map((franchise) => [franchise.fullName.trim().toLowerCase(), franchise]),
+);
+
+function toLookup(value: string): string {
+  return String(value ?? "").trim();
+}
+
+export function resolveFranchiseLike(value: string): FranchiseLookup | undefined {
+  const lookupValue = toLookup(value);
+  if (!lookupValue) return undefined;
+
+  const byId = FRANCHISE_BY_ID.get(lookupValue);
+  if (byId) {
+    return { ...byId, teamKey: normalizeExcelTeamKey(byId.fullName), lookupValue };
+  }
+
+  const normalizedTeamKey = normalizeExcelTeamKey(lookupValue);
+  const byTeamKey = FRANCHISE_BY_TEAM_KEY.get(normalizedTeamKey);
+  if (byTeamKey) {
+    return { ...byTeamKey, teamKey: normalizedTeamKey, lookupValue };
+  }
+
+  const byFullName = FRANCHISE_BY_FULL_NAME.get(lookupValue.toLowerCase());
+  if (byFullName) {
+    return { ...byFullName, teamKey: normalizeExcelTeamKey(byFullName.fullName), lookupValue };
+  }
+
+  const mapped = getUgfTeamByExcelKey(lookupValue);
+  if (!mapped) return undefined;
+
+  const parsed = splitCityName(mapped.team);
   return {
-    id,
-    city,
-    name: rest.join(" "),
-    fullName: ugf.team,
-    owner: `${city} Sports Group`,
+    id: mapped.teamKey,
+    city: parsed.city,
+    name: parsed.name,
+    fullName: mapped.team,
+    owner: `${parsed.city} Sports Group`,
     traits: ["Development"],
     jobSecurity: "Medium",
     gmPhilosophy: "Balanced",
     hcArchetype: "CEO",
     expectation: "Build a sustainable contender.",
+    teamKey: mapped.teamKey,
+    lookupValue,
   };
+}
+
+export function getFranchise(id: string): Franchise | undefined {
+  return resolveFranchiseLike(id);
 }
