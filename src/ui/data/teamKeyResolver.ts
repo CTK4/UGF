@@ -1,4 +1,4 @@
-import { getTeamIdByName } from "@/data/generatedData";
+import { getTeamIdByName, getTeamSummaryRows, type TeamSummaryRow } from "@/data/generatedData";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { UGF_TEAM_BY_KEY } from "@/data/ugfTeams";
 import { FRANCHISES } from "@/ui/data/franchises";
@@ -60,4 +60,16 @@ export function resolveTeamKey(idOrName: string): string {
   }
 
   return UNKNOWN_TEAM_KEY;
+}
+
+export function getTeamDisplayName(teamKey: string): string {
+  const resolvedTeamKey = resolveTeamKey(teamKey);
+  return UGF_TEAM_BY_KEY.get(resolvedTeamKey)?.team ?? String(teamKey ?? "").trim();
+}
+
+export function findTeamSummaryRow(teamKey: string): TeamSummaryRow | undefined {
+  const resolvedTeamKey = resolveTeamKey(teamKey);
+  if (resolvedTeamKey === UNKNOWN_TEAM_KEY) return undefined;
+
+  return getTeamSummaryRows().find((row) => resolveTeamKey(String(row.Team ?? "")) === resolvedTeamKey);
 }

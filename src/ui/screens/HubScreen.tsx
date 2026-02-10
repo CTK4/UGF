@@ -3,9 +3,8 @@ import type { ScreenProps } from "@/ui/types";
 import { getProspectLabel } from "@/services/draftDiscovery";
 import { getSuggestedNeed } from "@/engine/scouting";
 import { FRANCHISES } from "@/ui/data/franchises";
-import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { TeamLogo } from "@/ui/components/TeamLogo";
-import { getTeamSummaryRows } from "@/data/generatedData";
+import { findTeamSummaryRow, getTeamDisplayName, resolveTeamKey } from "@/ui/data/teamKeyResolver";
 
 export function HubScreen({ ui }: ScreenProps) {
   const save = ui.getState().save;
@@ -17,17 +16,24 @@ export function HubScreen({ ui }: ScreenProps) {
 
   const discoveredEntries = Object.entries(draftState.discovered).sort((a, b) => a[1].level - b[1].level || a[0].localeCompare(b[0]));
 
-  const standingsRows = getTeamSummaryRows() as Array<Record<string, unknown>>;
   const isMobile = typeof window !== "undefined" ? !window.matchMedia("(min-width: 900px)").matches : true;
   const standingsIconSize = isMobile ? 44 : 56;
   const standingsSnapshot = FRANCHISES.map((franchise) => {
-    const row = standingsRows.find((entry) => String(entry.Team ?? "").trim() === franchise.id) as Record<string, unknown> | undefined;
+    const teamKey = resolveTeamKey(franchise.fullName);
+    const row = findTeamSummaryRow(teamKey) as Record<string, unknown> | undefined;
+    if (!row && import.meta.env.DEV) {
+      console.warn("[HubScreen] No standings row found for franchise/team key.", {
+        franchiseId: franchise.id,
+        franchiseName: franchise.fullName,
+        teamKey,
+      });
+    }
     const wins = Number(row?.Wins ?? row?.W ?? 0);
     const losses = Number(row?.Losses ?? row?.L ?? 0);
     return {
       id: franchise.id,
-      teamKey: normalizeExcelTeamKey(franchise.fullName),
-      name: franchise.fullName,
+      teamKey,
+      name: getTeamDisplayName(teamKey),
       wins,
       losses,
       winPct: wins + losses > 0 ? wins / (wins + losses) : 0,
