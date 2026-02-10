@@ -6,7 +6,8 @@ import { FRANCHISES } from "@/ui/data/franchises";
 import { TeamLogo } from "@/ui/components/TeamLogo";
 import { findTeamSummaryRow, getTeamDisplayName, resolveTeamKey } from "@/ui/data/teamKeyResolver";
 import { SegmentedTabs } from "@/ui/components/SegmentedTabs";
-import { getContracts, getRosters, rosterTeamToTeamKey, sanitizeForbiddenName, type ContractRow, type RosterRow } from "@/data/rostersPublic";
+import { sanitizeForbiddenName } from "@/services/rosterImport";
+import { capSpaceForTeam } from "@/engine/cap";
 
 function money(n: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
@@ -16,38 +17,12 @@ export function HubScreen({ ui }: ScreenProps) {
   const save = ui.getState().save;
   const routeTab = ui.getState().route.key === "Hub" ? ui.getState().route.tab : undefined;
   const [hubTab, setHubTab] = useState<"summary" | "roster" | "contracts">(routeTab === "roster" || routeTab === "contracts" ? routeTab : "summary");
-  const [rosters, setRosters] = useState<RosterRow[] | null>(null);
-  const [contracts, setContracts] = useState<ContractRow[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (routeTab === "roster" || routeTab === "contracts") {
       setHubTab(routeTab);
     }
   }, [routeTab]);
-
-  useEffect(() => {
-    let canceled = false;
-    setLoadError(null);
-    void Promise.all([getRosters(), getContracts()])
-      .then(([nextRosters, nextContracts]) => {
-        if (canceled) return;
-        setRosters(nextRosters);
-        setContracts(nextContracts);
-      })
-      .catch((error: unknown) => {
-        if (canceled) return;
-        if (import.meta.env.DEV) {
-          console.error("[HubScreen] Failed to load public roster/contract data.", error);
-        }
-        setLoadError("Roster data is temporarily unavailable. You can keep playing and try again shortly.");
-        setRosters([]);
-        setContracts([]);
-      });
-    return () => {
-      canceled = true;
-    };
-  }, []);
 
   if (!save) {
     return <div className="ugf-card"><div className="ugf-card__body">Hub data loading / unavailable</div></div>;
@@ -82,19 +57,26 @@ export function HubScreen({ ui }: ScreenProps) {
   }).sort((a, b) => b.winPct - a.winPct || b.wins - a.wins || a.name.localeCompare(b.name)).slice(0, 8);
 
   const activeTeamKey = resolveTeamKey(gs.franchise.ugfTeamKey || gs.franchise.excelTeamKey || "");
-  const teamRoster = useMemo(
-    () => (rosters ?? []).filter((row) => rosterTeamToTeamKey(row.Team) === activeTeamKey),
-    [rosters, activeTeamKey],
-  );
+  const teamRoster = useMemo(() => {
+    const ids = gs.league.teamRosters[activeTeamKey] ?? [];
+    return ids.map((id) => gs.league.playersById[id]).filter(Boolean);
+  }, [gs.league.playersById, gs.league.teamRosters, activeTeamKey]);
   const teamContracts = useMemo(
-    () => (contracts ?? []).filter((row) => row.teamKey === activeTeamKey),
-    [contracts, activeTeamKey],
+    () => teamRoster.map((player) => ({
+      playerName: player.name,
+      position: player.pos || player.positionGroup,
+      yearsLeft: player.contract.yearsLeft,
+      expiring: player.contract.yearsLeft <= 1,
+      capHit: player.contract.amount,
+    })),
+    [teamRoster],
   );
   const expiring = teamContracts.filter((row) => row.expiring);
   const multiYear = teamContracts.filter((row) => !row.expiring);
   const totalCapObligation = teamContracts.reduce((sum, row) => sum + row.capHit, 0);
 
-  const rosterLoading = rosters === null || contracts === null;
+  const capUsed = gs.league.cap.capUsedByTeam[activeTeamKey] ?? 0;
+  const capSpace = capSpaceForTeam(activeTeamKey, gs.league.cap.capUsedByTeam, gs.league.cap.salaryCap);
 
 
   return (
@@ -119,42 +101,41 @@ export function HubScreen({ ui }: ScreenProps) {
           ariaLabel="Hub tabs"
         />
 
-        {rosterLoading ? <div className="ugf-pill">Loading rosters…</div> : null}
-        {loadError ? <div className="ugf-pill">{loadError}</div> : null}
+        <div className="ugf-pill">Cap Used: {money(capUsed)} / {money(gs.league.cap.salaryCap)} · Cap Space: <b>{money(capSpace)}</b></div>
 
-        {hubTab === "roster" && !rosterLoading ? (
+        {hubTab === "roster" ? (
           <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
             <b>Team Roster</b>
             {!teamRoster.length ? <div>No roster rows found for the active franchise.</div> : null}
-            {teamRoster.slice(0, 80).map((row, idx) => (
-              <div key={`${String(row["Player ID"] ?? row.PlayerName)}-${idx}`} className="ugf-card">
+            {teamRoster.slice(0, 80).map((player) => (
+              <div key={player.id} className="ugf-card">
                 <div className="ugf-card__body" style={{ display: "grid", gridTemplateColumns: "1.5fr repeat(5, minmax(70px, 1fr))", gap: 8 }}>
-                  <div><b>{String(row.PlayerName ?? "Unknown")}</b></div>
-                  <div>{String(row.PositionGroup ?? row.Position ?? "")}</div>
-                  <div>OVR {Number(row.Rating ?? 0)}</div>
-                  <div>Age {Number(row.Age ?? 0)}</div>
-                  <div>{Math.round(Number(row.ContractYearsRemaining ?? row["Original Contract Length"] ?? 0))} yrs</div>
-                  <div>{money(Number(row.AAV ?? row.ContractTotalValue_M ?? 0))}</div>
+                  <div><b>{sanitizeForbiddenName(player.name)}</b></div>
+                  <div>{player.pos || player.positionGroup}</div>
+                  <div>OVR {player.overall ?? "—"}</div>
+                  <div>Age {player.age ?? "—"}</div>
+                  <div>{player.contract.yearsLeft} yrs</div>
+                  <div>{money(player.contract.amount)}</div>
                 </div>
               </div>
             ))}
           </div></div>
         ) : null}
 
-        {hubTab === "contracts" && !rosterLoading ? (
+        {hubTab === "contracts" ? (
           <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
             <b>Contracts</b>
             <div>Total cap obligations: <b>{money(totalCapObligation)}</b></div>
             <div style={{ display: "grid", gap: 6 }}>
               <strong>Expiring ({expiring.length})</strong>
               {!expiring.length ? <div>None.</div> : expiring.map((row, idx) => (
-                <div key={`${row.playerName}-${idx}`}>• {row.playerName} ({row.position}) — {money(row.capHit)}</div>
+                <div key={`${row.playerName}-${idx}`}>• {sanitizeForbiddenName(row.playerName)} ({row.position}) — {money(row.capHit)}</div>
               ))}
             </div>
             <div style={{ display: "grid", gap: 6 }}>
               <strong>Multi-year ({multiYear.length})</strong>
               {!multiYear.length ? <div>None.</div> : multiYear.map((row, idx) => (
-                <div key={`${row.playerName}-${idx}`}>• {row.playerName} ({row.position}) — {row.yearsLeft} yrs · {money(row.capHit)}</div>
+                <div key={`${row.playerName}-${idx}`}>• {sanitizeForbiddenName(row.playerName)} ({row.position}) — {row.yearsLeft} yrs · {money(row.capHit)}</div>
               ))}
             </div>
           </div></div>

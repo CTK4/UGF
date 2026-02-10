@@ -59,8 +59,34 @@ export type Thread = {
   messages: ThreadMessage[];
 };
 
+export type PlayerContract = {
+  amount: number;
+  yearsLeft: number;
+  expSeason?: number;
+};
+
+export type LeaguePlayer = {
+  id: string;
+  name: string;
+  positionGroup: string;
+  pos: string;
+  teamKey: string;
+  overall?: number;
+  age?: number;
+  contract: PlayerContract;
+};
+
+export type LeagueState = {
+  playersById: Record<string, LeaguePlayer>;
+  teamRosters: Record<string, string[]>;
+  cap: {
+    salaryCap: number;
+    capUsedByTeam: Record<string, number>;
+  };
+};
+
 export type GameState = {
-  meta: { version: 1 };
+  meta: { version: 2 };
   phase: GamePhase;
   time: { season: 2026; week: number; phaseVersion: number; label: string };
   coach: {
@@ -94,6 +120,7 @@ export type GameState = {
   checkpoints: { ts: number; label: string; week: number; phaseVersion: number }[];
   career: { control: Record<ControlSide, SideControl> };
   draft: { discovered: Record<string, ProspectDiscovery>; watchlist: string[] };
+  league: LeagueState;
   completedGates: string[];
   lastUiError: string | null;
 };

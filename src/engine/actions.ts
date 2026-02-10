@@ -1,4 +1,4 @@
-import type { GameState, Role, StaffAssignment } from "@/engine/gameState";
+import type { GameState, LeagueState, Role, StaffAssignment } from "@/engine/gameState";
 
 export type SetCoachProfilePayload = {
   name: string;
@@ -25,6 +25,7 @@ export type GameAction =
   | { type: "SET_COACH_PROFILE"; payload: SetCoachProfilePayload }
   | { type: "SET_BACKGROUND"; payload: { backgroundKey: string } }
   | { type: "ACCEPT_OFFER"; payload: { ugfTeamKey: string; excelTeamKey: string } }
+  | { type: "HYDRATE_LEAGUE_ROSTER"; payload: LeagueState }
   | { type: "HIRE_COACH"; payload: { role: Role; assignment: StaffAssignment } }
   | { type: "SET_OFFSEASON_PLAN"; payload: OffseasonPlanPayload }
   | { type: "ENTER_JANUARY_OFFSEASON" }
@@ -38,6 +39,7 @@ export const gameActions = {
   setCoachProfile: (payload: SetCoachProfilePayload): GameAction => ({ type: "SET_COACH_PROFILE", payload }),
   setBackground: (backgroundKey: string): GameAction => ({ type: "SET_BACKGROUND", payload: { backgroundKey } }),
   acceptOffer: (ugfTeamKey: string, excelTeamKey: string): GameAction => ({ type: "ACCEPT_OFFER", payload: { ugfTeamKey, excelTeamKey } }),
+  hydrateLeagueRoster: (payload: LeagueState): GameAction => ({ type: "HYDRATE_LEAGUE_ROSTER", payload }),
   hireCoach: (role: Role, assignment: StaffAssignment): GameAction => ({ type: "HIRE_COACH", payload: { role, assignment } }),
   setOffseasonPlan: (payload: OffseasonPlanPayload): GameAction => ({ type: "SET_OFFSEASON_PLAN", payload }),
   enterJanuaryOffseason: (): GameAction => ({ type: "ENTER_JANUARY_OFFSEASON" }),
