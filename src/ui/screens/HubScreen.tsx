@@ -5,6 +5,7 @@ import { getSuggestedNeed } from "@/engine/scouting";
 import { FRANCHISES } from "@/ui/data/franchises";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { TeamLogo } from "@/ui/components/TeamLogo";
+import { getTeamSummaryRows } from "@/data/generatedData";
 
 export function HubScreen({ ui }: ScreenProps) {
   const save = ui.getState().save;
@@ -16,8 +17,7 @@ export function HubScreen({ ui }: ScreenProps) {
 
   const discoveredEntries = Object.entries(draftState.discovered).sort((a, b) => a[1].level - b[1].level || a[0].localeCompare(b[0]));
 
-  const tableSelector = ui.selectors?.table;
-  const standingsRows = typeof tableSelector === "function" ? tableSelector("Team Summary") : [];
+  const standingsRows = getTeamSummaryRows() as Array<Record<string, unknown>>;
   const isMobile = typeof window !== "undefined" ? !window.matchMedia("(min-width: 900px)").matches : true;
   const standingsIconSize = isMobile ? 44 : 56;
   const standingsSnapshot = FRANCHISES.map((franchise) => {
