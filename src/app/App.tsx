@@ -18,7 +18,7 @@ export function App() {
   const state = ui.getState();
   const Screen = RouteMap[state.route.key as RouteKey];
   const noSave = !state.save;
-  const saveRequiredRoutes = new Set<RouteKey>(["Hub", "Roster", "StaffTree", "PhoneInbox", "PhoneThread", "FreeAgency"]);
+  const saveRequiredRoutes = new Set<RouteKey>(["Hub", "Roster", "StaffTree", "PhoneInbox", "PhoneThread", "FreeAgency", "DraftBoard"]);
   const routeNeedsSave = saveRequiredRoutes.has(state.route.key as RouteKey);
 
   return (
@@ -33,6 +33,7 @@ export function App() {
           <button disabled={noSave} onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub" } })}>Hub</button>
           <button disabled={noSave} onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Roster" } })}>Roster</button>
           <button disabled={noSave} onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "FreeAgency" } })}>Free Agency</button>
+          <button disabled={noSave} onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "DraftBoard" } })}>Draft Board</button>
           <button disabled={noSave} onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffTree" } })}>Staff</button>
           <button disabled={noSave} onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "PhoneInbox" } })}>Phone</button>
           <button className="danger" onClick={() => ui.dispatch({ type: "RESET_SAVE" })}>Reset Save</button>

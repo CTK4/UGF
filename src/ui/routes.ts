@@ -18,6 +18,7 @@ import { CandidateDetailScreen } from "@/ui/screens/CandidateDetailScreen";
 import { PhoneInboxScreen, PhoneThreadScreen } from "@/ui/screens/PhoneScreens";
 import { FreeAgencyScreen } from "@/ui/screens/FreeAgencyScreen";
 import { RosterScreen } from "@/ui/screens/RosterScreen";
+import { DraftBoardScreen } from "@/ui/screens/DraftBoardScreen";
 
 export type RouteKey =
   | "Start"
@@ -35,7 +36,8 @@ export type RouteKey =
   | "PhoneInbox"
   | "PhoneThread"
   | "FreeAgency"
-  | "Roster";
+  | "Roster"
+  | "DraftBoard";
 
 export type Route =
   | { key: "Start" }
@@ -53,7 +55,8 @@ export type Route =
   | { key: "PhoneInbox" }
   | { key: "PhoneThread"; threadId: string }
   | { key: "FreeAgency" }
-  | { key: "Roster" };
+  | { key: "Roster" }
+  | { key: "DraftBoard" };
 
 export const RouteMap: Record<RouteKey, ComponentType<ScreenProps>> = {
   Start: StartScreen,
@@ -72,4 +75,5 @@ export const RouteMap: Record<RouteKey, ComponentType<ScreenProps>> = {
   PhoneThread: PhoneThreadScreen,
   FreeAgency: FreeAgencyScreen,
   Roster: RosterScreen,
+  DraftBoard: DraftBoardScreen,
 };

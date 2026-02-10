@@ -105,6 +105,7 @@ export function HubScreen({ ui }: ScreenProps) {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Roster" } })}>Open Roster</button>
           <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "FreeAgency" } })}>Open Free Agency</button>
+          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "DraftBoard" } })}>Draft Board</button>
         </div>
 
         {hubTab === "roster" ? (
