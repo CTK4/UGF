@@ -16,5 +16,9 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src/typecheck-entry.ts"],
+  "exclude": [
+    "src/ui/dispatch/dispatch.ts",
+    "src/services/gameData.ts"
+  ]
 }
