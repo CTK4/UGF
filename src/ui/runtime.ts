@@ -63,6 +63,7 @@ function openingState(): UIState["ui"]["opening"] {
     interviewResults: {},
     offers: [],
     lastOfferError: undefined,
+    lastInterviewError: undefined,
     coordinatorChoices: {},
   };
 }
@@ -779,6 +780,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
                 interviewResults,
                 offers: [],
                 lastOfferError: undefined,
+                lastInterviewError: undefined,
               },
             },
             route: { key: "Interviews" },
@@ -788,7 +790,26 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
         case "OPENING_START_INTERVIEW": {
           const franchiseId = resolveTeamKey(String(action.franchiseId ?? ""));
           const invite = state.ui.opening.interviewInvites.find((item) => item.franchiseId === franchiseId);
-          if (!invite) return;
+          if (!invite) {
+            if (import.meta.env.DEV) {
+              console.error("[runtime] OPENING_START_INTERVIEW invite not found", {
+                clickedFranchiseId: franchiseId,
+                inviteFranchiseIds: state.ui.opening.interviewInvites.map((item) => item.franchiseId),
+              });
+            }
+            setState({
+              ...state,
+              route: { key: "Interviews" },
+              ui: {
+                ...state.ui,
+                opening: {
+                  ...state.ui.opening,
+                  lastInterviewError: "Unable to open that interview invite. Please try another invite.",
+                },
+              },
+            });
+            return;
+          }
           const existing = state.ui.opening.interviewResults[franchiseId] ?? {
             franchiseId,
             ownerOpinion: 50,
@@ -805,24 +826,55 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               opening: {
                 ...state.ui.opening,
                 interviewResults: { ...state.ui.opening.interviewResults, [franchiseId]: existing },
+                lastInterviewError: undefined,
               },
             },
             route: { key: "OpeningInterview", franchiseId },
           });
+          if (import.meta.env.DEV) {
+            console.log("[runtime] OPENING_START_INTERVIEW routed", { franchiseId });
+          }
           return;
         }
         case "OPENING_ANSWER_INTERVIEW": {
           const franchiseId = resolveTeamKey(String(action.franchiseId ?? ""));
           const answerIndex = Number(action.answerIndex ?? -1);
           const current = state.ui.opening.interviewResults[franchiseId];
-          if (!current || current.completed) return;
+          const invite = state.ui.opening.interviewInvites.find((item) => item.franchiseId === franchiseId);
+          if (!invite || !current || current.completed) {
+            setState({
+              ...state,
+              route: { key: "Interviews" },
+              ui: {
+                ...state.ui,
+                opening: {
+                  ...state.ui.opening,
+                  lastInterviewError: "Interview state was out of sync. Please re-open your interview invitation.",
+                },
+              },
+            });
+            return;
+          }
 
           const script = getScriptForTeam(franchiseId);
           const questionId = script.questionIds[current.answers.length];
           const question = INTERVIEW_QUESTION_BANK[questionId];
           const choice = question?.choices[answerIndex];
           const choiceId = choice?.id;
-          if (!question || !choice || !choiceId) return;
+          if (!question || !choice || !choiceId) {
+            setState({
+              ...state,
+              route: { key: "Interviews" },
+              ui: {
+                ...state.ui,
+                opening: {
+                  ...state.ui.opening,
+                  lastInterviewError: "Interview question data was missing. Please re-open the invite and try again.",
+                },
+              },
+            });
+            return;
+          }
 
           const scriptTeamKey = resolveTeamKey(franchiseId);
           const ownerProfile =
@@ -866,7 +918,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             const { offers, error } = generateOpeningOffersWithFallback(state.ui.opening.interviewInvites, interviewResults);
             setState({
               ...state,
-              ui: { ...state.ui, opening: { ...state.ui.opening, interviewResults, offers, lastOfferError: error } },
+              ui: { ...state.ui, opening: { ...state.ui.opening, interviewResults, offers, lastOfferError: error, lastInterviewError: undefined } },
               route: { key: "Offers" },
             });
             return;
@@ -875,7 +927,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           if (nextResult.completed) {
             setState({
               ...state,
-              ui: { ...state.ui, opening: { ...state.ui.opening, interviewResults } },
+              ui: { ...state.ui, opening: { ...state.ui.opening, interviewResults, lastInterviewError: undefined } },
               route: { key: "Interviews" },
             });
             return;
@@ -883,7 +935,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
 
           setState({
             ...state,
-            ui: { ...state.ui, opening: { ...state.ui.opening, interviewResults } },
+            ui: { ...state.ui, opening: { ...state.ui.opening, interviewResults, lastInterviewError: undefined } },
             route: { key: "OpeningInterview", franchiseId },
           });
           return;

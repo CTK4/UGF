@@ -51,6 +51,7 @@ export type UIState = {
       interviewResults: Record<string, OpeningInterviewResult>;
       offers: InterviewInvite[];
       lastOfferError?: string;
+      lastInterviewError?: string;
       coordinatorChoices: Partial<Record<"OC" | "DC" | "STC", string>>;
     };
   };
