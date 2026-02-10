@@ -8,12 +8,16 @@ import { TeamLogo } from "@/ui/components/TeamLogo";
 
 export function HubScreen({ ui }: ScreenProps) {
   const save = ui.getState().save;
-  if (!save) return null;
+  if (!save) {
+    return <div className="ugf-card"><div className="ugf-card__body">Hub data loading / unavailable</div></div>;
+  }
   const gs = save.gameState;
+  const draftState = gs.draft ?? { discovered: {}, watchlist: [] };
 
-  const discoveredEntries = Object.entries(gs.draft.discovered).sort((a, b) => a[1].level - b[1].level || a[0].localeCompare(b[0]));
+  const discoveredEntries = Object.entries(draftState.discovered).sort((a, b) => a[1].level - b[1].level || a[0].localeCompare(b[0]));
 
-  const standingsRows = ui.selectors.table("Team Summary");
+  const tableSelector = ui.selectors?.table;
+  const standingsRows = typeof tableSelector === "function" ? tableSelector("Team Summary") : [];
   const isMobile = typeof window !== "undefined" ? !window.matchMedia("(min-width: 900px)").matches : true;
   const standingsIconSize = isMobile ? 44 : 56;
   const standingsSnapshot = FRANCHISES.map((franchise) => {
@@ -61,9 +65,9 @@ export function HubScreen({ ui }: ScreenProps) {
 
         <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
           <b>Draft Discovery</b>
-          <div><small>Watchlist ({gs.draft.watchlist.length})</small></div>
-          {gs.draft.watchlist.length === 0 && <div>No prospects watched yet.</div>}
-          {gs.draft.watchlist.map((prospectId) => (
+          <div><small>Watchlist ({draftState.watchlist.length})</small></div>
+          {draftState.watchlist.length === 0 && <div>No prospects watched yet.</div>}
+          {draftState.watchlist.map((prospectId) => (
             <div key={`watch-${prospectId}`}>• {getProspectLabel(prospectId)}</div>
           ))}
 

@@ -803,7 +803,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           });
           gameState = reduceGameState(gameState, gameActions.enterJanuaryOffseason());
           gameState = { ...gameState, tasks: generateBeatTasks(gameState) };
-          setState({ ...state, save: { version: 1, gameState }, route: { key: "StaffMeeting" } });
+          setState({ ...state, save: { version: 1, gameState }, route: { key: "Hub" } });
           return;
         }
         case "SUBMIT_STAFF_MEETING": {
@@ -999,7 +999,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           if (gameState.lastUiError) {
             const routeAction = gameState.lastUiError.toLowerCase().includes("hire")
               ? { type: "NAVIGATE", route: { key: "StaffTree" } }
-              : { type: "NAVIGATE", route: { key: "StaffMeeting" } };
+              : { type: "NAVIGATE", route: { key: "Hub" } };
             setState({
               ...state,
               ui: {

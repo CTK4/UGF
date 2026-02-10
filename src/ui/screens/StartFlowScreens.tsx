@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 import personnelData from "@/data/generated/personnel.json";
-import rosterData from "@/data/generated/rosters.json";
 import type { ScreenProps } from "@/ui/types";
 import { HOMETOWNS } from "@/data/hometowns";
-import { getFranchise, resolveFranchiseLike } from "@/ui/data/franchises";
+import { resolveFranchiseLike } from "@/ui/data/franchises";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { TeamLogo } from "@/ui/components/TeamLogo";
 import { TeamIcon } from "@/ui/components/TeamIcon";
@@ -12,37 +11,13 @@ import { INTERVIEW_SCRIPTS } from "@/data/interviewScripts";
 
 type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string };
 const personnel = personnelData as PersonnelRow[];
-type RosterRow = {
-  Team: string;
-  PositionGroup: string;
-  PlayerName: string;
-  Rating: number;
-  Age?: number;
-  Expiring?: boolean;
-  ContractStatus?: string;
-  ContractYearsLeft?: number;
-};
-const roster = rosterData as RosterRow[];
 const backgrounds = ["Former QB", "Defensive Architect", "Special Teams Ace", "CEO Program Builder"];
-const offseasonPriorities = [
-  "Retain core veterans",
-  "Add pass rush",
-  "Upgrade offensive line",
-  "Find QB succession plan",
-  "Bolster secondary depth",
-  "Create cap flexibility",
-  "Get younger at key spots",
-];
 
 const tierLabelByCode = {
   REBUILD: "Rebuild (Bottom-5)",
   FRINGE: "Fringe (Middle)",
   CONTENDER: "Contender (Top-10)",
 } as const;
-
-function toTeamKey(value: string) {
-  return value.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-}
 
 function rolePool(position: "OC" | "DC" | "ST Coordinator") {
   return personnel.filter((p) => p.Position === position).slice(0, 6);
@@ -263,117 +238,19 @@ export function HireCoordinatorsScreen({ ui }: ScreenProps) {
             {rolePool(pos).map((c) => <button type="button" key={c.DisplayName} onClick={() => ui.dispatch({ type: "SET_COORDINATOR_CHOICE", role, candidateName: c.DisplayName })}>{picks[role] === c.DisplayName ? "✓ " : ""}{c.DisplayName}</button>)}
           </div>
         ))}
-        <button type="button" disabled={!picks.OC || !picks.DC || !picks.STC} onClick={() => ui.dispatch({ type: "FINALIZE_NEW_SAVE" })}>Finalize and Enter Hub</button>
+        <button type="button" disabled={!picks.OC || !picks.DC || !picks.STC} onClick={() => ui.dispatch({ type: "FINALIZE_NEW_SAVE" })}>Finalize Coordinator Staff</button>
       </div>
     </div>
   );
 }
 
 export function StaffMeetingScreen({ ui }: ScreenProps) {
-  const state = ui.getState();
-  const gameState = state.save?.gameState;
-  const franchise = getFranchise(gameState?.franchise.ugfTeamKey ?? "");
-
-  const teamRoster = useMemo(() => {
-    if (!gameState) return [];
-    const teamKeys = new Set([
-      toTeamKey(gameState.franchise.excelTeamKey || ""),
-      toTeamKey(franchise?.fullName || ""),
-      toTeamKey(gameState.franchise.ugfTeamKey || ""),
-    ]);
-    return roster.filter((row) => teamKeys.has(toTeamKey(row.Team)));
-  }, [gameState, franchise?.fullName]);
-
-  const strengthAndHole = useMemo(() => {
-    const byGroup = new Map<string, { total: number; count: number }>();
-    teamRoster.forEach((player) => {
-      const current = byGroup.get(player.PositionGroup) ?? { total: 0, count: 0 };
-      byGroup.set(player.PositionGroup, { total: current.total + Number(player.Rating ?? 0), count: current.count + 1 });
-    });
-    const ranked = [...byGroup.entries()]
-      .map(([group, value]) => ({ group, avg: value.total / Math.max(1, value.count) }))
-      .sort((a, b) => b.avg - a.avg);
-    return {
-      strengths: ranked.slice(0, 2),
-      holes: [...ranked].reverse().slice(0, 2),
-    };
-  }, [teamRoster]);
-
-  const expiringPlayers = useMemo(() => {
-    const expires = teamRoster.filter((p) => p.Expiring === true || p.ContractYearsLeft === 0 || String(p.ContractStatus ?? "").toLowerCase().includes("expiring"));
-    return (expires.length > 0 ? expires : teamRoster).map((p) => p.PlayerName);
-  }, [teamRoster]);
-
-  const [priorities, setPriorities] = useState<string[]>(gameState?.offseasonPlan?.priorities ?? []);
-  const [resignTargets, setResignTargets] = useState<string[]>(gameState?.offseasonPlan?.resignTargets ?? []);
-  const [shopTargets, setShopTargets] = useState<string[]>(gameState?.offseasonPlan?.shopTargets ?? []);
-  const [tradeNotes, setTradeNotes] = useState(gameState?.offseasonPlan?.tradeNotes ?? "");
-
-  const toggleValue = (selected: string[], value: string, max: number, set: (values: string[]) => void) => {
-    if (selected.includes(value)) {
-      set(selected.filter((item) => item !== value));
-      return;
-    }
-    if (selected.length >= max) return;
-    set([...selected, value]);
-  };
-
-  const canSubmit = resignTargets.length >= 1 && resignTargets.length <= 3 && shopTargets.length <= 3;
-
   return (
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Staff Meeting</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 12 }}>
-        <div>
-          <b>Top Strengths</b>
-          {strengthAndHole.strengths.map((item) => <div key={`s-${item.group}`}>{item.group}: {item.avg.toFixed(1)}</div>)}
-        </div>
-        <div>
-          <b>Top Holes</b>
-          {strengthAndHole.holes.map((item) => <div key={`h-${item.group}`}>{item.group}: {item.avg.toFixed(1)}</div>)}
-        </div>
-
-        <div style={{ display: "grid", gap: 6 }}>
-          <b>Priorities</b>
-          {offseasonPriorities.map((priority) => (
-            <label key={priority} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input type="checkbox" checked={priorities.includes(priority)} onChange={() => toggleValue(priorities, priority, offseasonPriorities.length, setPriorities)} />
-              <span>{priority}</span>
-            </label>
-          ))}
-        </div>
-
-        <div style={{ display: "grid", gap: 6 }}>
-          <b>Re-sign Targets (1-3)</b>
-          {expiringPlayers.slice(0, 24).map((name) => (
-            <label key={name} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input type="checkbox" checked={resignTargets.includes(name)} onChange={() => toggleValue(resignTargets, name, 3, setResignTargets)} />
-              <span>{name}</span>
-            </label>
-          ))}
-        </div>
-
-        <div style={{ display: "grid", gap: 6 }}>
-          <b>Shop Targets (0-3)</b>
-          {teamRoster.slice(0, 24).map((player) => (
-            <label key={`shop-${player.PlayerName}`} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input type="checkbox" checked={shopTargets.includes(player.PlayerName)} onChange={() => toggleValue(shopTargets, player.PlayerName, 3, setShopTargets)} />
-              <span>{player.PlayerName}</span>
-            </label>
-          ))}
-        </div>
-
-        <label style={{ display: "grid", gap: 6 }}>
-          <b>Trade Notes</b>
-          <textarea value={tradeNotes} onChange={(e) => setTradeNotes(e.target.value)} rows={4} />
-        </label>
-
-        <button
-          disabled={!canSubmit}
-          onClick={() => ui.dispatch({ type: "SUBMIT_STAFF_MEETING", payload: { priorities, resignTargets, shopTargets, tradeNotes } })}
-        >
-          Submit Plan
-        </button>
+        <div>Staff Meeting is disabled for now.</div>
+        <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub" } })}>Back to Hub</button>
       </div>
     </div>
   );
