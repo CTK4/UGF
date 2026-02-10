@@ -89,12 +89,13 @@ export function CoachBackgroundScreen({ ui }: ScreenProps) {
 
 export function InterviewsScreen({ ui }: ScreenProps) {
   const opening = ui.getState().ui.opening;
-  const { interviewInvites, interviewResults } = opening;
+  const { interviewInvites, interviewResults, lastInterviewError } = opening;
   const allDone = interviewInvites.length > 0 && interviewInvites.every((invite) => interviewResults[invite.franchiseId]?.completed);
   return (
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Interview Invitations</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+        {lastInterviewError ? <div className="ugf-pill" style={{ color: "#ffd7d7", borderColor: "#b04545" }}>{lastInterviewError}</div> : null}
         {interviewInvites.map((invite) => {
           const franchise = resolveFranchiseLike(invite.franchiseId);
           const result = opening.interviewResults[invite.franchiseId];
@@ -102,7 +103,11 @@ export function InterviewsScreen({ ui }: ScreenProps) {
             <button
               key={invite.franchiseId}
               type="button"
-              onClick={() => ui.dispatch({ type: "OPENING_START_INTERVIEW", franchiseId: invite.franchiseId })}
+              onClick={() => {
+                const id = String(invite.franchiseId);
+                if (import.meta.env.DEV) console.log("[ui] interview invite clicked", { franchiseId: id });
+                ui.dispatch({ type: "OPENING_START_INTERVIEW", franchiseId: id });
+              }}
               style={{ display: "grid", gridTemplateColumns: "64px 1fr", alignItems: "center", gap: 10, textAlign: "left" }}
             >
               <span style={{ display: "inline-flex", width: 64, minWidth: 64, justifyContent: "center", alignItems: "center" }}>
@@ -125,11 +130,22 @@ export function InterviewsScreen({ ui }: ScreenProps) {
 export function OpeningInterviewScreen({ ui }: ScreenProps) {
   const state = ui.getState();
   if (state.route.key !== "OpeningInterview") return null;
-  const franchiseId = resolveTeamKey(state.route.franchiseId);
+  const franchiseId = String(state.route.franchiseId);
   const invite = state.ui.opening.interviewInvites.find((item) => item.franchiseId === franchiseId);
   const result = state.ui.opening.interviewResults[franchiseId];
+  const lastInterviewError = state.ui.opening.lastInterviewError;
   const franchise = resolveFranchiseLike(franchiseId);
-  if (!invite || !result) return null;
+  if (!invite || !result) {
+    return (
+      <div className="ugf-card">
+        <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+          <div><b>Interview unavailable</b></div>
+          {lastInterviewError ? <div className="ugf-pill" style={{ color: "#ffd7d7", borderColor: "#b04545" }}>{lastInterviewError}</div> : null}
+          <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Interviews" } })}>Back to Invitations</button>
+        </div>
+      </div>
+    );
+  }
   const scriptTeamKey = resolveTeamKey(franchiseId);
   const script = INTERVIEW_SCRIPTS[scriptTeamKey] ?? INTERVIEW_SCRIPTS.ATLANTA_APEX;
   const questionIndex = result.answers.length;
@@ -165,7 +181,10 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
               <button
                 key={`${questionId}-${choice.id}`}
                 type="button"
-                onClick={() => ui.dispatch({ type: "OPENING_ANSWER_INTERVIEW", franchiseId, answerIndex: index })}
+                onClick={() => {
+                  const id = String(invite.franchiseId);
+                  ui.dispatch({ type: "OPENING_ANSWER_INTERVIEW", franchiseId: id, answerIndex: index });
+                }}
               >
                 {choice.id}) {choice.text}
               </button>
@@ -173,6 +192,7 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
           </div>
         )}
         {result.lastToneFeedback ? <div className="ugf-pill">{result.lastToneFeedback}</div> : null}
+        {lastInterviewError ? <div className="ugf-pill" style={{ color: "#ffd7d7", borderColor: "#b04545" }}>{lastInterviewError}</div> : null}
       </div>
     </div>
   );
