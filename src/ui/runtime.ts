@@ -1034,6 +1034,12 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
     },
     selectors: {
       routeLabel: () => state.route.key,
+      table: (name: string): Array<Record<string, unknown>> => {
+        if (name === "Team Summary") {
+          return getTeamSummaryRows() as Array<Record<string, unknown>>;
+        }
+        return [];
+      },
     },
   };
 

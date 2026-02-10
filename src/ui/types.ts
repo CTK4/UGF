@@ -63,6 +63,7 @@ export type UIController = {
   dispatch: (action: UIAction) => void;
   selectors: {
     routeLabel: () => string;
+    table: (name: string) => Array<Record<string, unknown>>;
   };
 };
 
