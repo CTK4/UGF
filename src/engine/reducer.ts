@@ -36,6 +36,14 @@ function createEmptyLeagueState() {
   };
 }
 
+function createEmptyFreeAgencyState() {
+  return { freeAgents: [], lastUpdatedWeek: 0 };
+}
+
+function createEmptyCapState() {
+  return { capSpace: DEFAULT_SALARY_CAP, payroll: 0, capLimit: DEFAULT_SALARY_CAP };
+}
+
 export function createNewGameState(): GameState {
   return {
     meta: { version: 2 },
@@ -73,6 +81,9 @@ export function createNewGameState(): GameState {
     },
     draft: { discovered: {}, watchlist: [] },
     league: createEmptyLeagueState(),
+    roster: [],
+    freeAgency: createEmptyFreeAgencyState(),
+    cap: createEmptyCapState(),
     completedGates: [],
     lastUiError: null,
   };
@@ -95,6 +106,12 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
         staff: { ...createNewGameState().staff, ...(loaded?.staff ?? {}) },
         career: loaded?.career ?? createNewGameState().career,
         draft: loaded?.draft ?? createNewGameState().draft,
+        roster: loaded?.roster ?? [],
+        freeAgency: loaded?.freeAgency ?? createEmptyFreeAgencyState(),
+        cap: {
+          ...createEmptyCapState(),
+          ...(loaded?.cap ?? {}),
+        },
         league: {
           ...createEmptyLeagueState(),
           ...(loaded?.league ?? {}),

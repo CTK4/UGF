@@ -19,8 +19,16 @@ import { FRANCHISES, resolveFranchiseLike } from "@/ui/data/franchises";
 import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
 import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
 import { loadLeagueRosterForTeam } from "@/services/rosterImport";
+import { buildFreeAgentPool, buildTeamRosterRows, calculateCapSummary } from "@/ui/freeAgency/freeAgency";
 
 const SAVE_KEY = "ugf.save.v1";
+
+function deriveRosterAndCap(gameState: GameState): Pick<GameState, "roster" | "cap"> {
+  const teamKey = resolveTeamKey(gameState.franchise.ugfTeamKey || gameState.franchise.excelTeamKey || "");
+  const roster = buildTeamRosterRows(gameState, teamKey);
+  const cap = calculateCapSummary(roster, gameState.league.cap.salaryCap);
+  return { roster, cap };
+}
 
 function loadSave(): { save: SaveData | null; corrupted: boolean } {
   try {
@@ -435,8 +443,18 @@ function createCandidate(role: StaffRole, id: number) {
 
 export async function createUIRuntime(onChange: () => void): Promise<UIController> {
   const { save, corrupted } = loadSave();
-  const loadedGameState = save?.gameState
+  const loadedGameStateRaw = save?.gameState
     ? reduceGameState(createNewGameState(), gameActions.loadState(save.gameState))
+    : null;
+  const loadedGameState = loadedGameStateRaw
+    ? {
+        ...loadedGameStateRaw,
+        ...deriveRosterAndCap(loadedGameStateRaw),
+        freeAgency: {
+          freeAgents: loadedGameStateRaw.freeAgency?.freeAgents ?? [],
+          lastUpdatedWeek: loadedGameStateRaw.freeAgency?.lastUpdatedWeek ?? 0,
+        },
+      }
     : null;
 
   let state: UIState = {
@@ -474,6 +492,20 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
       switch (action.type) {
         case "NAVIGATE": {
           const nextRoute = action.route as UIState["route"];
+          if (nextRoute.key === "FreeAgency" && state.save) {
+            const currentWeek = state.save.gameState.time.week;
+            const needsRefresh = !state.save.gameState.freeAgency?.freeAgents?.length || state.save.gameState.freeAgency.lastUpdatedWeek !== currentWeek;
+            if (needsRefresh) {
+              const freeAgents = buildFreeAgentPool(state.save.gameState);
+              const gameState = {
+                ...state.save.gameState,
+                freeAgency: { freeAgents, lastUpdatedWeek: currentWeek },
+                ...deriveRosterAndCap(state.save.gameState),
+              };
+              setState({ ...state, save: { version: 1, gameState }, route: nextRoute, ui: { ...state.ui, activeModal: null } });
+              return;
+            }
+          }
           if (nextRoute.key === "Offers") {
             const allDone =
               state.ui.opening.interviewInvites.length > 0 &&
@@ -489,6 +521,136 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             }
           }
           setState({ ...state, route: nextRoute, ui: { ...state.ui, activeModal: null } });
+          return;
+        }
+        case "REFRESH_FREE_AGENCY": {
+          if (!state.save) return;
+          const currentWeek = state.save.gameState.time.week;
+          const freeAgents = buildFreeAgentPool(state.save.gameState);
+          const gameState = {
+            ...state.save.gameState,
+            freeAgency: { freeAgents, lastUpdatedWeek: currentWeek },
+            ...deriveRosterAndCap(state.save.gameState),
+          };
+          setState({
+            ...state,
+            save: { version: 1, gameState },
+            ui: { ...state.ui, notifications: [`Free agency pool refreshed (${freeAgents.length} players).`, ...state.ui.notifications].slice(0, 3) },
+          });
+          return;
+        }
+        case "SIGN_FREE_AGENT": {
+          if (!state.save) return;
+          const playerId = String(action.playerId ?? "");
+          const years = Math.max(1, Math.round(Number(action.years ?? 1)));
+          const salary = Math.max(0, Math.round(Number(action.salary ?? 0)));
+          const teamKey = resolveTeamKey(state.save.gameState.franchise.ugfTeamKey || state.save.gameState.franchise.excelTeamKey || "");
+          const freeAgent = state.save.gameState.freeAgency.freeAgents.find((row) => row.id === playerId);
+          if (!freeAgent) return;
+          const roster = buildTeamRosterRows(state.save.gameState, teamKey);
+          const cap = calculateCapSummary(roster, state.save.gameState.league.cap.salaryCap);
+          if (cap.payroll + salary > cap.capLimit) {
+            setState({
+              ...state,
+              ui: {
+                ...state.ui,
+                activeModal: {
+                  title: "Insufficient cap space",
+                  message: `Cannot sign ${freeAgent.playerName}. You need more cap space.`,
+                  lines: [`Cap Space: ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(cap.capSpace)}`],
+                  actions: [{ label: "Close", action: { type: "CLOSE_MODAL" } }],
+                },
+              },
+            });
+            return;
+          }
+
+          const updatedFreeAgents = state.save.gameState.freeAgency.freeAgents.filter((row) => row.id !== playerId);
+          const signed = { ...freeAgent, years, salary, teamKey, contractStatus: "ACTIVE" as const };
+          const leaguePlayer = {
+            id: signed.id,
+            name: signed.playerName,
+            positionGroup: signed.position,
+            pos: signed.position,
+            teamKey,
+            overall: signed.overall,
+            age: signed.age,
+            contract: { amount: signed.salary, yearsLeft: signed.years, expSeason: state.save.gameState.time.season + signed.years },
+          };
+          const nextRosters = {
+            ...state.save.gameState.league.teamRosters,
+            [teamKey]: [...(state.save.gameState.league.teamRosters[teamKey] ?? []), signed.id],
+          };
+          const gameState = {
+            ...state.save.gameState,
+            league: {
+              ...state.save.gameState.league,
+              playersById: { ...state.save.gameState.league.playersById, [signed.id]: leaguePlayer },
+              teamRosters: nextRosters,
+              cap: {
+                ...state.save.gameState.league.cap,
+                capUsedByTeam: {
+                  ...state.save.gameState.league.cap.capUsedByTeam,
+                  [teamKey]: (state.save.gameState.league.cap.capUsedByTeam[teamKey] ?? 0) + signed.salary,
+                },
+              },
+            },
+            freeAgency: { freeAgents: updatedFreeAgents, lastUpdatedWeek: state.save.gameState.time.week },
+          };
+          const withDerived = { ...gameState, ...deriveRosterAndCap(gameState) };
+          setState({
+            ...state,
+            save: { version: 1, gameState: withDerived },
+            ui: {
+              ...state.ui,
+              activeModal: null,
+              notifications: [`Signed ${signed.playerName} for ${signed.years}y / ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(signed.salary)}.`, ...state.ui.notifications].slice(0, 3),
+            },
+          });
+          return;
+        }
+        case "RELEASE_PLAYER": {
+          if (!state.save) return;
+          const playerId = String(action.playerId ?? "");
+          const teamKey = resolveTeamKey(state.save.gameState.franchise.ugfTeamKey || state.save.gameState.franchise.excelTeamKey || "");
+          const player = state.save.gameState.league.playersById[playerId];
+          if (!player) return;
+          const releasedRow = buildTeamRosterRows(state.save.gameState, teamKey).find((row) => row.id === playerId);
+          const teamRoster = (state.save.gameState.league.teamRosters[teamKey] ?? []).filter((id) => id !== playerId);
+          const gameState = {
+            ...state.save.gameState,
+            league: {
+              ...state.save.gameState.league,
+              playersById: {
+                ...state.save.gameState.league.playersById,
+                [playerId]: { ...player, teamKey: "" },
+              },
+              teamRosters: {
+                ...state.save.gameState.league.teamRosters,
+                [teamKey]: teamRoster,
+              },
+              cap: {
+                ...state.save.gameState.league.cap,
+                capUsedByTeam: {
+                  ...state.save.gameState.league.cap.capUsedByTeam,
+                  [teamKey]: Math.max(0, (state.save.gameState.league.cap.capUsedByTeam[teamKey] ?? 0) - (player.contract.amount ?? 0)),
+                },
+              },
+            },
+            freeAgency: {
+              freeAgents: releasedRow
+                ? [{ ...releasedRow, teamKey: null, contractStatus: "FREE_AGENT" as const }, ...state.save.gameState.freeAgency.freeAgents]
+                : [...state.save.gameState.freeAgency.freeAgents],
+              lastUpdatedWeek: state.save.gameState.time.week,
+            },
+            // TODO: MVP ignores dead cap penalties for released contracts.
+          };
+          const withDerived = { ...gameState, ...deriveRosterAndCap(gameState) };
+          setState({
+            ...state,
+            save: { version: 1, gameState: withDerived },
+            ui: { ...state.ui, notifications: [`Released ${player.name}.`, ...state.ui.notifications].slice(0, 3) },
+          });
           return;
         }
         case "RESET_SAVE":
@@ -718,7 +880,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           }
 
           const runAcceptOfferFlow = async () => {
-            let gameState = reduceGameState(createNewGameState(1), gameActions.startNew(1));
+            let gameState = reduceGameState(createNewGameState(), gameActions.startNew());
             gameState = reduceGameState(
               gameState,
               gameActions.setCoachProfile({
@@ -741,8 +903,14 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               season: gameState.time.season,
             });
             gameState = reduceGameState(gameState, gameActions.hydrateLeagueRoster(league));
+            const derived = deriveRosterAndCap(gameState);
             gameState = {
               ...gameState,
+              ...derived,
+              freeAgency: {
+                freeAgents: buildFreeAgentPool(gameState),
+                lastUpdatedWeek: gameState.time.week,
+              },
               inbox: ensureThreads(gameState),
               tasks: [{ id: "task-1", type: "STAFF_MEETING", title: "Hire coordinators", description: "Fill OC/DC/STC positions.", status: "OPEN" }],
               draft: gameState.draft ?? { discovered: {}, watchlist: [] },
@@ -880,6 +1048,21 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
         }
         case "CLOSE_MODAL":
           setState({ ...state, ui: { ...state.ui, activeModal: null } });
+          return;
+        case "OPEN_MODAL":
+          setState({
+            ...state,
+            ui: {
+              ...state.ui,
+              activeModal: {
+                title: String(action.title ?? "Confirm"),
+                message: String(action.message ?? ""),
+                lines: Array.isArray(action.lines) ? action.lines.filter((line): line is string => typeof line === "string") : undefined,
+                warning: typeof action.warning === "string" ? action.warning : undefined,
+                actions: Array.isArray(action.actions) ? (action.actions as Array<{ label: string; action: UIAction }>) : undefined,
+              },
+            },
+          });
           return;
         case "CONFIRM_HIRE": {
           if (!state.save) return;
