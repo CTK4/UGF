@@ -20,14 +20,24 @@ import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
 import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
 import { loadLeagueRosterForTeam } from "@/services/rosterImport";
 import { buildFreeAgentPool, buildTeamRosterRows, calculateCapSummary } from "@/ui/freeAgency/freeAgency";
+import { ROSTER_CAP_LIMIT, calculateRosterCap, loadRosterPlayersForTeam } from "@/ui/roster/rosterAdapter";
 
 const SAVE_KEY = "ugf.save.v1";
 
-function deriveRosterAndCap(gameState: GameState): Pick<GameState, "roster" | "cap"> {
-  const teamKey = resolveTeamKey(gameState.franchise.ugfTeamKey || gameState.franchise.excelTeamKey || "");
-  const roster = buildTeamRosterRows(gameState, teamKey);
-  const cap = calculateCapSummary(roster, gameState.league.cap.salaryCap);
-  return { roster, cap };
+function ensureRosterCapState(gameState: GameState): Pick<GameState, "roster" | "cap"> {
+  const rosterPlayers = gameState.roster?.players ?? {};
+  const deadMoney = gameState.cap?.deadMoney ?? [];
+  const capLimit = Number(gameState.cap?.limit ?? gameState.cap?.capLimit ?? ROSTER_CAP_LIMIT);
+  const cap = calculateRosterCap(Object.values(rosterPlayers), deadMoney, capLimit);
+  return {
+    roster: { players: rosterPlayers, warning: gameState.roster?.warning },
+    cap: {
+      ...gameState.cap,
+      ...cap,
+      limit: capLimit,
+      deadMoney,
+    },
+  };
 }
 
 function loadSave(): { save: SaveData | null; corrupted: boolean } {
@@ -449,7 +459,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
   const loadedGameState = loadedGameStateRaw
     ? {
         ...loadedGameStateRaw,
-        ...deriveRosterAndCap(loadedGameStateRaw),
+        ...ensureRosterCapState(loadedGameStateRaw),
         freeAgency: {
           freeAgents: loadedGameStateRaw.freeAgency?.freeAgents ?? [],
           lastUpdatedWeek: loadedGameStateRaw.freeAgency?.lastUpdatedWeek ?? 0,
@@ -500,7 +510,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               const gameState = {
                 ...state.save.gameState,
                 freeAgency: { freeAgents, lastUpdatedWeek: currentWeek },
-                ...deriveRosterAndCap(state.save.gameState),
+                ...ensureRosterCapState(state.save.gameState),
               };
               setState({ ...state, save: { version: 1, gameState }, route: nextRoute, ui: { ...state.ui, activeModal: null } });
               return;
@@ -530,7 +540,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           const gameState = {
             ...state.save.gameState,
             freeAgency: { freeAgents, lastUpdatedWeek: currentWeek },
-            ...deriveRosterAndCap(state.save.gameState),
+            ...ensureRosterCapState(state.save.gameState),
           };
           setState({
             ...state,
@@ -597,7 +607,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             },
             freeAgency: { freeAgents: updatedFreeAgents, lastUpdatedWeek: state.save.gameState.time.week },
           };
-          const withDerived = { ...gameState, ...deriveRosterAndCap(gameState) };
+          const withDerived = { ...gameState, ...ensureRosterCapState(gameState) };
           setState({
             ...state,
             save: { version: 1, gameState: withDerived },
@@ -609,47 +619,95 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           });
           return;
         }
+        case "INIT_ROSTER_DATA": {
+          if (!state.save) return;
+          const existingPlayers = Object.keys(state.save.gameState.roster?.players ?? {});
+          if (existingPlayers.length > 0) return;
+          const teamLookup = state.save.gameState.franchise.ugfTeamKey || state.save.gameState.franchise.excelTeamKey || "";
+          void (async () => {
+            const { players, warning } = await loadRosterPlayersForTeam(teamLookup);
+            const playerMap = Object.fromEntries(players.map((player) => [player.id, player]));
+            const baseGameState = {
+              ...state.save!.gameState,
+              roster: {
+                players: playerMap,
+                warning,
+              },
+              cap: {
+                ...state.save!.gameState.cap,
+                limit: Number(state.save!.gameState.cap?.limit ?? ROSTER_CAP_LIMIT),
+                deadMoney: state.save!.gameState.cap?.deadMoney ?? [],
+              },
+            };
+            const nextGameState = { ...baseGameState, ...ensureRosterCapState(baseGameState) };
+            setState({
+              ...state,
+              save: { version: 1, gameState: nextGameState },
+            });
+          })().catch((error) => {
+            if (import.meta.env.DEV) {
+              console.warn("[runtime] INIT_ROSTER_DATA failed", error);
+            }
+          });
+          return;
+        }
+        case "PROMPT_RELEASE_PLAYER": {
+          if (!state.save) return;
+          const playerId = String(action.playerId ?? "");
+          const player = state.save.gameState.roster?.players?.[playerId];
+          if (!player || player.status === "RELEASED") return;
+          const estimate = Math.min(player.capHit * 0.4, player.capHit);
+          setState({
+            ...state,
+            ui: {
+              ...state.ui,
+              activeModal: {
+                title: `Release ${player.name}?`,
+                message: "This move cannot be undone in this MVP flow.",
+                warning: "Releasing this player will create dead cap this season.",
+                lines: [`Estimated Dead Cap: ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(estimate)}`],
+                actions: [
+                  { label: "Confirm Release", action: { type: "RELEASE_PLAYER", playerId } },
+                  { label: "Cancel", action: { type: "CLOSE_MODAL" } },
+                ],
+              },
+            },
+          });
+          return;
+        }
         case "RELEASE_PLAYER": {
           if (!state.save) return;
           const playerId = String(action.playerId ?? "");
-          const teamKey = resolveTeamKey(state.save.gameState.franchise.ugfTeamKey || state.save.gameState.franchise.excelTeamKey || "");
-          const player = state.save.gameState.league.playersById[playerId];
-          if (!player) return;
-          const releasedRow = buildTeamRosterRows(state.save.gameState, teamKey).find((row) => row.id === playerId);
-          const teamRoster = (state.save.gameState.league.teamRosters[teamKey] ?? []).filter((id) => id !== playerId);
-          const gameState = {
+          const player = state.save.gameState.roster?.players?.[playerId];
+          if (!player || player.status === "RELEASED") return;
+          const deadCap = Math.min(player.capHit * 0.4, player.capHit);
+          const nextGameStateBase = {
             ...state.save.gameState,
-            league: {
-              ...state.save.gameState.league,
-              playersById: {
-                ...state.save.gameState.league.playersById,
-                [playerId]: { ...player, teamKey: "" },
-              },
-              teamRosters: {
-                ...state.save.gameState.league.teamRosters,
-                [teamKey]: teamRoster,
-              },
-              cap: {
-                ...state.save.gameState.league.cap,
-                capUsedByTeam: {
-                  ...state.save.gameState.league.cap.capUsedByTeam,
-                  [teamKey]: Math.max(0, (state.save.gameState.league.cap.capUsedByTeam[teamKey] ?? 0) - (player.contract.amount ?? 0)),
-                },
+            roster: {
+              ...state.save.gameState.roster,
+              players: {
+                ...state.save.gameState.roster.players,
+                [playerId]: { ...player, status: "RELEASED" as const },
               },
             },
-            freeAgency: {
-              freeAgents: releasedRow
-                ? [{ ...releasedRow, teamKey: null, contractStatus: "FREE_AGENT" as const }, ...state.save.gameState.freeAgency.freeAgents]
-                : [...state.save.gameState.freeAgency.freeAgents],
-              lastUpdatedWeek: state.save.gameState.time.week,
+            cap: {
+              ...state.save.gameState.cap,
+              limit: Number(state.save.gameState.cap?.limit ?? ROSTER_CAP_LIMIT),
+              deadMoney: [
+                ...(state.save.gameState.cap?.deadMoney ?? []),
+                { playerId, amount: deadCap, season: state.save.gameState.time.season },
+              ],
             },
-            // TODO: MVP ignores dead cap penalties for released contracts.
           };
-          const withDerived = { ...gameState, ...deriveRosterAndCap(gameState) };
+          const nextGameState = { ...nextGameStateBase, ...ensureRosterCapState(nextGameStateBase) };
           setState({
             ...state,
-            save: { version: 1, gameState: withDerived },
-            ui: { ...state.ui, notifications: [`Released ${player.name}.`, ...state.ui.notifications].slice(0, 3) },
+            save: { version: 1, gameState: nextGameState },
+            ui: {
+              ...state.ui,
+              activeModal: null,
+              notifications: [`Released ${player.name}. Dead cap: ${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(deadCap)}.`, ...state.ui.notifications].slice(0, 3),
+            },
           });
           return;
         }
@@ -903,7 +961,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               season: gameState.time.season,
             });
             gameState = reduceGameState(gameState, gameActions.hydrateLeagueRoster(league));
-            const derived = deriveRosterAndCap(gameState);
+            const derived = ensureRosterCapState(gameState);
             gameState = {
               ...gameState,
               ...derived,

@@ -97,6 +97,19 @@ export type PlayerContractRow = {
   contractStatus: "ACTIVE" | "FREE_AGENT";
 };
 
+export type PlayerContractState = {
+  id: string;
+  name: string;
+  pos: string;
+  age: number;
+  overall: number;
+  yearsLeft: number;
+  salary: number;
+  bonus: number;
+  capHit: number;
+  status: "ACTIVE" | "RELEASED";
+};
+
 export type GameState = {
   meta: { version: 2 };
   phase: GamePhase;
@@ -133,12 +146,17 @@ export type GameState = {
   career: { control: Record<ControlSide, SideControl> };
   draft: { discovered: Record<string, ProspectDiscovery>; watchlist: string[] };
   league: LeagueState;
-  roster: PlayerContractRow[];
+  roster: {
+    players: Record<string, PlayerContractState>;
+    warning?: string;
+  };
   freeAgency: {
     freeAgents: PlayerContractRow[];
     lastUpdatedWeek: number;
   };
   cap: {
+    limit: number;
+    deadMoney: Array<{ playerId: string; amount: number; season: number }>;
     capSpace: number;
     payroll: number;
     capLimit: number;

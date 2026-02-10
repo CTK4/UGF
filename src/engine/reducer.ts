@@ -41,7 +41,11 @@ function createEmptyFreeAgencyState() {
 }
 
 function createEmptyCapState() {
-  return { capSpace: DEFAULT_SALARY_CAP, payroll: 0, capLimit: DEFAULT_SALARY_CAP };
+  return { limit: DEFAULT_SALARY_CAP, deadMoney: [], capSpace: DEFAULT_SALARY_CAP, payroll: 0, capLimit: DEFAULT_SALARY_CAP };
+}
+
+function createEmptyRosterState() {
+  return { players: {} };
 }
 
 export function createNewGameState(): GameState {
@@ -81,7 +85,7 @@ export function createNewGameState(): GameState {
     },
     draft: { discovered: {}, watchlist: [] },
     league: createEmptyLeagueState(),
-    roster: [],
+    roster: createEmptyRosterState(),
     freeAgency: createEmptyFreeAgencyState(),
     cap: createEmptyCapState(),
     completedGates: [],
@@ -106,11 +110,19 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
         staff: { ...createNewGameState().staff, ...(loaded?.staff ?? {}) },
         career: loaded?.career ?? createNewGameState().career,
         draft: loaded?.draft ?? createNewGameState().draft,
-        roster: loaded?.roster ?? [],
+        roster: Array.isArray(loaded?.roster)
+          ? createEmptyRosterState()
+          : {
+              ...createEmptyRosterState(),
+              ...(loaded?.roster ?? {}),
+              players: loaded?.roster?.players ?? {},
+            },
         freeAgency: loaded?.freeAgency ?? createEmptyFreeAgencyState(),
         cap: {
           ...createEmptyCapState(),
           ...(loaded?.cap ?? {}),
+          deadMoney: loaded?.cap?.deadMoney ?? [],
+          limit: Number(loaded?.cap?.limit ?? loaded?.cap?.capLimit ?? DEFAULT_SALARY_CAP),
         },
         league: {
           ...createEmptyLeagueState(),
