@@ -102,6 +102,9 @@ export function HubScreen({ ui }: ScreenProps) {
         />
 
         <div className="ugf-pill">Cap Used: {money(capUsed)} / {money(gs.league.cap.salaryCap)} · Cap Space: <b>{money(capSpace)}</b></div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "FreeAgency" } })}>Open Free Agency</button>
+        </div>
 
         {hubTab === "roster" ? (
           <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
@@ -109,13 +112,14 @@ export function HubScreen({ ui }: ScreenProps) {
             {!teamRoster.length ? <div>No roster rows found for the active franchise.</div> : null}
             {teamRoster.slice(0, 80).map((player) => (
               <div key={player.id} className="ugf-card">
-                <div className="ugf-card__body" style={{ display: "grid", gridTemplateColumns: "1.5fr repeat(5, minmax(70px, 1fr))", gap: 8 }}>
+                <div className="ugf-card__body" style={{ display: "grid", gridTemplateColumns: "1.3fr repeat(5, minmax(70px, 1fr)) 110px", gap: 8, alignItems: "center" }}>
                   <div><b>{sanitizeForbiddenName(player.name)}</b></div>
                   <div>{player.pos || player.positionGroup}</div>
                   <div>OVR {player.overall ?? "—"}</div>
                   <div>Age {player.age ?? "—"}</div>
                   <div>{player.contract.yearsLeft} yrs</div>
                   <div>{money(player.contract.amount)}</div>
+                  <button className="danger" onClick={() => ui.dispatch({ type: "RELEASE_PLAYER", playerId: player.id })}>Release</button>
                 </div>
               </div>
             ))}
