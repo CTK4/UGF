@@ -66,7 +66,7 @@ export function StartScreen({ ui }: ScreenProps) {
         <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
           {hasSave ? <button onClick={() => ui.dispatch({ type: "LOAD_GAME" })}>Resume Career</button> : null}
           <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CreateCoach" } })}>Start New Career</button>
-          <button className="danger" type="button" onClick={() => ui.dispatch({ type: "RESET_SAVE" })}>Reset</button>
+          <button type="button" onClick={() => ui.dispatch({ type: "FORCE_SAVE" })}>Save</button>
         </div>
       </div>
     </div>

@@ -459,6 +459,20 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           localStorage.removeItem(SAVE_KEY);
           setState({ ...state, save: null, route: { key: "Start" }, corruptedSave: false, ui: { ...state.ui, opening: openingState() } });
           return;
+        case "FORCE_SAVE":
+          if (!state.save) return;
+          try {
+            if (writeTimer) {
+              window.clearTimeout(writeTimer);
+              writeTimer = null;
+            }
+            localStorage.setItem(SAVE_KEY, JSON.stringify(state.save));
+          } catch (error) {
+            if (import.meta.env.DEV) {
+              console.error("[runtime] FORCE_SAVE failed", error);
+            }
+          }
+          return;
         case "SET_COACH_NAME":
           setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachName: String(action.coachName ?? "") } } });
           return;
