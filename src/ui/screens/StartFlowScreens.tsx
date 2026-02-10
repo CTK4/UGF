@@ -9,6 +9,7 @@ import { TeamLogo } from "@/ui/components/TeamLogo";
 import { TeamIcon } from "@/ui/components/TeamIcon";
 import { INTERVIEW_QUESTION_BANK } from "@/data/interviewBank";
 import { INTERVIEW_SCRIPTS } from "@/data/interviewScripts";
+import { coordinatorCandidateMeta, type CoordinatorRole } from "@/ui/helpers/deterministic";
 
 type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string };
 const personnel = personnelData as PersonnelRow[];
@@ -40,7 +41,7 @@ export function StartScreen({ ui }: ScreenProps) {
         <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
           {hasSave ? <button onClick={() => ui.dispatch({ type: "LOAD_GAME" })}>Resume Career</button> : null}
           <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CreateCoach" } })}>Start New Career</button>
-          <button type="button" onClick={() => ui.dispatch({ type: "FORCE_SAVE" })}>Save</button>
+          <button type="button" disabled={!hasSave} onClick={() => ui.dispatch({ type: "FORCE_SAVE" })}>Save</button>
         </div>
       </div>
     </div>
@@ -234,12 +235,38 @@ export function HireCoordinatorsScreen({ ui }: ScreenProps) {
     <div className="ugf-card">
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
         {roles.map(([role, pos]) => (
-          <div key={role}>
+          <div key={role} style={{ display: "grid", gap: 8 }}>
             <b>{role}</b>
-            {rolePool(pos).map((c) => <button type="button" key={c.DisplayName} onClick={() => ui.dispatch({ type: "SET_COORDINATOR_CHOICE", role, candidateName: c.DisplayName })}>{picks[role] === c.DisplayName ? "✓ " : ""}{c.DisplayName}</button>)}
+            {rolePool(pos).map((c) => {
+              const meta = coordinatorCandidateMeta({ role: role as CoordinatorRole, name: c.DisplayName, scheme: c.Scheme });
+              const selected = picks[role] === c.DisplayName;
+              return (
+                <button
+                  type="button"
+                  key={c.DisplayName}
+                  onClick={() => ui.dispatch({ type: "SET_COORDINATOR_CHOICE", role, candidateName: c.DisplayName })}
+                  className="ugf-card"
+                  style={{ textAlign: "left", borderColor: selected ? "#ffbf47" : undefined, boxShadow: selected ? "0 0 0 1px rgba(255,191,71,0.6)" : undefined }}
+                >
+                  <span className="ugf-card__body" style={{ display: "grid", gap: 6 }}>
+                    <span style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <b>{selected ? "✓ " : ""}{c.DisplayName}</b>
+                      <span className="ugf-pill">{role}</span>
+                    </span>
+                    <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <span className="ugf-pill">Scheme: {meta.schemeTag}</span>
+                      <span className="ugf-pill">Style: {meta.styleTag}</span>
+                      <span className="ugf-pill">Fit: {meta.fitScore}</span>
+                      <span className="ugf-pill">${meta.salary.toLocaleString()} • {meta.years}y</span>
+                    </span>
+                    {selected ? <small>{meta.whyFit}</small> : null}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         ))}
-        <button type="button" disabled={!picks.OC || !picks.DC || !picks.STC} onClick={() => ui.dispatch({ type: "FINALIZE_NEW_SAVE" })}>Finalize Coordinator Staff</button>
+        <button type="button" disabled={!picks.OC || !picks.DC || !picks.STC} onClick={() => ui.dispatch({ type: "FINALIZE_NEW_SAVE" })}>Finalize and Enter Hub</button>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { RouteMap, type RouteKey } from "@/ui/routes";
 import { createUIRuntime } from "@/ui/runtime";
 import type { UIController } from "@/ui/types";
 import logoUrl from "@/assets/brand/ugf-head-coach-logo.png";
+import { NoSaveRouteGuard } from "@/ui/components/NoSaveRouteGuard";
 
 export function App() {
   const [, setTick] = useState(0);
@@ -16,6 +17,9 @@ export function App() {
 
   const state = ui.getState();
   const Screen = RouteMap[state.route.key as RouteKey];
+  const noSave = !state.save;
+  const saveRequiredRoutes = new Set<RouteKey>(["Hub", "StaffTree", "PhoneInbox", "PhoneThread"]);
+  const routeNeedsSave = saveRequiredRoutes.has(state.route.key as RouteKey);
 
   return (
     <div className="app">
@@ -26,9 +30,9 @@ export function App() {
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Start" } })}>Start</button>
-          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub" } })}>Hub</button>
-          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffTree" } })}>Staff</button>
-          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "PhoneInbox" } })}>Phone</button>
+          <button disabled={noSave} onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub" } })}>Hub</button>
+          <button disabled={noSave} onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffTree" } })}>Staff</button>
+          <button disabled={noSave} onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "PhoneInbox" } })}>Phone</button>
           <button className="danger" onClick={() => ui.dispatch({ type: "RESET_SAVE" })}>Reset Save</button>
         </div>
         <div className="ugf-pill">Route: {ui.selectors.routeLabel()}</div>
@@ -36,7 +40,7 @@ export function App() {
 
       {state.ui.notifications.at(0) ? <div className="ugf-card" style={{ marginBottom: 12 }}><div className="ugf-card__body">{state.ui.notifications.at(0)}</div></div> : null}
 
-      <Screen ui={ui} />
+      {noSave && routeNeedsSave ? <NoSaveRouteGuard ui={ui} title={state.route.key} /> : <Screen ui={ui} />}
 
       {state.ui.activeModal ? (
         <div className="modalBackdrop">
