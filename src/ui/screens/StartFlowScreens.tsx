@@ -5,6 +5,7 @@ import type { ScreenProps } from "@/ui/types";
 import { HOMETOWNS } from "@/data/hometowns";
 import { getFranchise, resolveFranchiseLike } from "@/ui/data/franchises";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
+import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
 import { TeamLogo } from "@/ui/components/TeamLogo";
 import { TeamIcon } from "@/ui/components/TeamIcon";
 import { INTERVIEW_QUESTION_BANK } from "@/data/interviewBank";
@@ -148,12 +149,12 @@ export function InterviewsScreen({ ui }: ScreenProps) {
 export function OpeningInterviewScreen({ ui }: ScreenProps) {
   const state = ui.getState();
   if (state.route.key !== "OpeningInterview") return null;
-  const franchiseId = state.route.franchiseId;
+  const franchiseId = resolveTeamKey(state.route.franchiseId);
   const invite = state.ui.opening.interviewInvites.find((item) => item.franchiseId === franchiseId);
   const result = state.ui.opening.interviewResults[franchiseId];
   const franchise = resolveFranchiseLike(franchiseId);
   if (!invite || !result) return null;
-  const scriptTeamKey = resolveFranchiseLike(franchiseId)?.teamKey ?? normalizeExcelTeamKey(franchiseId);
+  const scriptTeamKey = resolveTeamKey(franchiseId);
   const script = INTERVIEW_SCRIPTS[scriptTeamKey] ?? INTERVIEW_SCRIPTS.ATLANTA_APEX;
   const questionIndex = result.answers.length;
   const questionId = script.questionIds[questionIndex];

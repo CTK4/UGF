@@ -16,6 +16,7 @@ import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { getTeamIdByName, getTeamSummaryRows } from "@/data/generatedData";
 import { deriveOfferTerms } from "@/engine/offers";
 import { FRANCHISES, resolveFranchiseLike } from "@/ui/data/franchises";
+import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
 import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
 
 const SAVE_KEY = "ugf.save.v1";
@@ -91,8 +92,7 @@ type ChoiceId = "A" | "B" | "C";
 type InterviewDelta = { owner: number; gm: number; risk: number };
 
 function getScriptForTeam(teamLookup: string) {
-  const resolved = resolveFranchiseLike(teamLookup);
-  const teamKey = resolved?.teamKey ?? normalizeExcelTeamKey(teamLookup);
+  const teamKey = resolveTeamKey(teamLookup);
   return INTERVIEW_SCRIPTS[teamKey] ?? INTERVIEW_SCRIPTS.ATLANTA_APEX;
 }
 
@@ -191,9 +191,9 @@ function formatCapSpace(value: number | null): string {
   return `${sign}$${abs.toFixed(0)}`;
 }
 
-function buildSummaryLine(franchiseId: string, tier: InterviewInviteTier, capSpace: number | null): string {
+function buildSummaryLine(teamKey: string, tier: InterviewInviteTier, capSpace: number | null): string {
   const meta = INTERVIEW_SUMMARY_BY_TIER[tier];
-  const owner = getOwnerProfile(franchiseId);
+  const owner = getOwnerProfile(teamKey);
   const terms = deriveOfferTerms(tier, owner);
   return `${meta.descriptor} • Cap Space: ${formatCapSpace(capSpace)} • ${terms.years}y • ${terms.pressure} pressure • ${terms.mandate}`;
 }
@@ -203,31 +203,31 @@ function getOverallValue(row: Record<string, unknown>): number {
   return Number.isFinite(overall) ? overall : 0;
 }
 
-function buildTeamInviteMetricsByFranchiseId(): Map<string, TeamInviteMetrics> {
-  const metricsByFranchiseId = new Map<string, TeamInviteMetrics>();
+function buildTeamInviteMetricsByTeamKey(): Map<string, TeamInviteMetrics> {
+  const metricsByTeamKey = new Map<string, TeamInviteMetrics>();
 
   for (const row of getTeamSummaryRows() as unknown as Array<Record<string, unknown>>) {
     const teamName = String(row.Team ?? "").trim();
     if (!teamName) continue;
-    const franchiseId = getTeamIdByName(teamName);
-    metricsByFranchiseId.set(franchiseId, {
+    const teamKey = resolveTeamKey(getTeamIdByName(teamName));
+    metricsByTeamKey.set(teamKey, {
       overall: getOverallValue(row),
       capSpace: parseCapSpaceValue(row),
     });
   }
 
-  return metricsByFranchiseId;
+  return metricsByTeamKey;
 }
 
 function rankTeamsByOverall(
-  metricsByFranchiseId: Map<string, TeamInviteMetrics>,
-): Array<{ franchiseId: string; overall: number; rank: number; tier: InterviewInviteTier }> {
+  metricsByTeamKey: Map<string, TeamInviteMetrics>,
+): Array<{ teamKey: string; overall: number; rank: number; tier: InterviewInviteTier }> {
   const ranked = sortedFranchises()
     .map((franchise) => ({
-      franchiseId: franchise.id,
-      overall: metricsByFranchiseId.get(franchise.id)?.overall ?? 0,
+      teamKey: resolveTeamKey(franchise.fullName),
+      overall: metricsByTeamKey.get(resolveTeamKey(franchise.fullName))?.overall ?? 0,
     }))
-    .sort((a, b) => a.overall - b.overall || a.franchiseId.localeCompare(b.franchiseId));
+    .sort((a, b) => a.overall - b.overall || a.teamKey.localeCompare(b.teamKey));
 
   return ranked.map((team, index) => {
     const isBottomFive = index < 5;
@@ -238,34 +238,33 @@ function rankTeamsByOverall(
 }
 
 function pickFirstAvailable(
-  candidates: Array<{ franchiseId: string; overall: number; rank: number; tier: InterviewInviteTier }>,
+  candidates: Array<{ teamKey: string; overall: number; rank: number; tier: InterviewInviteTier }>,
   selected: Set<string>,
-): { franchiseId: string; overall: number; rank: number; tier: InterviewInviteTier } | null {
+): { teamKey: string; overall: number; rank: number; tier: InterviewInviteTier } | null {
   for (const candidate of candidates) {
-    if (!selected.has(candidate.franchiseId)) return candidate;
+    if (!selected.has(candidate.teamKey)) return candidate;
   }
   return null;
 }
 
 function buildInvite(
-  team: { franchiseId: string; overall: number; tier: InterviewInviteTier },
-  metricsByFranchiseId: Map<string, TeamInviteMetrics>,
+  team: { teamKey: string; overall: number; tier: InterviewInviteTier },
+  metricsByTeamKey: Map<string, TeamInviteMetrics>,
 ): InterviewInvite {
-  const resolved = resolveFranchiseLike(team.franchiseId);
-  const franchiseId = resolved?.teamKey ?? normalizeExcelTeamKey(team.franchiseId);
-  const capSpace = metricsByFranchiseId.get(team.franchiseId)?.capSpace ?? null;
+  const franchiseId = resolveTeamKey(team.teamKey);
+  const capSpace = metricsByTeamKey.get(franchiseId)?.capSpace ?? null;
 
   return {
     franchiseId,
     tier: team.tier,
     overall: team.overall,
-    summaryLine: buildSummaryLine(team.franchiseId, team.tier, capSpace),
+    summaryLine: buildSummaryLine(franchiseId, team.tier, capSpace),
   };
 }
 
 function generateInterviewInvites(hometownTeamKey: string): InterviewInvite[] {
-  const metricsByFranchiseId = buildTeamInviteMetricsByFranchiseId();
-  const ranked = rankTeamsByOverall(metricsByFranchiseId);
+  const metricsByTeamKey = buildTeamInviteMetricsByTeamKey();
+  const ranked = rankTeamsByOverall(metricsByTeamKey);
   if (!hometownTeamKey) {
     console.error("Missing hometownTeamKey for interview invites.");
   }
@@ -274,15 +273,15 @@ function generateInterviewInvites(hometownTeamKey: string): InterviewInvite[] {
     REBUILD: ranked.filter((team) => team.tier === "REBUILD"),
     FRINGE: ranked.filter((team) => team.tier === "FRINGE"),
     CONTENDER: ranked.filter((team) => team.tier === "CONTENDER"),
-  } satisfies Record<InterviewInviteTier, Array<{ franchiseId: string; overall: number; rank: number; tier: InterviewInviteTier }>>;
+  } satisfies Record<InterviewInviteTier, Array<{ teamKey: string; overall: number; rank: number; tier: InterviewInviteTier }>>;
 
   const selected = new Set<string>();
-  const hometown = hometownTeamKey || "UNKNOWN_TEAM";
+  const hometown = resolveTeamKey(hometownTeamKey || "UNKNOWN_TEAM");
   selected.add(hometown);
 
-  const hometownTeam = ranked.find((team) => team.franchiseId === hometown);
+  const hometownTeam = ranked.find((team) => team.teamKey === hometown);
   const invites: InterviewInvite[] = hometownTeam
-    ? [buildInvite(hometownTeam, metricsByFranchiseId)]
+    ? [buildInvite(hometownTeam, metricsByTeamKey)]
     : [{ franchiseId: hometown, tier: "FRINGE", overall: 0, summaryLine: buildSummaryLine(hometown, "FRINGE", null) }];
 
   const representedTiers = new Set<InterviewInviteTier>(invites.map((invite) => invite.tier));
@@ -291,16 +290,16 @@ function generateInterviewInvites(hometownTeamKey: string): InterviewInvite[] {
     if (representedTiers.has(tier)) continue;
     const picked = pickFirstAvailable(teamsByTier[tier], selected);
     if (!picked) continue;
-    selected.add(picked.franchiseId);
-    invites.push(buildInvite(picked, metricsByFranchiseId));
+    selected.add(picked.teamKey);
+    invites.push(buildInvite(picked, metricsByTeamKey));
     representedTiers.add(picked.tier);
   }
 
   while (invites.length < 3) {
     const fallback = pickFirstAvailable(ranked, selected);
     if (!fallback) break;
-    selected.add(fallback.franchiseId);
-    invites.push(buildInvite(fallback, metricsByFranchiseId));
+    selected.add(fallback.teamKey);
+    invites.push(buildInvite(fallback, metricsByTeamKey));
   }
 
   return invites.slice(0, 3);
@@ -566,7 +565,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "OPENING_START_INTERVIEW": {
-          const franchiseId = String(action.franchiseId ?? "");
+          const franchiseId = resolveTeamKey(String(action.franchiseId ?? ""));
           const invite = state.ui.opening.interviewInvites.find((item) => item.franchiseId === franchiseId);
           if (!invite) return;
           const existing = state.ui.opening.interviewResults[franchiseId] ?? {
@@ -592,7 +591,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "OPENING_ANSWER_INTERVIEW": {
-          const franchiseId = String(action.franchiseId ?? "");
+          const franchiseId = resolveTeamKey(String(action.franchiseId ?? ""));
           const answerIndex = Number(action.answerIndex ?? -1);
           const current = state.ui.opening.interviewResults[franchiseId];
           if (!current || current.completed) return;
@@ -604,11 +603,10 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           const choiceId = choice?.id;
           if (!question || !choice || !choiceId) return;
 
-          const resolvedFranchise = resolveFranchiseLike(franchiseId);
-          const scriptTeamKey = resolvedFranchise?.teamKey ?? normalizeExcelTeamKey(franchiseId);
+          const scriptTeamKey = resolveTeamKey(franchiseId);
           const ownerProfile =
             (OWNER_PROFILES as Record<string, (typeof OWNER_PROFILES)[keyof typeof OWNER_PROFILES]>)[scriptTeamKey] ?? OWNER_PROFILES.ATLANTA_APEX;
-          const teamMetrics = buildTeamInviteMetricsByFranchiseId().get(franchiseId) ?? { overall: 70, capSpace: 0 };
+          const teamMetrics = buildTeamInviteMetricsByTeamKey().get(franchiseId) ?? { overall: 70, capSpace: 0 };
           const gmProfile = deriveGmProfile({ overall: teamMetrics.overall, capSpace: teamMetrics.capSpace ?? 0 }, ownerProfile);
 
           const baseDelta: InterviewDelta = { owner: choice.baseOwner, gm: choice.baseGm, risk: choice.baseRisk };
@@ -670,7 +668,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "ACCEPT_OFFER": {
-          const franchiseId = String(action.franchiseId);
+          const franchiseId = resolveTeamKey(String(action.franchiseId));
           const offeredTeamKey = String(action.excelTeamKey ?? "");
           const franchise = resolveFranchiseLike(franchiseId);
           const offeredInvite = franchise
