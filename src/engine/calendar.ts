@@ -39,7 +39,6 @@ const SEASON_2026_BEATS: BeatDef[] = [
     index: 11,
     label: "Training Camp Prep",
     description: "Prepare final watchlists and camp focus areas.",
-    gates: ["GATE.STAFF_MEETING_DONE"],
     uiVisible: true,
   },
 ];

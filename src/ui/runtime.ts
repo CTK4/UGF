@@ -1,4 +1,5 @@
 import { STAFF_ROLES, type StaffRole } from "@/domain/staffRoles";
+import { getBeat } from "@/engine/calendar";
 import { gameActions } from "@/engine/actions";
 import type { GameState, StaffAssignment, Thread } from "@/engine/gameState";
 import { createNewGameState, reduceGameState } from "@/engine/reducer";
@@ -1301,14 +1302,69 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "ADVANCE_WEEK": {
-          const gameState = dispatchGameAction(gameActions.advanceWeek());
-          if (!gameState) return;
-          if (gameState.lastUiError) {
-            const routeAction = gameState.lastUiError.toLowerCase().includes("hire")
-              ? { type: "NAVIGATE", route: { key: "StaffTree" } }
-              : { type: "NAVIGATE", route: { key: "Hub" } };
+          if (!state.save) {
             setState({
               ...state,
+              ui: {
+                ...state.ui,
+                activeModal: {
+                  title: "No save loaded",
+                  message: "Load or start a save before advancing the week.",
+                  actions: [
+                    { label: "Back to Start", action: { type: "NAVIGATE", route: { key: "Start" } } },
+                    { label: "Create Coach", action: { type: "NAVIGATE", route: { key: "CreateCoach" } } },
+                  ],
+                },
+              },
+            });
+            return;
+          }
+
+          const before = { week: state.save.gameState.time.week, phase: state.save.gameState.phase };
+          let gameState: GameState;
+          try {
+            gameState = reduceGameState(state.save.gameState, gameActions.advanceWeek());
+          } catch (error) {
+            if (import.meta.env.DEV) {
+              console.error("[runtime] ADVANCE_WEEK failed", error);
+            }
+            const message = error instanceof Error ? error.message : String(error);
+            setState({
+              ...state,
+              ui: {
+                ...state.ui,
+                activeModal: {
+                  title: "Advance failed",
+                  message,
+                  actions: [{ label: "Close", action: { type: "CLOSE_MODAL" } }],
+                },
+              },
+            });
+            return;
+          }
+
+          const after = { week: gameState.time.week, phase: gameState.phase };
+          if (import.meta.env.DEV) {
+            console.log("[runtime] ADVANCE_WEEK", { before, after, lastUiError: gameState.lastUiError });
+          }
+
+          if (gameState.lastUiError) {
+            const errorText = gameState.lastUiError.toLowerCase();
+            const gateRequiresStaffMeeting = (() => {
+              try {
+                return getBeat(gameState.time.season, gameState.time.week).gates?.includes("GATE.STAFF_MEETING_DONE") ?? false;
+              } catch {
+                return false;
+              }
+            })();
+            const routeAction = errorText.includes("hire")
+              ? { type: "NAVIGATE", route: { key: "StaffTree" } }
+              : errorText.includes("staff meeting") || gateRequiresStaffMeeting
+                ? { type: "NAVIGATE", route: { key: "StaffMeeting" } }
+                : { type: "NAVIGATE", route: { key: "Hub" } };
+            setState({
+              ...state,
+              save: { version: 1, gameState },
               ui: {
                 ...state.ui,
                 activeModal: {
@@ -1323,7 +1379,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             });
             return;
           }
-          setState({ ...state, route: { key: "Hub" } });
+          setState({ ...state, save: { version: 1, gameState }, route: { key: "Hub" }, ui: { ...state.ui, activeModal: null } });
           return;
         }
         case "OPEN_PHONE_THREAD": {
