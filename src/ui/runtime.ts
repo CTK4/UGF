@@ -86,9 +86,7 @@ function clampRating(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
 
-const CHOICE_IDS = ["A", "B", "C"] as const;
-
-type ChoiceId = (typeof CHOICE_IDS)[number];
+type ChoiceId = "A" | "B" | "C";
 
 type InterviewDelta = { owner: number; gm: number; risk: number };
 
@@ -96,20 +94,20 @@ function getScriptForTeam(teamKey: string) {
   return INTERVIEW_SCRIPTS[teamKey] ?? INTERVIEW_SCRIPTS.ATLANTA_APEX;
 }
 
-function getQuestionDeltas(base: { owner: number; gm: number; risk: number }, choiceId: ChoiceId): InterviewDelta {
-  if (choiceId === "A") return { ...base };
-  if (choiceId === "B") return { owner: Math.round(base.owner * 0.5), gm: Math.round(base.gm * 0.5), risk: Math.round(base.risk * 0.25) };
-  return { owner: -Math.round(base.owner * 0.5), gm: -Math.round(base.gm * 0.5), risk: -Math.round(base.risk * 0.5) };
-}
-
-function sumTraitMods(traits: string[], traitModifiers: Array<{ trait: string; delta: InterviewDelta }>): InterviewDelta {
-  return traitModifiers.reduce(
-    (acc, mod) => {
-      if (!traits.includes(mod.trait)) return acc;
+function sumChoiceTraitMods(
+  traits: string[],
+  traitMods: Record<string, Partial<Record<ChoiceId, InterviewDelta>>> | undefined,
+  choiceId: ChoiceId,
+): InterviewDelta {
+  if (!traitMods) return { owner: 0, gm: 0, risk: 0 };
+  return traits.reduce(
+    (acc, trait) => {
+      const delta = traitMods[trait]?.[choiceId];
+      if (!delta) return acc;
       return {
-        owner: acc.owner + mod.delta.owner,
-        gm: acc.gm + mod.delta.gm,
-        risk: acc.risk + mod.delta.risk,
+        owner: acc.owner + delta.owner,
+        gm: acc.gm + delta.gm,
+        risk: acc.risk + delta.risk,
       };
     },
     { owner: 0, gm: 0, risk: 0 } satisfies InterviewDelta,
@@ -564,23 +562,24 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           const script = getScriptForTeam(franchiseId);
           const questionId = script.questionIds[current.answers.length];
           const question = INTERVIEW_QUESTION_BANK[questionId];
-          const choiceId = CHOICE_IDS[answerIndex];
-          if (!question || !choiceId) return;
+          const choice = question?.choices[answerIndex];
+          const choiceId = choice?.id;
+          if (!question || !choice || !choiceId) return;
 
           const ownerProfile = (OWNER_PROFILES as Record<string, (typeof OWNER_PROFILES)[keyof typeof OWNER_PROFILES]>)[franchiseId] ?? OWNER_PROFILES.ATLANTA_APEX;
           const teamMetrics = buildTeamInviteMetricsByFranchiseId().get(franchiseId) ?? { overall: 70, capSpace: 0 };
           const gmProfile = deriveGmProfile({ overall: teamMetrics.overall, capSpace: teamMetrics.capSpace ?? 0 }, ownerProfile);
 
-          const baseDelta = getQuestionDeltas(question.baseEffects, choiceId);
-          const ownerTraitMods = sumTraitMods(ownerProfile.traits, question.traitModifiers as Array<{ trait: string; delta: InterviewDelta }>);
-          const gmTraitMods = sumTraitMods(gmProfile.traits, question.traitModifiers as Array<{ trait: string; delta: InterviewDelta }>);
+          const baseDelta: InterviewDelta = { owner: choice.baseOwner, gm: choice.baseGm, risk: choice.baseRisk };
+          const ownerTraitMods = sumChoiceTraitMods(ownerProfile.traits, question.ownerTraitMods, choice.id);
+          const gmTraitMods = sumChoiceTraitMods(gmProfile.traits, question.gmTraitMods, choice.id);
 
           let ownerDelta = baseDelta.owner + ownerTraitMods.owner + gmTraitMods.owner;
           const gmDelta = baseDelta.gm + ownerTraitMods.gm + gmTraitMods.gm;
           const riskDelta = baseDelta.risk + ownerTraitMods.risk + gmTraitMods.risk;
 
           if (script.specialRules?.volatileOwnerSwing) {
-            ownerDelta += choiceId === "A" ? 1 : choiceId === "C" ? -1 : 0;
+            ownerDelta += choice.id === "A" ? 1 : choice.id === "C" ? -1 : 0;
           }
 
           const nextRisk = clampRating(current.risk + riskDelta);
@@ -589,7 +588,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             ownerOpinion: clampRating(current.ownerOpinion + ownerDelta),
             gmOpinion: clampRating(current.gmOpinion + gmDelta),
             risk: nextRisk,
-            answers: [...current.answers, { questionId, choiceId }],
+            answers: [...current.answers, { questionId, choiceId: choice.id }],
             completed: current.answers.length + 1 >= script.questionIds.length,
             lastToneFeedback:
               riskDelta > 0
@@ -631,7 +630,28 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           const franchiseId = String(action.franchiseId);
           const franchise = getFranchise(franchiseId);
           const isOffered = state.ui.opening.offers.some((offer) => offer.franchiseId === franchiseId);
-          if (!franchise || !isOffered) return;
+          if (!franchise || !isOffered) {
+            if (import.meta.env.DEV) {
+              console.error("[runtime] ACCEPT_OFFER rejected before flow", {
+                franchiseId,
+                franchiseFullName: franchise?.fullName,
+                offeredFranchiseIds: state.ui.opening.offers.map((offer) => offer.franchiseId),
+                reason: !franchise ? "franchise_not_found" : "franchise_not_in_offers",
+              });
+            }
+            setState({
+              ...state,
+              route: { key: "Offers" },
+              ui: {
+                ...state.ui,
+                opening: {
+                  ...state.ui.opening,
+                  lastOfferError: "Could not accept that offer. Please select one of the listed offers.",
+                },
+              },
+            });
+            return;
+          }
           const excelTeamKey = normalizeExcelTeamKey(franchise.fullName);
 
           const runAcceptOfferFlow = () => {
@@ -658,10 +678,13 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               tasks: [{ id: "task-1", type: "STAFF_MEETING", title: "Hire coordinators", description: "Fill OC/DC/STC positions.", status: "OPEN" }],
               draft: gameState.draft ?? { discovered: {}, watchlist: [] },
             };
-            localStorage.setItem(SAVE_KEY, JSON.stringify({ version: 1, gameState }));
+            const save = { version: 1 as const, gameState };
+            localStorage.setItem(SAVE_KEY, JSON.stringify(save));
             setState({
               ...state,
-              save: { version: 1, gameState },
+              // Offers looked dead when errors interrupted flow before route/save updates.
+              // Always persist + set state in one branch so clicks deterministically advance.
+              save,
               route: { key: "HireCoordinators" },
               ui: { ...state.ui, opening: { ...state.ui.opening, lastOfferError: undefined } },
             });
@@ -670,9 +693,14 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           try {
             runAcceptOfferFlow();
           } catch (error) {
-            if (import.meta.env.DEV) {
-              console.error("[runtime] ACCEPT_OFFER failed", error, { franchiseId, fullName: franchise.fullName, excelTeamKey });
-            }
+            const stack = error instanceof Error ? error.stack : undefined;
+            console.error("[runtime] ACCEPT_OFFER failed", {
+              franchiseId,
+              franchiseFullName: franchise.fullName,
+              excelTeamKey,
+              error,
+              stack,
+            });
             setState({
               ...state,
               route: { key: "Offers" },

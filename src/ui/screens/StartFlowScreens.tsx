@@ -226,7 +226,12 @@ export function OffersScreen({ ui }: ScreenProps) {
   return (
     <div className="ugf-card">
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
-        {lastOfferError ? <div className="ugf-pill" style={{ color: "#ffd7d7", borderColor: "#b04545" }}>{lastOfferError}</div> : null}
+        {lastOfferError ? (
+          <div style={{ display: "grid", gap: 8 }}>
+            <div className="ugf-pill" style={{ color: "#ffd7d7", borderColor: "#b04545" }}>{lastOfferError}</div>
+            <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Interviews" } })}>Back to Interviews</button>
+          </div>
+        ) : null}
         {offers.map((offer) => (
           <button type="button" key={offer.franchiseId} onClick={() => ui.dispatch({ type: "ACCEPT_OFFER", franchiseId: offer.franchiseId })}>
             <div><b>{(() => { const name = getFranchise(offer.franchiseId)?.fullName ?? offer.franchiseId; devGuardForbiddenTeamName(name); return name; })()}</b></div>
