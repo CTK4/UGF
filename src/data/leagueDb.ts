@@ -72,6 +72,16 @@ export type PersonnelRow = {
 
 export type DraftOrderRow = { season: number; round: number; pick: number; teamId: string };
 export type TeamFinanceRow = { teamId: string; season: number; capSpace?: number; cash?: number; revenue?: number; expenses?: number };
+export type TeamSummaryProjectionRow = {
+  teamId: string;
+  Team: string;
+  Conference: string;
+  Division: string;
+  OVERALL: number;
+  Wins: number;
+  Losses: number;
+  "Cap Space": number;
+};
 
 type LeagueDbRoot = {
   sheets?: {
@@ -101,6 +111,8 @@ const draftOrder = Object.freeze([...(sheets.DraftOrder ?? [])]);
 const finances = Object.freeze([...(sheets.TeamFinances ?? [])]);
 
 const teamsById = new Map(teams.map((team) => [String(team.teamId), team]));
+const conferenceById = new Map(conferences.map((conference) => [String(conference.conferenceId), conference]));
+const divisionById = new Map(divisions.map((division) => [String(division.divisionId), division]));
 const playersById = new Map(players.map((player) => [String(player.playerId), player]));
 const contractsById = new Map(contracts.map((contract) => [String(contract.contractId), contract]));
 const contractsByEntityKey = new Map(contracts.map((contract) => [toEntityKey(contract.entityType, contract.entityId), contract]));
@@ -207,6 +219,36 @@ export function getCurrentDraftOrder(): DraftOrderRow[] {
 }
 
 export function getFinances(): TeamFinanceRow[] { return [...finances]; }
+
+export function getTeamSummaryProjectionRows(season = getCurrentSeason(), leagueSeed = season): TeamSummaryProjectionRow[] {
+  return teams.map((team) => {
+    const teamId = String(team.teamId);
+    const teamPlayers = players.filter((player) => String(player.teamId ?? "") === teamId);
+    const overall = teamPlayers.length
+      ? Math.round((teamPlayers.reduce((sum, player) => sum + Number(player.overall ?? 0), 0) / teamPlayers.length) * 10) / 10
+      : 0;
+
+    const seedHash = Number.parseInt(stableHash(`${leagueSeed}:${teamId}`), 16);
+    const wins = Number.isFinite(seedHash) ? seedHash % 18 : 0;
+    const losses = Math.max(0, 17 - wins);
+
+    const capHits = contracts
+      .filter((contract) => String(contract.entityType ?? "").toUpperCase() === "PLAYER" && String(contract.teamId ?? "") === teamId)
+      .reduce((sum, contract) => sum + Number(contract.salaryY1 ?? 0), 0);
+    const capSpace = Number(finances.find((finance) => finance.teamId === teamId && Number(finance.season) === Number(season))?.capSpace ?? (getSalaryCap() - capHits));
+
+    return {
+      teamId,
+      Team: String(team.name ?? teamId),
+      Conference: String(conferenceById.get(String(team.conferenceId ?? ""))?.name ?? "Independent"),
+      Division: String(divisionById.get(String(team.divisionId ?? ""))?.name ?? "Independent"),
+      OVERALL: overall,
+      Wins: wins,
+      Losses: losses,
+      "Cap Space": Number.isFinite(capSpace) ? capSpace : 0,
+    };
+  });
+}
 
 export function getCurrentSeason(): number {
   const season = Number(league[0]?.season ?? draftOrder[0]?.season ?? 2026);

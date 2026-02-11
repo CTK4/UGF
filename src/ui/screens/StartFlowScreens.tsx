@@ -1,5 +1,5 @@
 import React from "react";
-import { getPersonnelRows } from "@/data/generatedData";
+import { getPersonnel } from "@/data/leagueDb";
 import type { ScreenProps } from "@/ui/types";
 import { HOMETOWNS } from "@/data/hometowns";
 import { resolveFranchiseLike } from "@/ui/data/franchises";
@@ -11,8 +11,29 @@ import { INTERVIEW_QUESTION_BANK } from "@/data/interviewBank";
 import { INTERVIEW_SCRIPTS } from "@/data/interviewScripts";
 import { coordinatorCandidateMeta, type CoordinatorRole } from "@/ui/helpers/deterministic";
 
-type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string; Status?: string };
-const personnel = getPersonnelRows() as PersonnelRow[];
+type CoordinatorCandidate = {
+  personId: string;
+  displayName: string;
+  role: "OC" | "DC" | "STC";
+  scheme?: string;
+  reputation: number;
+};
+
+const coordinatorCandidates = getPersonnel()
+  .filter((person) => {
+    const role = String(person.role ?? "").toUpperCase();
+    const status = String(person.status ?? "").toUpperCase();
+    return (role === "OC" || role === "DC" || role === "STC") && status === "FREE_AGENT";
+  })
+  .map((person) => ({
+    personId: String(person.personId),
+    displayName: String(person.fullName ?? "Unknown Coach"),
+    role: String(person.role ?? "").toUpperCase() as "OC" | "DC" | "STC",
+    scheme: String(person.scheme ?? "").trim() || undefined,
+    reputation: Number(person.reputation ?? 0),
+  }))
+  .sort((a, b) => b.reputation - a.reputation || a.displayName.localeCompare(b.displayName) || a.personId.localeCompare(b.personId));
+
 const backgrounds = ["Former QB", "Defensive Architect", "Special Teams Ace", "CEO Program Builder"];
 const coachPersonalities = ["Balanced", "Players Coach", "Disciplinarian", "Analytics First"] as const;
 
@@ -23,8 +44,8 @@ const tierLabelByCode = {
   CONTENDER: "Contender (Top-10)",
 } as const;
 
-function rolePool(position: "OC" | "DC" | "ST Coordinator") {
-  return personnel.filter((p) => p.Position === position && String(p.Status ?? "").toUpperCase() === "FREE_AGENT").slice(0, 6);
+function rolePool(role: "OC" | "DC" | "STC") {
+  return coordinatorCandidates.filter((candidate) => candidate.role === role).slice(0, 6);
 }
 
 function devGuardForbiddenTeamName(_teamName: string) {
@@ -264,31 +285,32 @@ export function OffersScreen({ ui }: ScreenProps) {
 
 export function HireCoordinatorsScreen({ ui }: ScreenProps) {
   const picks = ui.getState().ui.opening.coordinatorChoices;
-  const roles: Array<["OC" | "DC" | "STC", "OC" | "DC" | "ST Coordinator"]> = [["OC", "OC"], ["DC", "DC"], ["STC", "ST Coordinator"]];
+  const roles: Array<"OC" | "DC" | "STC"> = ["OC", "DC", "STC"];
 
   return (
     <div className="ugf-card">
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
-        {roles.map(([role, pos]) => (
+        {roles.map((role) => (
           <div key={role} style={{ display: "grid", gap: 8 }}>
             <b>{role}</b>
-            {rolePool(pos).map((c) => {
-              const meta = coordinatorCandidateMeta({ role: role as CoordinatorRole, name: c.DisplayName, scheme: c.Scheme });
-              const selected = picks[role] === c.DisplayName;
+            {rolePool(role).map((c) => {
+              const meta = coordinatorCandidateMeta({ role: role as CoordinatorRole, name: c.displayName, scheme: c.scheme });
+              const selected = picks[role] === c.displayName;
               return (
                 <button
                   type="button"
-                  key={c.DisplayName}
-                  onClick={() => ui.dispatch({ type: "SET_COORDINATOR_CHOICE", role, candidateName: c.DisplayName })}
+                  key={c.personId}
+                  onClick={() => ui.dispatch({ type: "SET_COORDINATOR_CHOICE", role, candidateName: c.displayName })}
                   className="ugf-card"
                   style={{ textAlign: "left", borderColor: selected ? "#ffbf47" : undefined, boxShadow: selected ? "0 0 0 1px rgba(255,191,71,0.6)" : undefined }}
                 >
                   <span className="ugf-card__body" style={{ display: "grid", gap: 6 }}>
                     <span style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                      <b>{selected ? "✓ " : ""}{c.DisplayName}</b>
-                      <span className="ugf-pill">{role}</span>
+                      <b>{selected ? "✓ " : ""}{c.displayName}</b>
+                      <span className="ugf-pill">{c.role}</span>
                     </span>
                     <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <span className="ugf-pill">Rep: {c.reputation}</span>
                       <span className="ugf-pill">Scheme: {meta.schemeTag}</span>
                       <span className="ugf-pill">Style: {meta.styleTag}</span>
                       <span className="ugf-pill">Fit: {meta.fitScore}</span>
