@@ -1,5 +1,4 @@
 import draftClassRaw from "@/data/generated/draftClass.json";
-import { getRosterRows } from "@/data/generatedData";
 import type { GameState } from "@/engine/gameState";
 
 export type ScoutingAction = { positions: string[] };
@@ -8,7 +7,6 @@ type DraftProspectRow = { "Player ID"?: string | number; Name?: string; POS?: st
 type RosterRow = { Team?: string; PositionGroup?: string; Rating?: number };
 
 const draftRows = draftClassRaw as DraftProspectRow[];
-const rosterRows = getRosterRows() as unknown as RosterRow[];
 
 function normalizeKey(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -34,6 +32,12 @@ export function getSuggestedNeed(state: GameState): string | null {
   const teamKeys = new Set([normalizeKey(state.franchise.excelTeamKey), normalizeKey(state.franchise.ugfTeamKey)].filter(Boolean));
   if (!teamKeys.size) return null;
   const byGroup = new Map<string, { total: number; count: number }>();
+
+  const rosterRows: RosterRow[] = Object.values(state.league.playersById).map((player) => ({
+    Team: player.teamKey,
+    PositionGroup: player.positionGroup || player.pos,
+    Rating: player.overall,
+  }));
 
   for (const row of rosterRows) {
     const team = normalizeKey(String(row.Team ?? ""));

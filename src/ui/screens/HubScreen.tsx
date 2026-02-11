@@ -80,12 +80,14 @@ export function HubScreen({ ui }: ScreenProps) {
       position: player.pos || player.positionGroup,
       yearsLeft: player.contract.yearsLeft,
       expiring: player.contract.yearsLeft <= 1,
+      pendingFreeAgent: String(player.status ?? "").toUpperCase() === "PENDING_FREE_AGENT",
       capHit: player.contract.amount,
     })),
     [teamRoster],
   );
   const expiring = teamContracts.filter((row) => row.expiring);
   const multiYear = teamContracts.filter((row) => !row.expiring);
+  const pendingFreeAgents = teamContracts.filter((row) => row.pendingFreeAgent);
   const totalCapObligation = teamContracts.reduce((sum, row) => sum + row.capHit, 0);
 
   const capUsed = gs.league.cap.capUsedByTeam[activeTeamKey] ?? 0;
@@ -181,6 +183,12 @@ export function HubScreen({ ui }: ScreenProps) {
               <strong>Multi-year ({multiYear.length})</strong>
               {!multiYear.length ? <div>None.</div> : multiYear.map((row, idx) => (
                 <div key={`${row.playerName}-${idx}`}>• {sanitizeForbiddenName(row.playerName)} ({row.position}) — {row.yearsLeft} yrs · {money(row.capHit)}</div>
+              ))}
+            </div>
+            <div style={{ display: "grid", gap: 6 }}>
+              <strong>Pending Free Agent ({pendingFreeAgents.length})</strong>
+              {!pendingFreeAgents.length ? <div>None.</div> : pendingFreeAgents.map((row, idx) => (
+                <div key={`pfa-${row.playerName}-${idx}`}>• {sanitizeForbiddenName(row.playerName)} ({row.position}) — re-sign decision pending</div>
               ))}
             </div>
           </div></div>
