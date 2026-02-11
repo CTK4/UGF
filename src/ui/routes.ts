@@ -11,6 +11,7 @@ import {
   HireCoordinatorsScreen,
   StaffMeetingScreen,
 } from "@/ui/screens/StartFlowScreens";
+import { DelegationSetupScreen } from "@/ui/screens/DelegationSetupScreen";
 import { HubScreen } from "@/ui/screens/HubScreen";
 import { StaffTreeScreen } from "@/ui/screens/StaffTreeScreen";
 import { HireMarketScreen } from "@/ui/screens/HireMarketScreen";
@@ -28,6 +29,7 @@ export type RouteKey =
   | "Offers"
   | "HireCoordinators"
   | "StaffMeeting"
+  | "DelegationSetup"
   | "Hub"
   | "StaffTree"
   | "HireMarket"
@@ -46,6 +48,7 @@ export type Route =
   | { key: "Offers" }
   | { key: "HireCoordinators" }
   | { key: "StaffMeeting" }
+  | { key: "DelegationSetup" }
   | { key: "Hub"; tab?: "staff" | "roster" | "contracts" | "standings" | "schedule" | "phone" }
   | { key: "StaffTree" }
   | { key: "HireMarket"; role: StaffRole }
@@ -64,6 +67,7 @@ export const RouteMap: Record<RouteKey, ComponentType<ScreenProps>> = {
   Offers: OffersScreen,
   HireCoordinators: HireCoordinatorsScreen,
   StaffMeeting: StaffMeetingScreen,
+  DelegationSetup: DelegationSetupScreen,
   Hub: HubScreen,
   StaffTree: StaffTreeScreen,
   HireMarket: HireMarketScreen,

@@ -14,6 +14,8 @@ import { coordinatorCandidateMeta, type CoordinatorRole } from "@/ui/helpers/det
 type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string; Status?: string };
 const personnel = getPersonnelRows() as PersonnelRow[];
 const backgrounds = ["Former QB", "Defensive Architect", "Special Teams Ace", "CEO Program Builder"];
+const coachPersonalities = ["Balanced", "Players Coach", "Disciplinarian", "Analytics First"] as const;
+
 
 const tierLabelByCode = {
   REBUILD: "Rebuild (Bottom-5)",
@@ -60,6 +62,19 @@ export function CreateCoachScreen({ ui }: ScreenProps) {
           placeholder="Coach name"
           onChange={(e) => ui.dispatch({ type: "SET_COACH_NAME", coachName: e.target.value })}
         />
+        <input
+          type="number"
+          min={24}
+          max={85}
+          value={opening.coachAge}
+          placeholder="Coach age"
+          onChange={(e) => ui.dispatch({ type: "SET_COACH_AGE", coachAge: Number(e.target.value) })}
+        />
+        <select value={opening.coachPersonality} onChange={(e) => ui.dispatch({ type: "SET_COACH_PERSONALITY", coachPersonality: e.target.value })}>
+          {coachPersonalities.map((personality) => (
+            <option key={personality} value={personality}>{personality}</option>
+          ))}
+        </select>
         <select value={opening.hometownId} onChange={(e) => ui.dispatch({ type: "SET_HOMETOWN", hometownId: e.target.value })}>
           <option value="">Select hometown…</option>
           {statesInOrder.map((state) => (

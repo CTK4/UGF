@@ -51,6 +51,7 @@ function createEmptyRosterState() {
 export function createNewGameState(): GameState {
   return {
     meta: { version: 2 },
+    world: { leagueSeed: 2026 },
     phase: "PRECAREER",
     time: {
       season: 2026,
@@ -71,6 +72,8 @@ export function createNewGameState(): GameState {
       hometownLabel: "",
       hometownTeamKey: "",
     },
+    characters: { byId: {}, coachId: null, ownersByTeamKey: {}, gmsByTeamKey: {} },
+    teamFrontOffice: {},
     franchise: { ugfTeamKey: "", excelTeamKey: "" },
     staff: { assignments: emptyAssignments(), budgetTotal: 18_000_000, budgetUsed: 0, blockedHireAttemptsRecent: 0 },
     offseasonPlan: null,
@@ -83,6 +86,13 @@ export function createNewGameState(): GameState {
         defense: createDefaultSideControl(),
         specialTeams: createDefaultSideControl(),
       },
+    },
+    delegation: {
+      offenseControl: "USER",
+      defenseControl: "USER",
+      gameManagement: "USER",
+      gmAuthority: "FULL",
+      setupComplete: false,
     },
     draft: { discovered: {}, watchlist: [] },
     league: createEmptyLeagueState(),
@@ -102,6 +112,9 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
         ...createNewGameState(),
         ...loaded,
         meta: { version: 2 },
+        world: {
+          leagueSeed: Number(loaded?.world?.leagueSeed ?? loaded?.time?.season ?? 2026),
+        },
         time: {
           season: Number(loaded?.time?.season ?? 2026),
           week: Number(loaded?.time?.week ?? loaded?.time?.beatIndex ?? 1),
@@ -110,7 +123,18 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
           label: String(loaded?.time?.label ?? phaseLabel((loaded?.phase as GamePhase) ?? "PRECAREER")),
         },
         staff: { ...createNewGameState().staff, ...(loaded?.staff ?? {}) },
+        characters: {
+          byId: loaded?.characters?.byId ?? {},
+          coachId: loaded?.characters?.coachId ?? null,
+          ownersByTeamKey: loaded?.characters?.ownersByTeamKey ?? {},
+          gmsByTeamKey: loaded?.characters?.gmsByTeamKey ?? {},
+        },
+        teamFrontOffice: loaded?.teamFrontOffice ?? {},
         career: loaded?.career ?? createNewGameState().career,
+        delegation: {
+          ...createNewGameState().delegation,
+          ...(loaded?.delegation ?? {}),
+        },
         draft: loaded?.draft ?? createNewGameState().draft,
         roster: Array.isArray(loaded?.roster)
           ? createEmptyRosterState()

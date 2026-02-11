@@ -119,6 +119,9 @@ export type PlayerContractState = {
 
 export type GameState = {
   meta: { version: 2 };
+  world: {
+    leagueSeed: number;
+  };
   phase: GamePhase;
   time: { season: number; week: number; dayIndex: number; phaseVersion: number; label: string };
   coach: {
@@ -134,6 +137,13 @@ export type GameState = {
     hometownLabel?: string;
     hometownTeamKey?: string;
   };
+  characters: {
+    byId: Record<string, Character>;
+    coachId: string | null;
+    ownersByTeamKey: Record<string, string>;
+    gmsByTeamKey: Record<string, string>;
+  };
+  teamFrontOffice: Record<string, { ownerId: string; gmId: string }>;
   franchise: { ugfTeamKey: string; excelTeamKey: string };
   staff: {
     assignments: Record<Role, StaffAssignment | null>;
@@ -151,6 +161,13 @@ export type GameState = {
   inbox: Thread[];
   checkpoints: { ts: number; label: string; week: number; phaseVersion: number }[];
   career: { control: Record<ControlSide, SideControl> };
+  delegation: {
+    offenseControl: "USER" | "OC";
+    defenseControl: "USER" | "DC";
+    gameManagement: "USER" | "SHARED";
+    gmAuthority: "FULL" | "GM_ONLY";
+    setupComplete: boolean;
+  };
   draft: { discovered: Record<string, ProspectDiscovery>; watchlist: string[] };
   league: LeagueState;
   roster: {
@@ -170,4 +187,27 @@ export type GameState = {
   };
   completedGates: string[];
   lastUiError: string | null;
+};
+
+export type CharacterRole = "COACH" | "OWNER" | "GM" | "PLAYER";
+
+export type Character = {
+  id: string;
+  teamKey?: string;
+  role: CharacterRole;
+  fullName: string;
+  age?: number;
+  personality: string;
+  ownerTraits?: {
+    patience: "LOW" | "MEDIUM" | "HIGH";
+    spending: "LOW" | "MEDIUM" | "HIGH";
+    interference: "LOW" | "MEDIUM" | "HIGH";
+  };
+  gmBiases?: {
+    youth: number;
+    speed: number;
+    ras: number;
+    discipline: number;
+    trenches: number;
+  };
 };

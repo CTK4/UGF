@@ -1,7 +1,7 @@
 import type { Role, GameState } from "@/engine/gameState";
 import type { Route } from "@/ui/routes";
 
-export type GateId = "GATE.COORDINATORS_HIRED" | "GATE.STAFF_MEETING_DONE";
+export type GateId = "GATE.COORDINATORS_HIRED" | "GATE.DELEGATION_SETUP_DONE" | "GATE.STAFF_MEETING_DONE";
 
 export type GateFailure = { gateId: GateId; message: string; route: Route };
 
@@ -18,6 +18,16 @@ export function resolveGate(gateId: GateId, state: GameState): GateFailure | nul
       gateId,
       message: `Advance blocked: ${missingRole} is not hired yet. Hire your coordinators in Staff Tree.`,
       route: { key: "StaffTree" },
+    };
+  }
+
+
+  if (gateId === "GATE.DELEGATION_SETUP_DONE") {
+    if (state.delegation?.setupComplete) return null;
+    return {
+      gateId,
+      message: "Advance blocked: Delegation setup is incomplete. Confirm delegation choices before continuing.",
+      route: { key: "DelegationSetup" },
     };
   }
 
