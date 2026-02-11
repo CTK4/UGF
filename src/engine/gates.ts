@@ -33,8 +33,6 @@ export function resolveGate(gateId: GateId, state: GameState): GateFailure | nul
 
   if (gateId === "GATE.STAFF_MEETING_DONE") {
     if (state.offseasonPlan) return null;
-    const taskDone = state.tasks.some((task) => task.type === "STAFF_MEETING" && task.status === "DONE");
-    if (taskDone) return null;
     return {
       gateId,
       message: "Advance blocked: Staff meeting is incomplete. Submit offseason priorities to continue.",

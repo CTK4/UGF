@@ -1432,11 +1432,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             shopTargets: Array.isArray(action.payload?.shopTargets) ? (action.payload.shopTargets as string[]) : [],
             tradeNotes: String(action.payload?.tradeNotes ?? ""),
           };
-          let gameState = reduceGameState(state.save.gameState, gameActions.setOffseasonPlan(payload));
-          const initialMeetingTask = gameState.tasks.find((task) => task.title === "Initial staff meeting");
-          if (initialMeetingTask) {
-            gameState = reduceGameState(gameState, gameActions.completeTask(initialMeetingTask.id));
-          }
+          const gameState = reduceGameState(state.save.gameState, gameActions.setOffseasonPlan(payload));
           setState({ ...state, save: { version: 1, gameState }, route: { key: "Hub" } });
           return;
         }

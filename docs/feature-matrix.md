@@ -246,3 +246,68 @@ Acceptance: execute full draft day with timer, trades, CPU reactions, post-draft
 - ⚠️ Partial: **19**
 - ❌ Missing: **50**
 
+
+---
+
+## Audit Corrections (2026-02-11 addendum)
+
+### 1) Staff meeting gate wording correction
+- Prior wording that treated title-based task completion as merely “stale” was incomplete.
+- Correct framing: **dual completion pathways existed** (`offseasonPlan`-based completion and task-completion-based completion), which created inconsistent completion semantics.
+- Required direction: remove the title-based pathway or convert any fallback completion logic to an ID-based task contract with a single canonical gate source.
+- Current gate behavior has now been tightened to canonical `offseasonPlan` completion only in runtime gating code.
+
+### 2) Canonical data drift appendix is now enumerated from `rg`
+The audit artifact now includes explicit command output for current import surfaces.
+
+- `rg -n "from \"@/data/generatedData\"|generatedData" src`
+  - `src/bundle/loadBundle.ts:4`
+  - `src/ui/data/teamKeyResolver.ts:1`
+  - `src/ui/data/franchises.ts:1`
+  - `src/ui/runtime.ts:17`
+  - `src/ui/screens/StartFlowScreens.tsx:2`
+  - `src/services/staffMarket.ts:1`
+  - `src/services/staffHiring.ts:1`
+
+- `rg -n "@/data/generated/" src`
+  - `src/data/generatedData.ts:1`
+  - `src/data/generatedData.ts:2`
+  - `src/data/generatedData.ts:3`
+  - `src/services/draftDiscovery.ts:1`
+  - `src/engine/scouting.ts:1`
+
+- `rg -n "rostersPublic" src`
+  - `src/data/rostersPublic.ts:37`
+  - `src/data/rostersPublic.ts:56`
+
+- Legacy table-registry accessor sweep (`rg -n "from \"@/data/TableRegistry\"|getTable\(" src`)
+  - Active import + accessor usage spans `src/ui/dispatch/dispatch.ts` and service modules including `draft.ts`, `trade.ts`, `contracts.ts`, `scouting.ts`, `staff.ts`, `gameData.ts`, `owner.ts`, `pff.ts`, `draftGrades.ts`, `draftNarratives.ts`, `draftMutations.ts`, and depth-chart services.
+
+### 3) Save/hydrate precedence recommendation sharpened
+- Risk is more than drift: the merge rule allows **any non-empty save players array** to dominate canonical league field precedence.
+- Recommended guard rule for next implementation step:
+  - If `save.meta.version < X` **or** `save.world.lastLeagueDbHash !== currentLeagueDbHash`, rebuild league state from canonical.
+  - Preserve only user-controlled deltas (transactions, signings, injuries, history, progression flags), not raw canonical-owned roster/contracts blobs.
+
+### 4) Salary cap utility status correction
+- `src/services/cap.ts` is present but currently **unused by runtime imports** in `src`.
+- Therefore this module should be described as “present but currently unused,” not as active cap enforcement logic.
+- Active cap checks are performed through contract/trade flow paths in other services.
+
+### 5) Verification Matrix Delta evidence requirement
+- Any future “Verification Matrix Delta” section should treat each claim as evidence-backed only when it cites concrete file + function location.
+- If claim is inferred or architectural intent, mark it explicitly as inferred and separate from verified implementation state.
+
+## Revised “Next 3 Tasks”
+
+1. **Canonicalize read paths**
+   - Include `src/data/generatedData.ts` in scope (deprecate or convert to projection wrapper over canonical `leagueDb`).
+   - Acceptance criterion: **No active runtime imports of `generatedData` or `src/data/generated/*` for canonical-owned entities.**
+
+2. **Hydrate merge hardening**
+   - Implement version/hash-aware canonical rebuild strategy.
+   - Add a failure-mode acceptance test: load a save carrying stale/forbidden team IDs and verify resolver + hydration produce only CITY_TEAM IDs and validation passes.
+
+3. **Legacy decommission (flagged first)**
+   - Move legacy registry pathways behind an opt-in flag before removal.
+   - Practical options: exclude from tsconfig/build, or move to `/legacy/` with no active imports, preserving history without accidental runtime reactivation.
