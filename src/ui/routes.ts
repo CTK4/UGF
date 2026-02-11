@@ -19,6 +19,19 @@ import { CandidateDetailScreen } from "@/ui/screens/CandidateDetailScreen";
 import { PhoneInboxScreen, PhoneThreadScreen } from "@/ui/screens/PhoneScreens";
 import { FreeAgencyScreen } from "@/ui/screens/FreeAgencyScreen";
 import { RosterScreen } from "@/ui/screens/RosterScreen";
+import { isMobileUI } from "@/ui/mobile/isMobileUI";
+import { MobilePhoneInboxScreen } from "@/ui/screens/MobilePhoneInboxScreen";
+import { MobilePhoneThreadScreen } from "@/ui/screens/MobilePhoneThreadScreen";
+
+function PhoneInboxRouteScreen(props: ScreenProps) {
+  const Screen = isMobileUI() ? MobilePhoneInboxScreen : PhoneInboxScreen;
+  return Screen(props);
+}
+
+function PhoneThreadRouteScreen(props: ScreenProps) {
+  const Screen = isMobileUI() ? MobilePhoneThreadScreen : PhoneThreadScreen;
+  return Screen(props);
+}
 
 export type RouteKey =
   | "Start"
@@ -72,8 +85,8 @@ export const RouteMap: Record<RouteKey, ComponentType<ScreenProps>> = {
   StaffTree: StaffTreeScreen,
   HireMarket: HireMarketScreen,
   CandidateDetail: CandidateDetailScreen,
-  PhoneInbox: PhoneInboxScreen,
-  PhoneThread: PhoneThreadScreen,
+  PhoneInbox: PhoneInboxRouteScreen,
+  PhoneThread: PhoneThreadRouteScreen,
   FreeAgency: FreeAgencyScreen,
   Roster: RosterScreen,
 };

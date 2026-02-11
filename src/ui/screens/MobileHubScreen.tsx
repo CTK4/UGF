@@ -20,12 +20,11 @@ Verification checklist:
 export function MobileHubScreen({ ui }: ScreenProps) {
   const save = ui.getState().save;
   const advanceState = ui.selectors.canAdvance();
-  const forceMobilePreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("ui") === "mobile";
 
   if (!save) {
     return (
       <div className="mobile-ui" style={{ display: "grid", gap: 12, maxWidth: 430, margin: "0 auto", padding: 12 }}>
-        <MobileTopBar title="Hub" rightActions={import.meta.env.DEV && forceMobilePreview ? <span className="ugf-pill">Mobile UI</span> : undefined} />
+        <MobileTopBar title="Hub" />
         <SectionCard title="No Save Loaded">
           <p style={{ margin: 0 }}>Hub actions are unavailable until a save is loaded.</p>
           <SecondaryActionButton label="Back to Start" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Start" } })} />
@@ -43,7 +42,6 @@ export function MobileHubScreen({ ui }: ScreenProps) {
         title="Hub"
         rightActions={
           <>
-            {import.meta.env.DEV && forceMobilePreview ? <span className="ugf-pill">Mobile UI</span> : null}
             <span className="ugf-pill">Wk {gs.time.week}</span>
           </>
         }
@@ -97,4 +95,3 @@ export function MobileHubScreen({ ui }: ScreenProps) {
     </div>
   );
 }
-
