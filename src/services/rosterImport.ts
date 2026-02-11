@@ -130,6 +130,19 @@ function toPersonnel(raw: ReturnType<typeof getPersonnel>[number]): LeaguePerson
   };
 }
 
+
+export function getLeagueDbHash(): string {
+  const payload = JSON.stringify({
+    teams: getTeams(),
+    players: getPlayers(),
+    contracts: getContracts(),
+    personnel: getPersonnel(),
+    draftOrder: getDraftOrder(getCurrentSeason()),
+    salaryCap: getSalaryCap(),
+  });
+  return deterministicHash(payload);
+}
+
 export async function loadLeagueRosterForTeam(input: HydrateInput): Promise<{ league: LeagueState; warning?: string }> {
   const season = Number(input.season || getCurrentSeason());
   const salaryCap = input.salaryCap ?? getSalaryCap() ?? DEFAULT_SALARY_CAP;

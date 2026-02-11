@@ -55,7 +55,7 @@ function createEmptyRosterState() {
 export function createNewGameState(): GameState {
   return {
     meta: { version: 2 },
-    world: { leagueSeed: 2026 },
+    world: { leagueSeed: 2026, leagueDbVersion: "v1", leagueDbHash: "" },
     phase: "PRECAREER",
     time: {
       season: 2026,
@@ -118,6 +118,8 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
         meta: { version: 2 },
         world: {
           leagueSeed: Number(loaded?.world?.leagueSeed ?? loaded?.time?.season ?? 2026),
+          leagueDbVersion: String(loaded?.world?.leagueDbVersion ?? "v1"),
+          leagueDbHash: String(loaded?.world?.leagueDbHash ?? ""),
         },
         time: {
           season: Number(loaded?.time?.season ?? 2026),
