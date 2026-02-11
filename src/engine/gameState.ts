@@ -79,12 +79,33 @@ export type LeaguePlayer = {
   teamKey: string;
   overall?: number;
   age?: number;
+  status?: string;
   contract: PlayerContract;
 };
+
+export type LeagueTeam = { id: string; teamId: string; name: string; conferenceId?: string; divisionId?: string; abbrev?: string; region?: string };
+export type LeaguePersonnel = { id: string; personId: string; fullName: string; role?: string; teamId?: string; status?: string; contractId?: string };
+export type LeagueContract = {
+  id: string;
+  contractId: string;
+  entityType: string;
+  entityId: string;
+  teamId?: string;
+  startSeason?: number;
+  endSeason?: number;
+  salaryY1?: number;
+  guaranteed?: number;
+  isExpired?: boolean;
+};
+export type LeagueDraftPick = { season: number; round: number; pick: number; teamId: string };
 
 export type LeagueState = {
   playersById: Record<string, LeaguePlayer>;
   teamRosters: Record<string, string[]>;
+  teamsById: Record<string, LeagueTeam>;
+  contractsById: Record<string, LeagueContract>;
+  personnelById: Record<string, LeaguePersonnel>;
+  draftOrderBySeason: Record<string, LeagueDraftPick[]>;
   cap: {
     salaryCap: number;
     capUsedByTeam: Record<string, number>;

@@ -1,5 +1,5 @@
-import { getRosterRows } from "@/data/generatedData";
-import { getSalaryCap } from "@/data/leagueDb";
+import { getContracts, getCurrentSeason, getPlayers, getSalaryCap, getTeamById, getTeamByKey } from "@/data/leagueDb";
+import type { LeagueState } from "@/engine/gameState";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
 
@@ -20,65 +20,69 @@ export type RosterPlayerRecord = {
   status: RosterPlayerStatus;
 };
 
-type GenericRow = Record<string, unknown>;
 
-function asNumber(value: unknown): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
+const contractsById = new Map(getContracts().map((row) => [String(row.contractId ?? "").trim(), row]));
+
+const playerContractsByEntityId = new Map(
+  getContracts()
+    .filter((row) => String(row.entityType ?? "").trim().toUpperCase() === "PLAYER")
+    .map((row) => [String(row.entityId ?? "").trim(), row]),
+);
+
+function resolveCanonicalTeamId(teamLookup: string): string {
+  const raw = String(teamLookup ?? "").trim();
+  const direct = getTeamById(raw) ?? getTeamByKey(raw);
+  if (direct) return String(direct.teamId);
+
+  const resolved = resolveTeamKey(raw);
+  const fromResolved = getTeamById(resolved) ?? getTeamByKey(resolved);
+  if (fromResolved) return String(fromResolved.teamId);
+
+  const fromExcel = normalizeExcelTeamKey(raw);
+  const excelCanonical = getTeamById(fromExcel) ?? getTeamByKey(fromExcel);
+  return String(excelCanonical?.teamId ?? fromExcel);
 }
 
-function firstString(row: GenericRow, keys: string[]): string {
-  for (const key of keys) {
-    const value = row[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-    if (typeof value === "number") return String(value);
+function contractForPlayer(playerId: string, contractId?: string) {
+  if (contractId) {
+    const byId = contractsById.get(String(contractId));
+    if (byId && String(byId.entityType ?? "").trim().toUpperCase() === "PLAYER") return byId;
   }
-  return "";
+  return playerContractsByEntityId.get(String(playerId).trim());
 }
 
-function firstNumber(row: GenericRow, keys: string[]): number {
-  for (const key of keys) {
-    const value = row[key];
-    const parsed = asNumber(value);
-    if (parsed) return parsed;
-    if (value === 0) return 0;
-  }
-  return 0;
-}
-
-export async function loadRosterPlayersForTeam(teamLookup: string): Promise<{ players: RosterPlayerRecord[]; warning?: string }> {
-  const resolvedTeamKey = resolveTeamKey(teamLookup);
-  const rows = getRosterRows() as GenericRow[];
-  if (!rows.length) {
-    return { players: [], warning: "LeagueDB roster source has no rows." };
+export async function loadRosterPlayersForTeam(teamLookup: string, league?: LeagueState): Promise<{ players: RosterPlayerRecord[]; warning?: string }> {
+  const canonicalTeamId = resolveCanonicalTeamId(teamLookup);
+  const teamPlayers = league
+    ? Object.values(league.playersById).filter((row) => String(row.teamKey ?? "") === canonicalTeamId).map((row) => ({
+        playerId: row.id,
+        fullName: row.name,
+        pos: row.pos,
+        age: row.age,
+        overall: row.overall,
+      }))
+    : getPlayers().filter((row) => String(row.teamId ?? "") === canonicalTeamId);
+  if (!teamPlayers.length) {
+    return { players: [], warning: `No roster rows matched team ${canonicalTeamId}.` };
   }
 
-  const teamRows = rows.filter((row) => {
-    const teamValue = firstString(row, ["Team", "team", "TeamName", "franchise", "club"]);
-    const normalizedKey = resolveTeamKey(teamValue || normalizeExcelTeamKey(teamValue));
-    return normalizedKey === resolvedTeamKey;
-  });
-
-  if (!teamRows.length) {
-    return { players: [], warning: `No roster rows matched team ${resolvedTeamKey}.` };
-  }
-
-  const players = teamRows.map((row, index): RosterPlayerRecord => {
-    const id = firstString(row, ["Player ID", "playerId", "id", "PlayerId"]) || `${resolvedTeamKey}-${index + 1}`;
-    const salary = firstNumber(row, ["AAV", "Salary", "salary", "CapHit", "capHit"]);
-    const bonus = firstNumber(row, ["Total_Guarantee", "Bonus", "bonus", "SigningBonus"]);
-    const capHit = firstNumber(row, ["CapHit", "capHit", "AAV", "salary"]) || salary;
-
+  const players = teamPlayers.map((row): RosterPlayerRecord => {
+    const id = String(row.playerId ?? "").trim();
+    const contract = league
+      ? Object.values(league.contractsById ?? {}).find((c) => String(c.entityType ?? "").toUpperCase() === "PLAYER" && String(c.entityId ?? "") === id)
+      : contractForPlayer(id, String((row as { contractId?: string }).contractId ?? ""));
+    const yearsLeft = Number.isFinite(Number(contract?.endSeason)) ? Math.max(0, Number(contract?.endSeason) - getCurrentSeason() + 1) : 1;
+    const salary = Math.max(0, Number(contract?.salaryY1 ?? 0));
     return {
       id,
-      name: firstString(row, ["PlayerName", "name", "player", "Name"]) || `Player ${index + 1}`,
-      pos: firstString(row, ["Position", "pos", "Pos", "PositionGroup"]) || "UNK",
-      age: Math.round(firstNumber(row, ["Age", "age"])),
-      overall: Math.round(firstNumber(row, ["Rating", "overall", "OVR"])),
-      yearsLeft: Math.max(0, Math.round(firstNumber(row, ["ContractYearsRemaining", "yearsLeft", "YearsLeft"]))),
+      name: String(row.fullName ?? "Unknown Player"),
+      pos: String(row.pos ?? "UNK"),
+      age: Math.max(0, Number(row.age ?? 0)),
+      overall: Math.max(0, Number(row.overall ?? 0)),
+      yearsLeft,
       salary,
-      bonus,
-      capHit,
+      bonus: Math.max(0, Number(contract?.guaranteed ?? 0)),
+      capHit: salary,
       status: "ACTIVE",
     };
   });

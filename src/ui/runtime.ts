@@ -20,6 +20,8 @@ import { FRANCHISES, resolveFranchiseLike } from "@/ui/data/franchises";
 import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
 import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
 import { loadLeagueRosterForTeam } from "@/services/rosterImport";
+import { validateLeagueDb } from "@/services/validateLeagueDb";
+import { getCurrentSeason } from "@/data/leagueDb";
 import { buildFreeAgentPool, buildTeamRosterRows, calculateCapSummary } from "@/ui/freeAgency/freeAgency";
 import { ROSTER_CAP_LIMIT, calculateRosterCap, loadRosterPlayersForTeam } from "@/ui/roster/rosterAdapter";
 import { buildCharacterRegistry } from "@/engine/characters";
@@ -208,6 +210,85 @@ function runBootAdvanceSelfCheck(save: SaveData | null): void {
     checks,
     sample: "[runtime] opening-flow self-check: 5/5 passed",
   });
+}
+
+
+
+async function hydrateLeagueFromCanonical(gameState: GameState): Promise<GameState> {
+  const teamKey = gameState.franchise.ugfTeamKey || gameState.franchise.excelTeamKey || "ATLANTA_APEX";
+  const { league: canonicalLeague } = await loadLeagueRosterForTeam({
+    teamKey,
+    excelTeamKey: gameState.franchise.excelTeamKey,
+    season: gameState.time.season || getCurrentSeason(),
+    salaryCap: gameState.league?.cap?.salaryCap,
+  });
+
+  const hasLiveLeagueData = Object.keys(gameState.league?.playersById ?? {}).length > 0;
+  const mergedLeague = hasLiveLeagueData
+    ? {
+        ...canonicalLeague,
+        ...gameState.league,
+        teamsById: Object.keys(gameState.league?.teamsById ?? {}).length ? gameState.league.teamsById : canonicalLeague.teamsById,
+        contractsById: Object.keys(gameState.league?.contractsById ?? {}).length ? gameState.league.contractsById : canonicalLeague.contractsById,
+        personnelById: Object.keys(gameState.league?.personnelById ?? {}).length ? gameState.league.personnelById : canonicalLeague.personnelById,
+        draftOrderBySeason: Object.keys(gameState.league?.draftOrderBySeason ?? {}).length ? gameState.league.draftOrderBySeason : canonicalLeague.draftOrderBySeason,
+        cap: {
+          salaryCap: Number(gameState.league?.cap?.salaryCap ?? canonicalLeague.cap.salaryCap),
+          capUsedByTeam: Object.keys(gameState.league?.cap?.capUsedByTeam ?? {}).length ? gameState.league.cap.capUsedByTeam : canonicalLeague.cap.capUsedByTeam,
+        },
+      }
+    : canonicalLeague;
+
+  return {
+    ...gameState,
+    league: mergedLeague,
+  };
+}
+
+function createLeagueValidationModal(errors: string[], hasSave: boolean) {
+  return {
+    title: "League Data Errors",
+    message: errors.slice(0, 5).join("\n") + "\nSee console for full list",
+    actions: [
+      { label: hasSave ? "Go to Hub" : "Go to Start", action: { type: "NAVIGATE", route: hasSave ? { key: "Hub" as const } : { key: "Start" as const } } },
+      { label: "Close", action: { type: "CLOSE_MODAL" } },
+    ],
+  };
+}
+
+function assertCityTeamLeagueInvariants(save: SaveData | null): void {
+  if (!import.meta.env.DEV || !save) return;
+  const league = save.gameState.league;
+  const teamIds = new Set(Object.keys(league.teamsById ?? {}));
+
+  for (const teamKey of Object.keys(league.teamRosters ?? {})) {
+    if (!teamIds.has(teamKey)) {
+      console.warn("[runtime] teamRosters contains non-CITY_TEAM key missing from teamsById", { teamKey });
+    }
+  }
+
+  for (const player of Object.values(league.playersById ?? {})) {
+    const teamKey = String(player.teamKey ?? "");
+    if (teamKey && teamKey !== "FREE_AGENT" && !teamIds.has(teamKey)) {
+      console.warn("[runtime] player.teamKey not found in teamsById", { playerId: player.id, teamKey });
+    }
+  }
+
+  for (const [season, picks] of Object.entries(league.draftOrderBySeason ?? {})) {
+    for (const pick of picks) {
+      if (!teamIds.has(String(pick.teamId ?? ""))) {
+        console.warn("[runtime] draftOrder pick teamId not found in teamsById", { season, round: pick.round, pick: pick.pick, teamId: pick.teamId });
+      }
+    }
+  }
+}
+
+function runLeagueValidation(save: SaveData | null): ReturnType<typeof createLeagueValidationModal> | null {
+  if (!import.meta.env.DEV || !save) return null;
+  const errors = validateLeagueDb(save.gameState.league);
+  if (!errors.length) return null;
+  console.error("[runtime] League Data Errors", errors);
+  return createLeagueValidationModal(errors, Boolean(save));
 }
 
 function openingState(): UIState["ui"]["opening"] {
@@ -618,14 +699,15 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
   const loadedGameStateRaw = save?.gameState
     ? reduceGameState(createNewGameState(), gameActions.loadState(save.gameState))
     : null;
-  const loadedGameState = loadedGameStateRaw
+  const loadedHydrated = loadedGameStateRaw ? await hydrateLeagueFromCanonical(loadedGameStateRaw) : null;
+  const loadedGameState = loadedHydrated
     ? {
-        ...loadedGameStateRaw,
-        ...ensureRosterCapState(loadedGameStateRaw),
-        ...ensureCharacterRegistryState(loadedGameStateRaw),
+        ...loadedHydrated,
+        ...ensureRosterCapState(loadedHydrated),
+        ...ensureCharacterRegistryState(loadedHydrated),
         freeAgency: {
-          freeAgents: loadedGameStateRaw.freeAgency?.freeAgents ?? [],
-          lastUpdatedWeek: loadedGameStateRaw.freeAgency?.lastUpdatedWeek ?? 0,
+          freeAgents: loadedHydrated.freeAgency?.freeAgents ?? [],
+          lastUpdatedWeek: loadedHydrated.freeAgency?.lastUpdatedWeek ?? 0,
         },
       }
     : null;
@@ -638,6 +720,11 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
   };
 
   runBootAdvanceSelfCheck(state.save);
+  assertCityTeamLeagueInvariants(state.save);
+  const bootLeagueValidationModal = runLeagueValidation(state.save);
+  if (bootLeagueValidationModal) {
+    state = { ...state, ui: { ...state.ui, activeModal: bootLeagueValidationModal } };
+  }
 
   let writeTimer: number | null = null;
   const scheduleSave = () => {
@@ -811,7 +898,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           if (existingPlayers.length > 0) return;
           const teamLookup = state.save.gameState.franchise.ugfTeamKey || state.save.gameState.franchise.excelTeamKey || "";
           void (async () => {
-            const { players, warning } = await loadRosterPlayersForTeam(teamLookup);
+            const { players, warning } = await loadRosterPlayersForTeam(teamLookup, state.save!.gameState.league);
             const playerMap = Object.fromEntries(players.map((player) => [player.id, player]));
             const baseGameState = {
               ...state.save!.gameState,
@@ -1301,7 +1388,15 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           });
           gameState = reduceGameState(gameState, gameActions.enterJanuaryOffseason());
           gameState = { ...gameState, tasks: generateBeatTasks(gameState) };
-          setState({ ...state, save: { version: 1, gameState }, route: { key: "DelegationSetup" } });
+          const nextSave = { version: 1 as const, gameState };
+          assertCityTeamLeagueInvariants(nextSave);
+          const validationModal = runLeagueValidation(nextSave);
+          setState({
+            ...state,
+            save: nextSave,
+            route: { key: "DelegationSetup" },
+            ui: { ...state.ui, activeModal: validationModal ?? state.ui.activeModal },
+          });
           return;
         }
         case "SET_DELEGATION_OPTION": {
@@ -1579,7 +1674,23 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             return;
           }
 
-          setState({ ...state, save: { version: 1, gameState: result.gameState }, route: { key: "Hub" }, ui: { ...state.ui, activeModal: null } });
+          if (import.meta.env.DEV) {
+            const noProgress =
+              before.season === result.gameState.time.season &&
+              before.week === result.gameState.time.week &&
+              before.dayIndex === result.gameState.time.dayIndex;
+            console.assert(!noProgress, "[runtime] ADVANCE_WEEK completed without calendar progress", { before, after: result.gameState.time });
+          }
+
+          const nextSave = { version: 1 as const, gameState: result.gameState };
+          assertCityTeamLeagueInvariants(nextSave);
+          const validationModal = runLeagueValidation(nextSave);
+          setState({
+            ...state,
+            save: nextSave,
+            route: { key: "Hub" },
+            ui: { ...state.ui, activeModal: validationModal ?? null },
+          });
           return;
         }
         case "OPEN_ADVANCE_BLOCKED_MODAL": {

@@ -29,6 +29,10 @@ function createEmptyLeagueState() {
   return {
     playersById: {},
     teamRosters: {},
+    teamsById: {},
+    contractsById: {},
+    personnelById: {},
+    draftOrderBySeason: {},
     cap: {
       salaryCap: DEFAULT_SALARY_CAP,
       capUsedByTeam: {},
@@ -153,6 +157,10 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
         league: {
           ...createEmptyLeagueState(),
           ...(loaded?.league ?? {}),
+          teamsById: loaded?.league?.teamsById ?? {},
+          contractsById: loaded?.league?.contractsById ?? {},
+          personnelById: loaded?.league?.personnelById ?? {},
+          draftOrderBySeason: loaded?.league?.draftOrderBySeason ?? {},
           cap: {
             salaryCap: Number(loaded?.league?.cap?.salaryCap ?? DEFAULT_SALARY_CAP),
             capUsedByTeam: loaded?.league?.cap?.capUsedByTeam ?? sumCapByTeam(loaded?.league?.playersById ?? {}),
@@ -185,7 +193,12 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
       return {
         ...prev,
         league: {
+          ...createEmptyLeagueState(),
           ...action.payload,
+          teamsById: action.payload.teamsById ?? {},
+          contractsById: action.payload.contractsById ?? {},
+          personnelById: action.payload.personnelById ?? {},
+          draftOrderBySeason: action.payload.draftOrderBySeason ?? {},
           cap: {
             salaryCap: Number(action.payload.cap.salaryCap || DEFAULT_SALARY_CAP),
             capUsedByTeam: { ...action.payload.cap.capUsedByTeam },
