@@ -19,6 +19,15 @@ type CoordinatorCandidate = {
   reputation: number;
 };
 
+const fallbackSpecialTeamsCandidates: readonly CoordinatorCandidate[] = [
+  { personId: "fallback-stc-1", displayName: "Lori Reardon", role: "STC", scheme: "Conservative / Field Position", reputation: 68 },
+  { personId: "fallback-stc-2", displayName: "Devlin Britton", role: "STC", scheme: "Block-Oriented Pressure", reputation: 66 },
+  { personId: "fallback-stc-3", displayName: "Donnie Chu", role: "STC", scheme: "Directional Control", reputation: 64 },
+  { personId: "fallback-stc-4", displayName: "Katya Beasley", role: "STC", scheme: "Safe Hands / No Risk", reputation: 63 },
+  { personId: "fallback-stc-5", displayName: "Yulissa Broussard", role: "STC", scheme: "Aggressive Returns", reputation: 62 },
+  { personId: "fallback-stc-6", displayName: "Orion Firth", role: "STC", scheme: "Fake-Ready / Opportunistic", reputation: 60 },
+];
+
 const coordinatorCandidates = getPersonnel()
   .filter((person) => {
     const role = String(person.role ?? "").toUpperCase();
@@ -45,7 +54,12 @@ const tierLabelByCode = {
 } as const;
 
 function rolePool(role: "OC" | "DC" | "STC") {
-  return coordinatorCandidates.filter((candidate) => candidate.role === role).slice(0, 6);
+  const live = coordinatorCandidates.filter((candidate) => candidate.role === role);
+  if (role !== "STC") return live.slice(0, 6);
+
+  const existingNames = new Set(live.map((candidate) => candidate.displayName.toLowerCase()));
+  const fallback = fallbackSpecialTeamsCandidates.filter((candidate) => !existingNames.has(candidate.displayName.toLowerCase()));
+  return [...live, ...fallback].slice(0, 6);
 }
 
 function devGuardForbiddenTeamName(_teamName: string) {
