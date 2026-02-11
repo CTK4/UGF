@@ -1,4 +1,5 @@
 import type { GameState, LeagueState, Role, StaffAssignment } from "@/engine/gameState";
+import type { ScoutingAction } from "@/engine/scouting";
 
 export type SetCoachProfilePayload = {
   name: string;
@@ -31,7 +32,8 @@ export type GameAction =
   | { type: "ENTER_JANUARY_OFFSEASON" }
   | { type: "COMPLETE_TASK"; payload: { taskId: string; positions?: string[] } }
   | { type: "MARK_THREAD_READ"; payload: { threadId: string } }
-  | { type: "ADVANCE_WEEK"; payload?: { label?: string } };
+  | { type: "ADVANCE_WEEK"; payload?: { label?: string } }
+  | { type: "APPLY_SCOUTING_ACTION"; payload: ScoutingAction };
 
 export const gameActions = {
   loadState: (state: GameState): GameAction => ({ type: "LOAD_STATE", payload: { state } }),
@@ -46,4 +48,5 @@ export const gameActions = {
   completeTask: (taskId: string, positions?: string[]): GameAction => ({ type: "COMPLETE_TASK", payload: { taskId, positions } }),
   markThreadRead: (threadId: string): GameAction => ({ type: "MARK_THREAD_READ", payload: { threadId } }),
   advanceWeek: (label?: string): GameAction => ({ type: "ADVANCE_WEEK", payload: { label } }),
+  applyScoutingAction: (payload: ScoutingAction): GameAction => ({ type: "APPLY_SCOUTING_ACTION", payload }),
 };

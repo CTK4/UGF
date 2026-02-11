@@ -1,8 +1,17 @@
 import type { StaffRole } from "@/domain/staffRoles";
+import type { LeagueSchedule } from "@/services/schedule/types";
+import type { GameResult } from "@/services/sim/types";
 
-export type GamePhase = "PRECAREER" | "INTERVIEWS" | "COORD_HIRING" | "JANUARY_OFFSEASON";
+export type GamePhase =
+  | "PRECAREER"
+  | "INTERVIEWS"
+  | "COORD_HIRING"
+  | "JANUARY_OFFSEASON"
+  | "DRAFT"
+  | "REGULAR_SEASON"
+  | "POSTGAME";
+
 export type Role = StaffRole;
-
 
 export type ControlAxis = "SCHEME" | "ASSISTANTS";
 export type ControlSide = "offense" | "defense" | "specialTeams";
@@ -51,19 +60,9 @@ export type Task = {
   routeHint?: string;
 };
 
-export type ThreadMessage = {
-  id: string;
-  from: string;
-  text: string;
-  ts: string;
-};
+export type ThreadMessage = { id: string; from: string; text: string; ts: string };
 
-export type Thread = {
-  id: string;
-  title: string;
-  unreadCount: number;
-  messages: ThreadMessage[];
-};
+export type Thread = { id: string; title: string; unreadCount: number; messages: ThreadMessage[] };
 
 export type PlayerContract = {
   amount: number;
@@ -106,10 +105,7 @@ export type LeagueState = {
   contractsById: Record<string, LeagueContract>;
   personnelById: Record<string, LeaguePersonnel>;
   draftOrderBySeason: Record<string, LeagueDraftPick[]>;
-  cap: {
-    salaryCap: number;
-    capUsedByTeam: Record<string, number>;
-  };
+  cap: { salaryCap: number; capUsedByTeam: Record<string, number> };
 };
 
 export type PlayerContractRow = {
@@ -138,13 +134,52 @@ export type PlayerContractState = {
   status: "ACTIVE" | "RELEASED";
 };
 
+export type CharacterRole = "COACH" | "OWNER" | "GM" | "PLAYER";
+
+export type Character = {
+  id: string;
+  teamKey?: string;
+  role: CharacterRole;
+  fullName: string;
+  age?: number;
+  personality: string;
+  ownerTraits?: {
+    patience: "LOW" | "MEDIUM" | "HIGH";
+    spending: "LOW" | "MEDIUM" | "HIGH";
+    interference: "LOW" | "MEDIUM" | "HIGH";
+  };
+  gmBiases?: { youth: number; speed: number; ras: number; discipline: number; trenches: number };
+};
+
+export type SeasonState = {
+  year: number;
+  schedule: LeagueSchedule | null;
+  resultsByGameId: Record<string, GameResult>;
+  wins: number;
+  losses: number;
+  lastGameId: string | null;
+};
+
+export type DraftProspect = {
+  id: string;
+  name: string;
+  pos: string;
+  school: string;
+  grade: number; // user-visible
+  ovrTruth: number; // hidden-ish
+  traits: string[];
+};
+
+export type DraftStateV1 = {
+  year: number;
+  prospects: DraftProspect[];
+  pickedProspectIds: string[];
+  userPickMade: boolean;
+};
+
 export type GameState = {
   meta: { version: 2 };
-  world: {
-    leagueSeed: number;
-    leagueDbVersion?: string;
-    leagueDbHash?: string;
-  };
+  world: { leagueSeed: number; leagueDbVersion?: string; leagueDbHash?: string };
   phase: GamePhase;
   time: { season: number; week: number; dayIndex: number; phaseVersion: number; label: string };
   coach: {
@@ -155,7 +190,6 @@ export type GameState = {
     reputation: number;
     mediaStyle: string;
     personalityBaseline: string;
-    // legacy compatibility
     hometownId?: string;
     hometownLabel?: string;
     hometownTeamKey?: string;
@@ -192,45 +226,12 @@ export type GameState = {
     setupComplete: boolean;
   };
   draft: { discovered: Record<string, ProspectDiscovery>; watchlist: string[] };
+  draftV1?: DraftStateV1;
+  season?: SeasonState;
   league: LeagueState;
-  roster: {
-    players: Record<string, PlayerContractState>;
-    warning?: string;
-  };
-  freeAgency: {
-    freeAgents: PlayerContractRow[];
-    lastUpdatedWeek: number;
-  };
-  cap: {
-    limit: number;
-    deadMoney: Array<{ playerId: string; amount: number; season: number }>;
-    capSpace: number;
-    payroll: number;
-    capLimit: number;
-  };
+  roster: { players: Record<string, PlayerContractState>; warning?: string };
+  freeAgency: { freeAgents: PlayerContractRow[]; lastUpdatedWeek: number };
+  cap: { limit: number; deadMoney: Array<{ playerId: string; amount: number; season: number }>; capSpace: number; payroll: number; capLimit: number };
   completedGates: string[];
   lastUiError: string | null;
-};
-
-export type CharacterRole = "COACH" | "OWNER" | "GM" | "PLAYER";
-
-export type Character = {
-  id: string;
-  teamKey?: string;
-  role: CharacterRole;
-  fullName: string;
-  age?: number;
-  personality: string;
-  ownerTraits?: {
-    patience: "LOW" | "MEDIUM" | "HIGH";
-    spending: "LOW" | "MEDIUM" | "HIGH";
-    interference: "LOW" | "MEDIUM" | "HIGH";
-  };
-  gmBiases?: {
-    youth: number;
-    speed: number;
-    ras: number;
-    discipline: number;
-    trenches: number;
-  };
 };

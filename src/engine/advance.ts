@@ -1,51 +1,44 @@
-// advance.ts - Day Advancement Logic, Phase Transitions, and Gate Validation 
+import { buildTimeLabel, getAdvanceTarget, getBeat } from "@/engine/calendar";
+import type { GameState, GamePhase } from "@/engine/gameState";
+import type { GateFailure } from "@/engine/gates";
+import { validateBeatGates } from "@/engine/gates";
+import { syncJanuaryTasks } from "@/engine/tasks";
 
-export class GameEngine {
-    private currentDay: number;
-    private currentPhase: string;
-    private gates: boolean[];
+export type AdvanceOutcome =
+  | { ok: true; gameState: GameState }
+  | { ok: false; blocked: GateFailure; gameState: GameState };
 
-    constructor() {
-        this.currentDay = 1;
-        this.currentPhase = 'morning';
-        this.gates = [true, true, true]; // Example of gate validations
-    }
-
-    advanceDay(): void {
-        this.currentDay++;
-        this.transitionPhase();
-        this.validateGates();
-    }
-
-    transitionPhase(): void {
-        switch (this.currentPhase) {
-            case 'morning':
-                this.currentPhase = 'afternoon';
-                break;
-            case 'afternoon':
-                this.currentPhase = 'evening';
-                break;
-            case 'evening':
-                this.currentPhase = 'night';
-                break;
-            case 'night':
-                this.currentPhase = 'morning';
-                break;
-        }
-    }
-
-    validateGates(): void {
-        // Logic to validate gates for the current day and phase
-        this.gates = this.gates.map(gate => this.checkGateValidity(gate));
-    }
-
-    private checkGateValidity(gate: boolean): boolean {
-        // Example logic for validating a gate
-        return gate; // Implement actual validation logic here
-    }
+export function getAdvanceBlocker(state: GameState): GateFailure | null {
+  const currentBeat = getBeat(state.time.season, state.time.week);
+  return validateBeatGates(state, currentBeat.gates ?? []);
 }
 
-// Example usage:
-const gameEngine = new GameEngine();
-gameEngine.advanceDay();
-console.log(`Day: ${gameEngine['currentDay']}, Phase: ${gameEngine['currentPhase']}`);
+function phaseForBeatIndex(weekIndex: number): GamePhase {
+  if (weekIndex <= 0) return "PRECAREER";
+  if (weekIndex <= 4) return "JANUARY_OFFSEASON";
+  if (weekIndex === 5) return "DRAFT";
+  return "REGULAR_SEASON";
+}
+
+export function advanceDay(state: GameState): AdvanceOutcome {
+  const blocked = getAdvanceBlocker(state);
+  if (blocked) return { ok: false, blocked, gameState: state };
+
+  const target = getAdvanceTarget(state.time);
+  const phaseVersion = state.time.phaseVersion + 1;
+  const label = buildTimeLabel(target.season, target.week, target.dayIndex);
+  const phase = phaseForBeatIndex(target.week);
+
+  const nextState: GameState = {
+    ...state,
+    time: { ...state.time, season: target.season, week: target.week, dayIndex: target.dayIndex, phaseVersion, label },
+    phase,
+    checkpoints: [...state.checkpoints, { ts: Date.now(), label, week: target.week, phaseVersion }],
+    lastUiError: null,
+  };
+
+  return {
+    ok: true,
+    gameState: phase === "JANUARY_OFFSEASON" ? { ...nextState, tasks: syncJanuaryTasks(nextState) } : nextState,
+  };
+}
