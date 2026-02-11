@@ -25,6 +25,7 @@ import { getCurrentSeason } from "@/data/leagueDb";
 import { buildFreeAgentPool, buildTeamRosterRows, calculateCapSummary } from "@/ui/freeAgency/freeAgency";
 import { ROSTER_CAP_LIMIT, calculateRosterCap, loadRosterPlayersForTeam } from "@/ui/roster/rosterAdapter";
 import { buildCharacterRegistry } from "@/engine/characters";
+import { clearLocalSave, loadLocalSave, persistLocalSave } from "@/domainE/persistence/localSave";
 
 /**
  * Verification Checklist
@@ -40,7 +41,6 @@ import { buildCharacterRegistry } from "@/engine/characters";
  *    Expected: delegation settings + generated owner/GM characters persist.
  */
 
-const SAVE_KEY = "ugf.save.v1";
 
 function ensureRosterCapState(gameState: GameState): Pick<GameState, "roster" | "cap"> {
   const rosterPlayers = gameState.roster?.players ?? {};
@@ -88,15 +88,7 @@ function ensureCharacterRegistryState(gameState: GameState): Pick<GameState, "ch
 }
 
 function loadSave(): { save: SaveData | null; corrupted: boolean } {
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return { save: null, corrupted: false };
-    const parsed = JSON.parse(raw) as SaveData;
-    if (parsed?.version !== 1 || !parsed?.gameState) return { save: null, corrupted: true };
-    return { save: parsed, corrupted: false };
-  } catch {
-    return { save: null, corrupted: true };
-  }
+  return loadLocalSave();
 }
 
 
@@ -731,7 +723,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
     if (!state.save) return;
     if (writeTimer) window.clearTimeout(writeTimer);
     writeTimer = window.setTimeout(() => {
-      if (state.save) localStorage.setItem(SAVE_KEY, JSON.stringify(state.save));
+      if (state.save) persistLocalSave(state.save);
     }, 120);
   };
 
@@ -985,7 +977,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "RESET_SAVE":
-          localStorage.removeItem(SAVE_KEY);
+          clearLocalSave();
           setState({ ...state, save: null, route: { key: "Start" }, corruptedSave: false, ui: { ...state.ui, opening: openingState() } });
           return;
         case "FORCE_SAVE":
@@ -995,7 +987,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               window.clearTimeout(writeTimer);
               writeTimer = null;
             }
-            localStorage.setItem(SAVE_KEY, JSON.stringify(state.save));
+            persistLocalSave(state.save);
           } catch (error) {
             if (import.meta.env.DEV) {
               console.error("[runtime] FORCE_SAVE failed", error);
@@ -1319,7 +1311,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               draft: gameState.draft ?? { discovered: {}, watchlist: [] },
             };
             const save = { version: 1 as const, gameState };
-            localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+            persistLocalSave(save);
             setState({
               ...state,
               // Offers looked dead when errors interrupted flow before route/save updates.
