@@ -98,6 +98,12 @@ export function HubScreen({ ui }: ScreenProps) {
       <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
         <div className="ugf-pill">Season {gs.time.season} · January Week {gs.time.week} · {getJanuaryDayLabel(gs.time.dayIndex)}</div>
         <div className="ugf-pill">Phase: January Offseason</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <span className="ugf-pill">Offense: {gs.delegation.offenseControl}</span>
+          <span className="ugf-pill">Defense: {gs.delegation.defenseControl}</span>
+          <span className="ugf-pill">Game Mgmt: {gs.delegation.gameManagement}</span>
+          <span className="ugf-pill">GM Auth: {gs.delegation.gmAuthority}</span>
+        </div>
         <div className="ugf-card" style={{ borderColor: "rgba(120, 180, 255, 0.45)" }}>
           <div className="ugf-card__body" style={{ display: "grid", gap: 6 }}>
             <b>Next required task(s)</b>
@@ -254,6 +260,7 @@ export function HubScreen({ ui }: ScreenProps) {
           <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub" } })}>Scouting</button>
           <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub", tab: "contracts" } })}>Draft Board</button>
           <button
+            disabled={!advanceState.canAdvance}
             aria-disabled={!advanceState.canAdvance}
             title={advanceState.canAdvance ? "Advance to the next day" : advanceState.message ?? "Advance is blocked"}
             onClick={() => ui.dispatch({ type: "ADVANCE_WEEK" })}

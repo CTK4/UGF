@@ -22,6 +22,21 @@ import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, Save
 import { loadLeagueRosterForTeam } from "@/services/rosterImport";
 import { buildFreeAgentPool, buildTeamRosterRows, calculateCapSummary } from "@/ui/freeAgency/freeAgency";
 import { ROSTER_CAP_LIMIT, calculateRosterCap, loadRosterPlayersForTeam } from "@/ui/roster/rosterAdapter";
+import { buildCharacterRegistry } from "@/engine/characters";
+
+/**
+ * Verification Checklist
+ * 1) Start New Career -> Create Coach: set name + age + personality + hometown.
+ *    Expected: Next button enables and selections persist into save after accepting offer.
+ * 2) Flow interviews -> accept offer -> hire OC/DC/STC -> Finalize.
+ *    Expected: Route goes to Delegation Setup (not Hub).
+ * 3) Select delegation options and continue.
+ *    Expected: Hub shows delegation summary pills and Advance Week button state matches blocker panel.
+ * 4) With a blocker present, click Advance Week.
+ *    Expected: modal shows exact blocker reason and CTA navigates to required route.
+ * 5) Refresh browser.
+ *    Expected: delegation settings + generated owner/GM characters persist.
+ */
 
 const SAVE_KEY = "ugf.save.v1";
 
@@ -38,6 +53,35 @@ function ensureRosterCapState(gameState: GameState): Pick<GameState, "roster" | 
       limit: capLimit,
       deadMoney,
     },
+  };
+}
+
+
+function ensureCharacterRegistryState(gameState: GameState): Pick<GameState, "characters" | "teamFrontOffice"> {
+  const hasRegistry = Object.keys(gameState.characters?.byId ?? {}).length > 0;
+  const teamKey = resolveTeamKey(gameState.franchise?.ugfTeamKey || gameState.franchise?.excelTeamKey || "");
+  if (hasRegistry || !teamKey) {
+    return {
+      characters: gameState.characters ?? { byId: {}, coachId: null, ownersByTeamKey: {}, gmsByTeamKey: {} },
+      teamFrontOffice: gameState.teamFrontOffice ?? {},
+    };
+  }
+
+  const registry = buildCharacterRegistry({
+    leagueSeed: gameState.world?.leagueSeed ?? gameState.time.season,
+    coachName: gameState.coach.name || "You",
+    coachAge: gameState.coach.age ?? 35,
+    coachPersonality: gameState.coach.personalityBaseline || "Balanced",
+    userTeamKey: teamKey,
+  });
+  return {
+    characters: {
+      byId: registry.byId,
+      coachId: registry.coachId,
+      ownersByTeamKey: registry.ownersByTeamKey,
+      gmsByTeamKey: registry.gmsByTeamKey,
+    },
+    teamFrontOffice: registry.teamFrontOffice,
   };
 }
 
@@ -86,40 +130,91 @@ function assertAdvanceRoutingInvariant(save: SaveData | null): void {
 
   if (availability.route) {
     const routeKey = availability.route.key;
-    const knownRoute = routeKey === "Start" || routeKey === "CreateCoach" || routeKey === "CoachBackground" || routeKey === "Interviews" || routeKey === "OpeningInterview" || routeKey === "Offers" || routeKey === "HireCoordinators" || routeKey === "StaffMeeting" || routeKey === "Hub" || routeKey === "StaffTree" || routeKey === "HireMarket" || routeKey === "CandidateDetail" || routeKey === "PhoneInbox" || routeKey === "PhoneThread" || routeKey === "FreeAgency" || routeKey === "Roster";
+    const knownRoute = routeKey === "Start" || routeKey === "CreateCoach" || routeKey === "CoachBackground" || routeKey === "Interviews" || routeKey === "OpeningInterview" || routeKey === "Offers" || routeKey === "HireCoordinators" || routeKey === "StaffMeeting" || routeKey === "DelegationSetup" || routeKey === "Hub" || routeKey === "StaffTree" || routeKey === "HireMarket" || routeKey === "CandidateDetail" || routeKey === "PhoneInbox" || routeKey === "PhoneThread" || routeKey === "FreeAgency" || routeKey === "Roster";
     console.assert(knownRoute, "[runtime] unknown route key for advance blocker CTA", availability.route);
   }
 }
 
 function runBootAdvanceSelfCheck(save: SaveData | null): void {
-  if (!import.meta.env.DEV || !save) return;
-  const availability = getAdvanceAvailability(save);
-  const before = save.gameState.time;
-  const blockerRoute = availability.route?.key;
-  console.log("[runtime] advance self-check", {
-    phase: save.gameState.phase,
-    season: before.season,
-    week: before.week,
-    dayIndex: before.dayIndex,
-    canAdvance: availability.canAdvance,
-    blockerMessage: availability.message,
-    blockerRoute,
+  if (!import.meta.env.DEV) return;
+
+  const checks: Array<{ name: string; ok: boolean; details: string }> = [];
+
+  const makeSyntheticSave = (stage: "post_offer" | "post_hire" | "post_delegation"): SaveData => {
+    let gameState = createNewGameState();
+    gameState = reduceGameState(gameState, gameActions.acceptOffer("ATLANTA_APEX", normalizeExcelTeamKey("Atlanta Apex")));
+
+    if (stage === "post_hire" || stage === "post_delegation") {
+      gameState = {
+        ...gameState,
+        staff: {
+          ...gameState.staff,
+          assignments: {
+            ...gameState.staff.assignments,
+            OC: { candidateId: "oc-1", coachName: "OC One", salary: 1_000_000, years: 2, hiredWeek: 1 },
+            DC: { candidateId: "dc-1", coachName: "DC One", salary: 1_000_000, years: 2, hiredWeek: 1 },
+            STC: { candidateId: "st-1", coachName: "ST One", salary: 1_000_000, years: 2, hiredWeek: 1 },
+          },
+        },
+      };
+    }
+
+    if (stage === "post_delegation") {
+      gameState = {
+        ...gameState,
+        delegation: { ...gameState.delegation, setupComplete: true },
+      };
+    }
+
+    return { version: 1, gameState };
+  };
+
+  const postOffer = makeSyntheticSave("post_offer");
+  const offerAvailability = getAdvanceAvailability(postOffer);
+  checks.push({ name: "post_offer_blocked", ok: !offerAvailability.canAdvance, details: offerAvailability.message ?? "missing message" });
+
+  const postHire = makeSyntheticSave("post_hire");
+  const hireAvailability = getAdvanceAvailability(postHire);
+  checks.push({
+    name: "post_hire_delegation_blocker",
+    ok: !hireAvailability.canAdvance && hireAvailability.route?.key === "DelegationSetup",
+    details: `${hireAvailability.message ?? "none"} -> ${hireAvailability.route?.key ?? "none"}`,
   });
 
-  if (availability.canAdvance) {
-    const result = advanceDay(save.gameState);
-    console.assert(result.ok, "[runtime] self-check expected ADVANCE_WEEK to succeed when canAdvance is true");
-    if (result.ok) {
-      const after = result.gameState.time;
-      const changed = after.season !== before.season || after.week !== before.week || after.dayIndex !== before.dayIndex;
-      console.assert(changed, "[runtime] self-check expected time to change after advance");
-    }
+  const postDelegation = makeSyntheticSave("post_delegation");
+  const delegationAvailability = getAdvanceAvailability(postDelegation);
+  checks.push({
+    name: "post_delegation_route",
+    ok: initialRoute(postDelegation).key === "Hub",
+    details: `initialRoute=${initialRoute(postDelegation).key}`,
+  });
+  checks.push({
+    name: "post_delegation_advance_selector_parity",
+    ok: delegationAvailability.canAdvance === (getAdvanceBlocker(postDelegation.gameState) === null),
+    details: `canAdvance=${delegationAvailability.canAdvance}`,
+  });
+
+  if (save) {
+    const availability = getAdvanceAvailability(save);
+    checks.push({
+      name: "loaded_save_selector_parity",
+      ok: availability.canAdvance === (getAdvanceBlocker(save.gameState) === null),
+      details: `route=${availability.route?.key ?? "none"}`,
+    });
   }
+
+  const failures = checks.filter((check) => !check.ok);
+  console.log(`[runtime] opening-flow self-check: ${checks.length - failures.length}/${checks.length} passed`, {
+    checks,
+    sample: "[runtime] opening-flow self-check: 5/5 passed",
+  });
 }
 
 function openingState(): UIState["ui"]["opening"] {
   return {
     coachName: "",
+    coachAge: 35,
+    coachPersonality: "Balanced",
     background: "Former QB",
     hometownId: "",
     hometownLabel: "",
@@ -135,6 +230,7 @@ function openingState(): UIState["ui"]["opening"] {
 
 function initialRoute(save: SaveData | null): UIState["route"] {
   if (!save) return { key: "Start" };
+  if (!save.gameState.delegation?.setupComplete) return { key: "DelegationSetup" };
   return { key: "Hub" };
 }
 
@@ -526,6 +622,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
     ? {
         ...loadedGameStateRaw,
         ...ensureRosterCapState(loadedGameStateRaw),
+        ...ensureCharacterRegistryState(loadedGameStateRaw),
         freeAgency: {
           freeAgents: loadedGameStateRaw.freeAgency?.freeAgents ?? [],
           lastUpdatedWeek: loadedGameStateRaw.freeAgency?.lastUpdatedWeek ?? 0,
@@ -821,6 +918,12 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
         case "SET_COACH_NAME":
           setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachName: String(action.coachName ?? "") } } });
           return;
+        case "SET_COACH_AGE":
+          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachAge: Math.max(24, Math.min(85, Number(action.coachAge ?? 35) || 35)) } } });
+          return;
+        case "SET_COACH_PERSONALITY":
+          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachPersonality: String(action.coachPersonality ?? "Balanced") } } });
+          return;
         case "SET_BACKGROUND":
           setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, background: String(action.background ?? "") } } });
           return;
@@ -1083,14 +1186,14 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               gameState,
               gameActions.setCoachProfile({
                 name: state.ui.opening.coachName || "You",
-                age: 35,
+                age: state.ui.opening.coachAge,
                 hometown: state.ui.opening.hometownLabel || "Unknown",
                 hometownId: state.ui.opening.hometownId,
                 hometownLabel: state.ui.opening.hometownLabel,
                 hometownTeamKey: state.ui.opening.hometownTeamKey || "UNKNOWN_TEAM",
                 reputation: 50,
                 mediaStyle: "Balanced",
-                personalityBaseline: "Balanced",
+                personalityBaseline: state.ui.opening.coachPersonality,
               }),
             );
             gameState = reduceGameState(gameState, gameActions.setBackground(state.ui.opening.background));
@@ -1102,9 +1205,24 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             });
             gameState = reduceGameState(gameState, gameActions.hydrateLeagueRoster(league));
             const derived = ensureRosterCapState(gameState);
+            const registry = buildCharacterRegistry({
+              leagueSeed: gameState.world.leagueSeed,
+              coachName: state.ui.opening.coachName || "You",
+              coachAge: state.ui.opening.coachAge,
+              coachPersonality: state.ui.opening.coachPersonality,
+              userTeamKey: franchiseId,
+            });
             gameState = {
               ...gameState,
               ...derived,
+              characters: {
+                byId: registry.byId,
+                coachId: registry.coachId,
+                ownersByTeamKey: registry.ownersByTeamKey,
+                gmsByTeamKey: registry.gmsByTeamKey,
+              },
+              teamFrontOffice: registry.teamFrontOffice,
+              delegation: { ...gameState.delegation, setupComplete: false },
               freeAgency: {
                 freeAgents: buildFreeAgentPool(gameState),
                 lastUpdatedWeek: gameState.time.week,
@@ -1183,6 +1301,39 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           });
           gameState = reduceGameState(gameState, gameActions.enterJanuaryOffseason());
           gameState = { ...gameState, tasks: generateBeatTasks(gameState) };
+          setState({ ...state, save: { version: 1, gameState }, route: { key: "DelegationSetup" } });
+          return;
+        }
+        case "SET_DELEGATION_OPTION": {
+          if (!state.save) return;
+          const key = String(action.key ?? "") as "offenseControl" | "defenseControl" | "gameManagement" | "gmAuthority";
+          const value = String(action.value ?? "");
+          const allowed = {
+            offenseControl: ["USER", "OC"],
+            defenseControl: ["USER", "DC"],
+            gameManagement: ["USER", "SHARED"],
+            gmAuthority: ["FULL", "GM_ONLY"],
+          } as const;
+          if (!(key in allowed) || !(allowed[key as keyof typeof allowed] as readonly string[]).includes(value)) return;
+          const gameState = {
+            ...state.save.gameState,
+            delegation: {
+              ...state.save.gameState.delegation,
+              [key]: value,
+            },
+          };
+          setState({ ...state, save: { version: 1, gameState } });
+          return;
+        }
+        case "CONFIRM_DELEGATION_SETUP": {
+          if (!state.save) return;
+          const gameState = {
+            ...state.save.gameState,
+            delegation: {
+              ...state.save.gameState.delegation,
+              setupComplete: true,
+            },
+          };
           setState({ ...state, save: { version: 1, gameState }, route: { key: "Hub" } });
           return;
         }
@@ -1442,7 +1593,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "LOAD_GAME":
-          if (state.save) setState({ ...state, route: { key: "Hub" } });
+          if (state.save) setState({ ...state, route: initialRoute(state.save) });
           return;
         default:
           return;

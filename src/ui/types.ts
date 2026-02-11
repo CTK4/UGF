@@ -43,6 +43,8 @@ export type UIState = {
     notifications: string[];
     opening: {
       coachName: string;
+      coachAge: number;
+      coachPersonality: string;
       background: string;
       hometownId: string;
       hometownLabel: string;
