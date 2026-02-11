@@ -171,6 +171,29 @@
   filter: brightness(1.08);
 }
 
+.mobile-hub-screen {
+  display: grid;
+  gap: 12px;
+  max-width: 430px;
+  margin: 0 auto;
+  padding: 12px;
+}
+
+.mobile-hub-screen__task-status {
+  font-size: 13px;
+  color: var(--mobile-text);
+}
+
+.mobile-hub-screen__empty {
+  color: var(--mobile-muted);
+  font-size: 12px;
+}
+
+.mobile-hub-screen__cta-row {
+  display: grid;
+  gap: 8px;
+}
+
 @media (max-width: 430px) {
   .mobile-topbar,
   .mobile-focus-card__header,
