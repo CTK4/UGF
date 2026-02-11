@@ -8,6 +8,7 @@ import { findTeamSummaryRow, getTeamDisplayName, resolveTeamKey } from "@/ui/dat
 import { SegmentedTabs } from "@/ui/components/SegmentedTabs";
 import { sanitizeForbiddenName } from "@/services/rosterImport";
 import { capSpaceForTeam } from "@/engine/cap";
+import { JANUARY_DAY_LABELS, getJanuaryDayLabel } from "@/engine/calendar";
 
 function money(n: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
@@ -83,8 +84,9 @@ export function HubScreen({ ui }: ScreenProps) {
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Hub</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
-        <div className="ugf-pill">{gs.time.season} · Week {gs.time.week}</div>
-        <div className="ugf-pill">Phase: {gs.phase} · {gs.time.label}</div>
+        <div className="ugf-pill">Season {gs.time.season} · January Week {gs.time.week} · {getJanuaryDayLabel(gs.time.dayIndex)}</div>
+        <div className="ugf-pill">Phase: January Offseason</div>
+        <div className="ugf-pill">Owner Mood: Neutral · Hot Seat: Warm (MVP placeholders)</div>
         <div>Coach: <b>{gs.coach.name || "Unnamed"}</b></div>
         <div>Franchise: {sanitizeForbiddenName(gs.franchise.ugfTeamKey || "Not selected")}</div>
 
@@ -150,6 +152,16 @@ export function HubScreen({ ui }: ScreenProps) {
           <>
 
         <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+          <b>January Calendar</b>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(36px, 1fr))", gap: 6 }}>
+            {JANUARY_DAY_LABELS.map((label, idx) => (
+              <div key={label} className="ugf-pill" style={{ textAlign: "center", fontWeight: idx === gs.time.dayIndex ? 700 : 400, opacity: idx === gs.time.dayIndex ? 1 : 0.7 }}>{label}</div>
+            ))}
+          </div>
+          <small>Current slot: Week {gs.time.week} · {getJanuaryDayLabel(gs.time.dayIndex)}</small>
+        </div></div>
+
+        <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
           <b>Tasks</b>
           {gs.tasks.length === 0 && <div>No tasks available this week.</div>}
           {gs.tasks.map((task) => (
@@ -204,9 +216,12 @@ export function HubScreen({ ui }: ScreenProps) {
         </div></div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffTree" } })}>Staff Tree</button>
+          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Roster" } })}>Roster</button>
+          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffTree" } })}>Staff</button>
           <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "PhoneInbox" } })}>Phone</button>
-          <button onClick={() => ui.dispatch({ type: "ADVANCE_WEEK" })}>Advance Week</button>
+          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub" } })}>Scouting</button>
+          <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub", tab: "contracts" } })}>Draft Board</button>
+          <button onClick={() => ui.dispatch({ type: "ADVANCE_WEEK" })}>Advance Day</button>
         </div>
           </>
         )}

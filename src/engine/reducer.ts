@@ -55,6 +55,7 @@ export function createNewGameState(): GameState {
     time: {
       season: 2026,
       week: 1,
+      dayIndex: 0,
       phaseVersion: 1,
       label: phaseLabel("PRECAREER"),
     },
@@ -102,8 +103,9 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
         ...loaded,
         meta: { version: 2 },
         time: {
-          season: 2026,
+          season: Number(loaded?.time?.season ?? 2026),
           week: Number(loaded?.time?.week ?? loaded?.time?.beatIndex ?? 1),
+          dayIndex: Number(loaded?.time?.dayIndex ?? 0),
           phaseVersion: Number(loaded?.time?.phaseVersion ?? 1),
           label: String(loaded?.time?.label ?? phaseLabel((loaded?.phase as GamePhase) ?? "PRECAREER")),
         },
@@ -223,7 +225,7 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
       const label = action.payload?.label ?? `Week ${week}`;
       return {
         ...prev,
-        time: { ...prev.time, week, phaseVersion, label },
+        time: { ...prev.time, week, dayIndex: 0, phaseVersion, label },
         checkpoints: [...prev.checkpoints, { ts: Date.now(), label, week, phaseVersion }],
         lastUiError: null,
       };
