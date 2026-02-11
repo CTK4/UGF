@@ -1,19 +1,51 @@
-// day advancement logic
-function advanceDay(currentDate) {
-    let nextDate = new Date(currentDate);
-    nextDate.setDate(currentDate.getDate() + 1);
-    return nextDate;
+// advance.ts - Day Advancement Logic, Phase Transitions, and Gate Validation 
+
+export class GameEngine {
+    private currentDay: number;
+    private currentPhase: string;
+    private gates: boolean[];
+
+    constructor() {
+        this.currentDay = 1;
+        this.currentPhase = 'morning';
+        this.gates = [true, true, true]; // Example of gate validations
+    }
+
+    advanceDay(): void {
+        this.currentDay++;
+        this.transitionPhase();
+        this.validateGates();
+    }
+
+    transitionPhase(): void {
+        switch (this.currentPhase) {
+            case 'morning':
+                this.currentPhase = 'afternoon';
+                break;
+            case 'afternoon':
+                this.currentPhase = 'evening';
+                break;
+            case 'evening':
+                this.currentPhase = 'night';
+                break;
+            case 'night':
+                this.currentPhase = 'morning';
+                break;
+        }
+    }
+
+    validateGates(): void {
+        // Logic to validate gates for the current day and phase
+        this.gates = this.gates.map(gate => this.checkGateValidity(gate));
+    }
+
+    private checkGateValidity(gate: boolean): boolean {
+        // Example logic for validating a gate
+        return gate; // Implement actual validation logic here
+    }
 }
 
-// phase transition logic
-function transitionPhase(currentPhase) {
-    const phases = ['morning', 'afternoon', 'evening', 'night'];
-    let currentIndex = phases.indexOf(currentPhase);
-    let nextIndex = (currentIndex + 1) % phases.length;
-    return phases[nextIndex];
-}
-
-// Example usage
-const currentDate = new Date('2026-02-11T22:25:30Z');
-console.log("Next Date:", advanceDay(currentDate));
-console.log("Next Phase:", transitionPhase('evening'));
+// Example usage:
+const gameEngine = new GameEngine();
+gameEngine.advanceDay();
+console.log(`Day: ${gameEngine['currentDay']}, Phase: ${gameEngine['currentPhase']}`);
