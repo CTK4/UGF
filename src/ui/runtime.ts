@@ -14,14 +14,13 @@ import { deriveGmProfile } from "@/data/gmDerivation";
 import { OWNER_PROFILES } from "@/data/ownerProfiles";
 import { getOwnerProfile } from "@/data/owners";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
-import { getTeamIdByName, getTeamSummaryRows } from "@/data/generatedData";
 import { deriveOfferTerms } from "@/engine/offers";
 import { FRANCHISES, resolveFranchiseLike } from "@/ui/data/franchises";
 import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
 import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
 import { loadLeagueRosterForTeam } from "@/services/rosterImport";
 import { validateLeagueDb } from "@/services/validateLeagueDb";
-import { getCurrentSeason } from "@/data/leagueDb";
+import { getCurrentSeason, getTeamSummaryProjectionRows } from "@/data/leagueDb";
 import { buildFreeAgentPool, buildTeamRosterRows, calculateCapSummary } from "@/ui/freeAgency/freeAgency";
 import { ROSTER_CAP_LIMIT, calculateRosterCap, loadRosterPlayersForTeam } from "@/ui/roster/rosterAdapter";
 import { buildCharacterRegistry } from "@/engine/characters";
@@ -428,12 +427,6 @@ function generateOpeningOffersWithFallback(
   }
 }
 
-function parseCapSpaceValue(row: Record<string, unknown>): number | null {
-  const raw = row.capSpace ?? row.cap_room ?? row.capRoom ?? row["Cap Space"];
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 function formatCapSpace(value: number | null): string {
   if (value === null) return "N/A";
 
@@ -452,21 +445,15 @@ function buildSummaryLine(teamKey: string, tier: InterviewInviteTier, capSpace: 
   return `${meta.descriptor} • Cap Space: ${formatCapSpace(capSpace)} • ${terms.years}y • ${terms.pressure} pressure • ${terms.mandate}`;
 }
 
-function getOverallValue(row: Record<string, unknown>): number {
-  const overall = Number(row.OVERALL ?? row.AvgRating ?? row["Avg Rating"] ?? 0);
-  return Number.isFinite(overall) ? overall : 0;
-}
-
-function buildTeamInviteMetricsByTeamKey(): Map<string, TeamInviteMetrics> {
+function buildTeamInviteMetricsByTeamKey(leagueSeed: number): Map<string, TeamInviteMetrics> {
   const metricsByTeamKey = new Map<string, TeamInviteMetrics>();
+  const rows = getTeamSummaryProjectionRows(getCurrentSeason(), leagueSeed);
 
-  for (const row of getTeamSummaryRows() as unknown as Array<Record<string, unknown>>) {
-    const teamName = String(row.Team ?? "").trim();
-    if (!teamName) continue;
-    const teamKey = resolveTeamKey(getTeamIdByName(teamName));
+  for (const row of rows) {
+    const teamKey = resolveTeamKey(row.teamId);
     metricsByTeamKey.set(teamKey, {
-      overall: getOverallValue(row),
-      capSpace: parseCapSpaceValue(row),
+      overall: Number(row.OVERALL ?? 0),
+      capSpace: Number.isFinite(Number(row["Cap Space"])) ? Number(row["Cap Space"]) : null,
     });
   }
 
@@ -516,8 +503,8 @@ function buildInvite(
   };
 }
 
-function generateInterviewInvites(hometownTeamKey: string): InterviewInvite[] {
-  const metricsByTeamKey = buildTeamInviteMetricsByTeamKey();
+function generateInterviewInvites(hometownTeamKey: string, leagueSeed: number): InterviewInvite[] {
+  const metricsByTeamKey = buildTeamInviteMetricsByTeamKey(leagueSeed);
   const ranked = rankTeamsByOverall(metricsByTeamKey);
   if (!hometownTeamKey) {
     console.error("Missing hometownTeamKey for interview invites.");
@@ -1025,7 +1012,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "RUN_INTERVIEWS": {
-          const interviewInvites = generateInterviewInvites(state.ui.opening.hometownTeamKey);
+          const interviewInvites = generateInterviewInvites(state.ui.opening.hometownTeamKey, state.ui.opening.leagueSeed);
           const interviewResults = Object.fromEntries(
             interviewInvites.map((invite) => [
               invite.franchiseId,
@@ -1149,7 +1136,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           const scriptTeamKey = resolveTeamKey(franchiseId);
           const ownerProfile =
             (OWNER_PROFILES as Record<string, (typeof OWNER_PROFILES)[keyof typeof OWNER_PROFILES]>)[scriptTeamKey] ?? OWNER_PROFILES.ATLANTA_APEX;
-          const teamMetrics = buildTeamInviteMetricsByTeamKey().get(franchiseId) ?? { overall: 70, capSpace: 0 };
+          const teamMetrics = buildTeamInviteMetricsByTeamKey(state.ui.opening.leagueSeed).get(franchiseId) ?? { overall: 70, capSpace: 0 };
           const gmProfile = deriveGmProfile({ overall: teamMetrics.overall, capSpace: teamMetrics.capSpace ?? 0 }, ownerProfile);
 
           const baseDelta: InterviewDelta = { owner: choice.baseOwner, gm: choice.baseGm, risk: choice.baseRisk };
@@ -1702,7 +1689,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
       routeLabel: () => state.route.key,
       table: (name: string): Array<Record<string, unknown>> => {
         if (name === "Team Summary") {
-          return getTeamSummaryRows() as Array<Record<string, unknown>>;
+          return getTeamSummaryProjectionRows(getCurrentSeason(), state.ui.opening.leagueSeed) as Array<Record<string, unknown>>;
         }
         return [];
       },
