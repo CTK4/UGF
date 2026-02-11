@@ -57,6 +57,8 @@ export type UIState = {
   };
 };
 
+export type GateFailure = { gateId: string; message: string; route: Route };
+
 export type UIAction = { type: string; [key: string]: unknown };
 
 export type UIController = {

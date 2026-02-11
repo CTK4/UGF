@@ -30,6 +30,11 @@ export type StaffAssignment = {
 };
 
 export type TaskType =
+  | "HIRE_COORDINATORS"
+  | "ROSTER_REVIEW"
+  | "SCOUTING_SETUP"
+  | "FREE_AGENCY_PREP"
+  | "DRAFT_PREP"
   | "STAFF_MEETING"
   | "SCOUT_POSITION"
   | "COMBINE_REVIEW"
@@ -43,6 +48,7 @@ export type Task = {
   title: string;
   description: string;
   status: "OPEN" | "DONE";
+  routeHint?: string;
 };
 
 export type ThreadMessage = {
@@ -114,7 +120,7 @@ export type PlayerContractState = {
 export type GameState = {
   meta: { version: 2 };
   phase: GamePhase;
-  time: { season: 2026; week: number; phaseVersion: number; label: string };
+  time: { season: number; week: number; dayIndex: number; phaseVersion: number; label: string };
   coach: {
     name: string;
     age: number;
