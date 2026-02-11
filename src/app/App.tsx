@@ -4,19 +4,30 @@ import { createUIRuntime } from "@/ui/runtime";
 import type { UIController } from "@/ui/types";
 import logoUrl from "@/assets/brand/ugf-head-coach-logo.png";
 import { NoSaveRouteGuard } from "@/ui/components/NoSaveRouteGuard";
+import { MobileHubScreen } from "@/ui/screens/MobileHubScreen";
 
 export function App() {
   const [, setTick] = useState(0);
   const [ui, setUi] = useState<UIController | null>(null);
+  const [isNarrowViewport, setIsNarrowViewport] = useState(() => (typeof window !== "undefined" ? window.innerWidth < 520 : false));
 
   useEffect(() => {
     void createUIRuntime(() => setTick((t) => t + 1)).then(setUi);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResize = () => setIsNarrowViewport(window.innerWidth < 520);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   if (!ui) return <div className="app"><div className="card">Booting...</div></div>;
 
   const state = ui.getState();
-  const Screen = RouteMap[state.route.key as RouteKey];
+  const forceMobileHub = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("ui") === "mobile";
+  const useMobileHub = state.route.key === "Hub" && (forceMobileHub || isNarrowViewport);
+  const Screen = useMobileHub ? MobileHubScreen : RouteMap[state.route.key as RouteKey];
   const noSave = !state.save;
   const saveRequiredRoutes = new Set<RouteKey>(["Hub", "Roster", "StaffTree", "PhoneInbox", "PhoneThread", "FreeAgency"]);
   const routeNeedsSave = saveRequiredRoutes.has(state.route.key as RouteKey);
