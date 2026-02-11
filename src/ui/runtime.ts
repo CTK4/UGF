@@ -18,12 +18,13 @@ import { deriveOfferTerms } from "@/engine/offers";
 import { FRANCHISES, resolveFranchiseLike } from "@/ui/data/franchises";
 import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
 import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
-import { loadLeagueRosterForTeam } from "@/services/rosterImport";
+import { getLeagueDbHash, loadLeagueRosterForTeam } from "@/services/rosterImport";
 import { validateLeagueDb } from "@/services/validateLeagueDb";
 import { getCurrentSeason, getTeamSummaryProjectionRows } from "@/data/leagueDb";
 import { buildFreeAgentPool, buildTeamRosterRows, calculateCapSummary } from "@/ui/freeAgency/freeAgency";
 import { ROSTER_CAP_LIMIT, calculateRosterCap, loadRosterPlayersForTeam } from "@/ui/roster/rosterAdapter";
 import { buildCharacterRegistry } from "@/engine/characters";
+import { DEFAULT_SALARY_CAP, sumCapByTeam } from "@/engine/cap";
 import { clearLocalSave, loadLocalSave, persistLocalSave } from "@/domainE/persistence/localSave";
 
 /**
@@ -38,6 +39,10 @@ import { clearLocalSave, loadLocalSave, persistLocalSave } from "@/domainE/persi
  *    Expected: modal shows exact blocker reason and CTA navigates to required route.
  * 5) Refresh browser.
  *    Expected: delegation settings + generated owner/GM characters persist.
+ * 6) Corrupt saved league.teamRosters in localStorage (duplicate/mismatched player IDs), then refresh.
+ *    Expected: league rebuilds from canonical players/contracts, and advance is blocked if validation still fails.
+ * 7) Change LeagueDB JSON to include duplicate playerId, then reload.
+ *    Expected: validation modal appears and advance is blocked with "League data invalid. Fix LeagueDB JSON."
  */
 
 
@@ -205,8 +210,61 @@ function runBootAdvanceSelfCheck(save: SaveData | null): void {
 
 
 
+function shouldPreserveSaveOnlyEntity(entity: unknown): boolean {
+  const marker = entity as Record<string, unknown> | null;
+  if (!marker) return false;
+  return marker.userCreated === true || marker.transaction === true || marker.createdByTransaction === true;
+}
+
+function rebuildLeagueDerivedMaps(playersById: GameState["league"]["playersById"]): Pick<GameState["league"], "teamRosters" | "cap"> {
+  const teamRosters: Record<string, string[]> = {};
+  for (const player of Object.values(playersById)) {
+    const teamKey = String(player.teamKey ?? "");
+    if (!teamKey) continue;
+    if (!teamRosters[teamKey]) teamRosters[teamKey] = [];
+    teamRosters[teamKey].push(player.id);
+  }
+  return {
+    teamRosters,
+    cap: {
+      salaryCap: DEFAULT_SALARY_CAP,
+      capUsedByTeam: sumCapByTeam(playersById),
+    },
+  };
+}
+
+function mergeSaveLeagueDeltas(canonicalLeague: GameState["league"], saveLeague: GameState["league"] | undefined): GameState["league"] {
+  const mergedPlayersById = { ...canonicalLeague.playersById };
+  const mergedContractsById = { ...canonicalLeague.contractsById };
+
+  for (const [playerId, player] of Object.entries(saveLeague?.playersById ?? {})) {
+    if (mergedPlayersById[playerId]) continue;
+    if (!shouldPreserveSaveOnlyEntity(player)) continue;
+    mergedPlayersById[playerId] = player;
+  }
+
+  for (const [contractId, contract] of Object.entries(saveLeague?.contractsById ?? {})) {
+    if (mergedContractsById[contractId]) continue;
+    if (!shouldPreserveSaveOnlyEntity(contract)) continue;
+    mergedContractsById[contractId] = contract;
+  }
+
+  const derived = rebuildLeagueDerivedMaps(mergedPlayersById);
+  return {
+    ...canonicalLeague,
+    playersById: mergedPlayersById,
+    contractsById: mergedContractsById,
+    teamRosters: derived.teamRosters,
+    cap: {
+      salaryCap: Number(canonicalLeague.cap?.salaryCap ?? DEFAULT_SALARY_CAP),
+      capUsedByTeam: derived.cap.capUsedByTeam,
+    },
+  };
+}
+
 async function hydrateLeagueFromCanonical(gameState: GameState): Promise<GameState> {
   const teamKey = gameState.franchise.ugfTeamKey || gameState.franchise.excelTeamKey || "ATLANTA_APEX";
+  const leagueDbHash = getLeagueDbHash();
   const { league: canonicalLeague } = await loadLeagueRosterForTeam({
     teamKey,
     excelTeamKey: gameState.franchise.excelTeamKey,
@@ -214,24 +272,21 @@ async function hydrateLeagueFromCanonical(gameState: GameState): Promise<GameSta
     salaryCap: gameState.league?.cap?.salaryCap,
   });
 
-  const hasLiveLeagueData = Object.keys(gameState.league?.playersById ?? {}).length > 0;
-  const mergedLeague = hasLiveLeagueData
-    ? {
-        ...canonicalLeague,
-        ...gameState.league,
-        teamsById: Object.keys(gameState.league?.teamsById ?? {}).length ? gameState.league.teamsById : canonicalLeague.teamsById,
-        contractsById: Object.keys(gameState.league?.contractsById ?? {}).length ? gameState.league.contractsById : canonicalLeague.contractsById,
-        personnelById: Object.keys(gameState.league?.personnelById ?? {}).length ? gameState.league.personnelById : canonicalLeague.personnelById,
-        draftOrderBySeason: Object.keys(gameState.league?.draftOrderBySeason ?? {}).length ? gameState.league.draftOrderBySeason : canonicalLeague.draftOrderBySeason,
-        cap: {
-          salaryCap: Number(gameState.league?.cap?.salaryCap ?? canonicalLeague.cap.salaryCap),
-          capUsedByTeam: Object.keys(gameState.league?.cap?.capUsedByTeam ?? {}).length ? gameState.league.cap.capUsedByTeam : canonicalLeague.cap.capUsedByTeam,
-        },
-      }
-    : canonicalLeague;
+  const savedHash = String(gameState.world?.leagueDbHash ?? "");
+  const hashChanged = Boolean(savedHash) && savedHash !== leagueDbHash;
+  const mergedLeague = mergeSaveLeagueDeltas(canonicalLeague, gameState.league);
+
+  if (hashChanged) {
+    console.warn("[runtime] leagueDb hash mismatch. canonical rebuild forced.", { savedHash, leagueDbHash });
+  }
 
   return {
     ...gameState,
+    world: {
+      ...gameState.world,
+      leagueDbVersion: "v1",
+      leagueDbHash,
+    },
     league: mergedLeague,
   };
 }
@@ -274,12 +329,31 @@ function assertCityTeamLeagueInvariants(save: SaveData | null): void {
   }
 }
 
-function runLeagueValidation(save: SaveData | null): ReturnType<typeof createLeagueValidationModal> | null {
-  if (!import.meta.env.DEV || !save) return null;
+function getLeagueValidationErrors(save: SaveData | null): string[] {
+  if (!save) return [];
   const errors = validateLeagueDb(save.gameState.league);
+  if (errors.length) {
+    console.error("[runtime] League Data Errors", errors);
+  }
+  return errors;
+}
+
+function runLeagueValidation(save: SaveData | null): ReturnType<typeof createLeagueValidationModal> | null {
+  const errors = getLeagueValidationErrors(save);
   if (!errors.length) return null;
-  console.error("[runtime] League Data Errors", errors);
+  if (!import.meta.env.DEV) return null;
   return createLeagueValidationModal(errors, Boolean(save));
+}
+
+function createLeagueInvalidAdvanceModal(errors: string[]) {
+  return {
+    title: "League Data Invalid",
+    message: ["League data invalid. Fix LeagueDB JSON.", ...errors.slice(0, 3)].join("\n"),
+    actions: [
+      { label: "Go to Hub", action: { type: "NAVIGATE", route: { key: "Hub" as const } } },
+      { label: "Close", action: { type: "CLOSE_MODAL" } },
+    ],
+  };
 }
 
 function openingState(): UIState["ui"]["opening"] {
@@ -700,8 +774,11 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
 
   runBootAdvanceSelfCheck(state.save);
   assertCityTeamLeagueInvariants(state.save);
+  const bootValidationErrors = getLeagueValidationErrors(state.save);
   const bootLeagueValidationModal = runLeagueValidation(state.save);
-  if (bootLeagueValidationModal) {
+  if (bootValidationErrors.length && !bootLeagueValidationModal) {
+    state = { ...state, ui: { ...state.ui, activeModal: createLeagueInvalidAdvanceModal(bootValidationErrors) } };
+  } else if (bootLeagueValidationModal) {
     state = { ...state, ui: { ...state.ui, activeModal: bootLeagueValidationModal } };
   }
 
@@ -1366,7 +1443,24 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             gameState = reduceGameState(gameState, gameActions.hireCoach(role, assignment));
           });
           gameState = reduceGameState(gameState, gameActions.enterJanuaryOffseason());
-          gameState = { ...gameState, tasks: generateBeatTasks(gameState) };
+          const finalizedDerivedLeague = rebuildLeagueDerivedMaps(gameState.league.playersById ?? {});
+          gameState = {
+            ...gameState,
+            world: {
+              ...gameState.world,
+              leagueDbVersion: "v1",
+              leagueDbHash: getLeagueDbHash(),
+            },
+            league: {
+              ...gameState.league,
+              teamRosters: finalizedDerivedLeague.teamRosters,
+              cap: {
+                salaryCap: Number(gameState.league.cap?.salaryCap ?? DEFAULT_SALARY_CAP),
+                capUsedByTeam: finalizedDerivedLeague.cap.capUsedByTeam,
+              },
+            },
+            tasks: generateBeatTasks(gameState),
+          };
           const nextSave = { version: 1 as const, gameState };
           assertCityTeamLeagueInvariants(nextSave);
           const validationModal = runLeagueValidation(nextSave);
@@ -1619,6 +1713,18 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
 
           if (!state.save) return;
 
+          const preAdvanceErrors = getLeagueValidationErrors(state.save);
+          if (preAdvanceErrors.length) {
+            setState({
+              ...state,
+              ui: {
+                ...state.ui,
+                activeModal: createLeagueInvalidAdvanceModal(preAdvanceErrors),
+              },
+            });
+            return;
+          }
+
           const before = {
             season: state.save.gameState.time.season,
             week: state.save.gameState.time.week,
@@ -1657,7 +1763,26 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             console.assert(!noProgress, "[runtime] ADVANCE_WEEK completed without calendar progress", { before, after: result.gameState.time });
           }
 
-          const nextSave = { version: 1 as const, gameState: result.gameState };
+          const derivedLeagueState = rebuildLeagueDerivedMaps(result.gameState.league.playersById ?? {});
+          const nextSave = {
+            version: 1 as const,
+            gameState: {
+              ...result.gameState,
+              world: {
+                ...result.gameState.world,
+                leagueDbVersion: "v1",
+                leagueDbHash: getLeagueDbHash(),
+              },
+              league: {
+                ...result.gameState.league,
+                teamRosters: derivedLeagueState.teamRosters,
+                cap: {
+                  salaryCap: Number(result.gameState.league.cap?.salaryCap ?? DEFAULT_SALARY_CAP),
+                  capUsedByTeam: derivedLeagueState.cap.capUsedByTeam,
+                },
+              },
+            },
+          };
           assertCityTeamLeagueInvariants(nextSave);
           const validationModal = runLeagueValidation(nextSave);
           setState({

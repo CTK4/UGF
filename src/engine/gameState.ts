@@ -142,6 +142,8 @@ export type GameState = {
   meta: { version: 2 };
   world: {
     leagueSeed: number;
+    leagueDbVersion?: string;
+    leagueDbHash?: string;
   };
   phase: GamePhase;
   time: { season: number; week: number; dayIndex: number; phaseVersion: number; label: string };
