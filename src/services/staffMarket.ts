@@ -1,7 +1,4 @@
-import personnelData from "@/data/generated/personnel.json";
-import personnelLookupData from "@/data/generated/personnelIdLookup.json";
-import teamPersonnelData from "@/data/generated/teamPersonnel.json";
-import teamSummaryData from "@/data/generated/teamSummary.json";
+import { getPersonnelIdLookupRows, getPersonnelRows, getTeamPersonnelRows, getTeamSummaryRows } from "@/data/generatedData";
 import type { SaveData } from "@/ui/types";
 import { ASSISTANT_ROLES, STAFF_ROLE_LABELS, type StaffRole } from "@/domain/staffRoles";
 
@@ -11,10 +8,10 @@ type PersonnelRow = Record<string, unknown>;
 type TeamPersonnelRow = Record<string, string | null>;
 type TeamSummaryRow = Record<string, unknown>;
 
-const personnel = personnelData as PersonnelRow[];
-const teamPersonnel = teamPersonnelData as TeamPersonnelRow[];
-const lookup = personnelLookupData as PersonnelRow[];
-const teamSummary = teamSummaryData as TeamSummaryRow[];
+const personnel = getPersonnelRows() as PersonnelRow[];
+const teamPersonnel = getTeamPersonnelRows() as TeamPersonnelRow[];
+const lookup = getPersonnelIdLookupRows() as PersonnelRow[];
+const teamSummary = getTeamSummaryRows() as TeamSummaryRow[];
 
 const ROLE_BASE: Record<StaffRole, number> = {
   HC: 10_000_000,
@@ -123,7 +120,7 @@ export function ensureFinancials(save: SaveData): SaveData {
 
 function employedNames(save: SaveData): Set<string> {
   const names = new Set<string>();
-  for (const row of teamPersonnel.slice(1)) {
+  for (const row of teamPersonnel) {
     for (const key of ["Unnamed: 3", "Unnamed: 4", "Unnamed: 5"]) {
       const value = String(row[key] ?? "").trim();
       if (value) names.add(cleanName(value).toLowerCase());

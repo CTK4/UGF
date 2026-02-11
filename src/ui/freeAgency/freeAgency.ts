@@ -1,5 +1,5 @@
 import type { GameState, PlayerContractRow } from "@/engine/gameState";
-import { getRosterRows } from "@/data/generatedData";
+import { getPlayers, getTeams } from "@/data/leagueDb";
 import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
 import { sanitizeForbiddenName } from "@/services/rosterImport";
 
@@ -40,6 +40,8 @@ export function playerContractRowFromLeague(state: GameState, playerId: string):
   const player = state.league.playersById[playerId];
   if (!player) return null;
   const overall = Math.max(40, Math.min(99, Math.round(player.overall ?? 65)));
+  const source = getPlayers().find((row) => String(row.playerId) === playerId);
+  const pending = String(source?.status ?? "").toUpperCase() === "PENDING_FREE_AGENT";
   return {
     id: player.id,
     playerName: sanitizeForbiddenName(player.name),
@@ -50,6 +52,7 @@ export function playerContractRowFromLeague(state: GameState, playerId: string):
     salary: Math.max(0, Math.round(player.contract.amount ?? askSalaryFromOverall(overall))),
     teamKey: player.teamKey || null,
     contractStatus: player.teamKey ? "ACTIVE" : "FREE_AGENT",
+    needsResign: pending,
   };
 }
 
@@ -64,14 +67,17 @@ export function buildTeamRosterRows(state: GameState, teamKey: string): PlayerCo
 export function buildFreeAgentPool(state: GameState): PlayerContractRow[] {
   const userTeam = resolveTeamKey(state.franchise.ugfTeamKey || state.franchise.excelTeamKey || "");
   const onUserRoster = new Set(state.league.teamRosters[userTeam] ?? []);
-  const fromData = getRosterRows().map((row) => {
-    const name = sanitizeForbiddenName(String(row.PlayerName ?? "").trim());
-    const position = String(row.Position ?? row.PositionGroup ?? "UNK").trim() || "UNK";
-    const overall = toNumber(row.Rating, 65);
-    const age = toNumber(row.Age, 25);
-    const teamKey = resolveTeamKey(String(row.Team ?? ""));
-    const rowTeam = teamKey === "UNKNOWN_TEAM" ? null : teamKey;
-    const id = stableHash(`${name}:${position}:${age}:${row["Player ID"] ?? ""}`);
+  const teamNameById = new Map(getTeams().map((team) => [team.teamId, team.name]));
+
+  const fromData = getPlayers().map((row) => {
+    const name = sanitizeForbiddenName(String(row.fullName ?? "").trim());
+    const position = String(row.pos ?? "UNK").trim() || "UNK";
+    const overall = toNumber(row.overall, 65);
+    const age = toNumber(row.age, 25);
+    const teamKey = resolveTeamKey(String(teamNameById.get(String(row.teamId ?? "")) ?? row.teamId ?? ""));
+    const rowTeam = row.teamId === "FREE_AGENT" || teamKey === "UNKNOWN_TEAM" ? null : teamKey;
+    const id = String(row.playerId ?? stableHash(`${name}:${position}:${age}`));
+    const pending = String(row.status ?? "").toUpperCase() === "PENDING_FREE_AGENT";
     return {
       id,
       playerName: name,
@@ -79,9 +85,10 @@ export function buildFreeAgentPool(state: GameState): PlayerContractRow[] {
       overall,
       age,
       years: askYearsFromOverall(overall),
-      salary: Math.max(0, Math.round(Number(row.AAV) > 0 ? Number(row.AAV) : askSalaryFromOverall(overall))),
+      salary: Math.max(0, Math.round(askSalaryFromOverall(overall))),
       teamKey: rowTeam,
       contractStatus: rowTeam ? "ACTIVE" : "FREE_AGENT",
+      needsResign: pending,
     } satisfies PlayerContractRow;
   });
 
@@ -103,9 +110,5 @@ export function buildFreeAgentPool(state: GameState): PlayerContractRow[] {
     if (!unique.has(key)) unique.set(key, { ...row, id: key });
   }
 
-  const freeAgents = [...unique.values()].sort((a, b) => b.overall - a.overall || a.playerName.localeCompare(b.playerName));
-  if (!freeAgents.length && import.meta.env.DEV) {
-    console.warn("[freeAgency] Free agent pool empty. Check generated roster source: src/data/generated/rosters.json and runtime hydration path.");
-  }
-  return freeAgents.slice(0, MAX_FREE_AGENTS);
+  return [...unique.values()].sort((a, b) => b.overall - a.overall || a.playerName.localeCompare(b.playerName)).slice(0, MAX_FREE_AGENTS);
 }

@@ -1,5 +1,5 @@
 import React from "react";
-import personnelData from "@/data/generated/personnel.json";
+import { getPersonnelRows } from "@/data/generatedData";
 import type { ScreenProps } from "@/ui/types";
 import { HOMETOWNS } from "@/data/hometowns";
 import { resolveFranchiseLike } from "@/ui/data/franchises";
@@ -11,8 +11,8 @@ import { INTERVIEW_QUESTION_BANK } from "@/data/interviewBank";
 import { INTERVIEW_SCRIPTS } from "@/data/interviewScripts";
 import { coordinatorCandidateMeta, type CoordinatorRole } from "@/ui/helpers/deterministic";
 
-type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string };
-const personnel = personnelData as PersonnelRow[];
+type PersonnelRow = { DisplayName: string; Position: string; Scheme?: string; Status?: string };
+const personnel = getPersonnelRows() as PersonnelRow[];
 const backgrounds = ["Former QB", "Defensive Architect", "Special Teams Ace", "CEO Program Builder"];
 
 const tierLabelByCode = {
@@ -22,7 +22,7 @@ const tierLabelByCode = {
 } as const;
 
 function rolePool(position: "OC" | "DC" | "ST Coordinator") {
-  return personnel.filter((p) => p.Position === position).slice(0, 6);
+  return personnel.filter((p) => p.Position === position && String(p.Status ?? "").toUpperCase() === "FREE_AGENT").slice(0, 6);
 }
 
 function devGuardForbiddenTeamName(_teamName: string) {

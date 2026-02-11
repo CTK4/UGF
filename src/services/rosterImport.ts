@@ -1,9 +1,8 @@
 import type { LeaguePlayer, LeagueState } from "@/engine/gameState";
 import { DEFAULT_SALARY_CAP, sumCapByTeam } from "@/engine/cap";
+import { getContracts, getPlayers, getSalaryCap } from "@/data/leagueDb";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
-
-type RawRosterRow = Record<string, unknown>;
 
 type HydrateInput = {
   teamKey: string;
@@ -16,27 +15,6 @@ export function sanitizeForbiddenName(value: string): string {
   return String(value ?? "").replace(/Gotham/gi, "Gothic").replace(/Voodoo/gi, "Hex");
 }
 
-function toNumber(value: unknown): number | undefined {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : undefined;
-}
-
-function getString(row: RawRosterRow, keys: string[]): string {
-  for (const key of keys) {
-    const raw = row[key];
-    if (typeof raw === "string" && raw.trim().length > 0) return raw.trim();
-  }
-  return "";
-}
-
-function getNumber(row: RawRosterRow, keys: string[]): number | undefined {
-  for (const key of keys) {
-    const value = toNumber(row[key]);
-    if (value !== undefined) return value;
-  }
-  return undefined;
-}
-
 function deterministicHash(input: string): string {
   let hash = 2166136261;
   for (let i = 0; i < input.length; i += 1) {
@@ -46,10 +24,6 @@ function deterministicHash(input: string): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-function derivePlayerId(teamKey: string, name: string, pos: string, age?: number): string {
-  return `p_${deterministicHash(`${teamKey}:${name}:${pos}:${age ?? "na"}`)}`;
-}
-
 function normalizeTeamKey(teamLike: string): string {
   const sanitized = sanitizeForbiddenName(teamLike);
   const resolved = resolveTeamKey(sanitized);
@@ -57,94 +31,44 @@ function normalizeTeamKey(teamLike: string): string {
   return normalizeExcelTeamKey(sanitized);
 }
 
-function deriveContractAmount(overall: number | undefined): number {
-  const safeOverall = Math.max(40, Math.min(99, Math.round(overall ?? 65)));
-  return 450_000 + safeOverall * 140_000;
+function contractAmountFor(playerId: string): number {
+  const contract = getContracts().find((row) => String(row.entityId ?? "") === playerId);
+  return Number(contract?.salaryY1 ?? 0);
 }
 
-function normalizeRow(row: RawRosterRow, defaultTeamKey: string, season: number): LeaguePlayer | null {
-  const name = sanitizeForbiddenName(getString(row, ["PlayerName", "Name", "playerName"]));
-  if (!name) return null;
+function yearsLeftFor(playerId: string, season: number): number {
+  const contract = getContracts().find((row) => String(row.entityId ?? "") === playerId);
+  const endSeason = Number(contract?.endSeason ?? season);
+  return Math.max(1, endSeason - season + 1);
+}
 
-  const positionGroup = getString(row, ["PositionGroup", "Position", "Pos", "positionGroup", "position"]);
-  const pos = getString(row, ["Position", "Pos", "position", "PositionGroup"]) || positionGroup || "UNK";
-  const teamFromRow = getString(row, ["Team", "team", "TeamName"]);
-  const teamKey = teamFromRow ? normalizeTeamKey(teamFromRow) : defaultTeamKey;
-
-  const overall = getNumber(row, ["Rating", "Overall", "OVR", "overall"]);
-  const age = getNumber(row, ["Age", "age"]);
-  const yearsLeft = Math.max(
-    1,
-    Math.round(getNumber(row, ["ContractYearsRemaining", "ContractYearsLeft", "YearsLeft", "Original Contract Length", "contractYearsLeft"]) ?? 1),
-  );
-
-  const amountRaw = getNumber(row, ["AAV", "CapHit", "ContractAmount", "Salary", "ContractTotalValue_M"]);
-  const amount = amountRaw !== undefined
-    ? amountRaw < 10_000 ? amountRaw * 1_000_000 : amountRaw
-    : deriveContractAmount(overall);
-
-  const expSeason = season + yearsLeft;
-  const rawId = getString(row, ["Player ID", "playerId", "id"]);
-  const id = rawId ? `p_${deterministicHash(`${teamKey}:${rawId}`)}` : derivePlayerId(teamKey, name, pos, age);
-
+function toLeaguePlayer(raw: ReturnType<typeof getPlayers>[number], season: number): LeaguePlayer {
+  const teamKey = raw.teamId === "FREE_AGENT" ? "" : normalizeTeamKey(String(raw.teamId ?? ""));
   return {
-    id,
-    name,
-    positionGroup: positionGroup || pos,
-    pos,
+    id: String(raw.playerId ?? `p_${deterministicHash(String(raw.fullName ?? ""))}`),
+    name: sanitizeForbiddenName(String(raw.fullName ?? "Unknown")),
+    positionGroup: String(raw.pos ?? "UNK"),
+    pos: String(raw.pos ?? "UNK"),
     teamKey,
-    overall,
-    age,
+    overall: Number(raw.overall ?? 65),
+    age: Number(raw.age ?? 25),
     contract: {
-      amount: Math.max(0, Math.round(amount)),
-      yearsLeft,
-      expSeason,
+      amount: contractAmountFor(String(raw.playerId ?? "")),
+      yearsLeft: yearsLeftFor(String(raw.playerId ?? ""), season),
+      expSeason: season + yearsLeftFor(String(raw.playerId ?? ""), season),
     },
   };
 }
 
-async function fetchJson(path: string): Promise<unknown | null> {
-  try {
-    const response = await fetch(path, { cache: "no-store" });
-    if (!response.ok) return null;
-    return await response.json();
-  } catch {
-    return null;
-  }
-}
-
-function asArrayPayload(value: unknown): RawRosterRow[] {
-  return Array.isArray(value) ? (value.filter((row) => row && typeof row === "object") as RawRosterRow[]) : [];
-}
-
 export async function loadLeagueRosterForTeam(input: HydrateInput): Promise<{ league: LeagueState; warning?: string }> {
-  const salaryCap = input.salaryCap ?? DEFAULT_SALARY_CAP;
+  const salaryCap = input.salaryCap ?? getSalaryCap() ?? DEFAULT_SALARY_CAP;
   const defaultTeamKey = normalizeTeamKey(input.teamKey || input.excelTeamKey || "");
-  const keyCandidates = [defaultTeamKey, input.excelTeamKey ?? ""].filter(Boolean);
-  const fileCandidates = [...new Set(keyCandidates.map((key) => `/rosters/${normalizeExcelTeamKey(key)}.json`))];
 
-  let rows: RawRosterRow[] = [];
-  for (const path of fileCandidates) {
-    const payload = asArrayPayload(await fetchJson(path));
-    if (payload.length) {
-      rows = payload;
-      break;
-    }
-  }
-
-  if (!rows.length) {
-    const aggregate = asArrayPayload(await fetchJson("/rosters"));
-    rows = aggregate.filter((row) => normalizeTeamKey(getString(row, ["Team", "team", "TeamName"])) === defaultTeamKey);
-  }
-
-  const players = rows
-    .map((row) => normalizeRow(row, defaultTeamKey, input.season))
-    .filter((player): player is LeaguePlayer => player !== null)
-    .sort((a, b) => a.id.localeCompare(b.id));
-
+  const players = getPlayers().map((raw) => toLeaguePlayer(raw, input.season));
   const playersById = Object.fromEntries(players.map((player) => [player.id, player]));
   const teamRosters: Record<string, string[]> = {};
   for (const player of players) {
+    if (!player.teamKey) continue;
     if (!teamRosters[player.teamKey]) teamRosters[player.teamKey] = [];
     teamRosters[player.teamKey].push(player.id);
   }
@@ -158,10 +82,10 @@ export async function loadLeagueRosterForTeam(input: HydrateInput): Promise<{ le
     },
   };
 
-  if (!players.length) {
+  if (!(teamRosters[defaultTeamKey]?.length ?? 0)) {
     return {
       league,
-      warning: `Roster data missing for ${defaultTeamKey}, using empty roster.`,
+      warning: `Roster data missing for ${defaultTeamKey}, using current LeagueDB snapshot.`,
     };
   }
 

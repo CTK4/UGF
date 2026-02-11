@@ -1,15 +1,13 @@
-import personnelData from "@/data/generated/personnel.json";
-import teamPersonnelData from "@/data/generated/teamPersonnel.json";
-import teamSummaryData from "@/data/generated/teamSummary.json";
+import { getPersonnelRows, getTeamPersonnelRows, getTeamSummaryRows } from "@/data/generatedData";
 import { ASSISTANT_STAFF_ROLES, type StaffRole } from "@/domain/staffRoles";
 import type { Candidate, OwnerStandard, SaveData, Standards } from "@/ui/types";
 
 type PersonnelRow = { ID: number; DisplayName?: string; Name?: string; Position?: string; Traits?: string; Scheme?: string };
 type TeamSummaryRow = { Team?: string; "Cap Space"?: number };
 
-const personnel = personnelData as PersonnelRow[];
-const teamPersonnel = teamPersonnelData as Array<Record<string, unknown>>;
-const teamSummary = teamSummaryData as TeamSummaryRow[];
+const personnel = getPersonnelRows() as PersonnelRow[];
+const teamPersonnel = getTeamPersonnelRows() as Array<Record<string, unknown>>;
+const teamSummary = getTeamSummaryRows() as TeamSummaryRow[];
 
 const BASE_SALARY_BY_ROLE: Record<StaffRole, number> = {
   HC: 10_000_000,
