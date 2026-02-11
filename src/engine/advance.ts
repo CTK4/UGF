@@ -8,9 +8,13 @@ export type AdvanceOutcome =
   | { ok: true; gameState: GameState }
   | { ok: false; blocked: GateFailure; gameState: GameState };
 
-export function advanceDay(state: GameState): AdvanceOutcome {
+export function getAdvanceBlocker(state: GameState): GateFailure | null {
   const currentBeat = getBeat(state.time.season, state.time.week);
-  const blocked = validateBeatGates(state, currentBeat.gates ?? []);
+  return validateBeatGates(state, currentBeat.gates ?? []);
+}
+
+export function advanceDay(state: GameState): AdvanceOutcome {
+  const blocked = getAdvanceBlocker(state);
   if (blocked) {
     return { ok: false, blocked, gameState: state };
   }

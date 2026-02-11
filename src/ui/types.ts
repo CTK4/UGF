@@ -61,12 +61,19 @@ export type GateFailure = { gateId: string; message: string; route: Route };
 
 export type UIAction = { type: string; [key: string]: unknown };
 
+export type AdvanceAvailability = {
+  canAdvance: boolean;
+  message?: string;
+  route?: Route;
+};
+
 export type UIController = {
   getState: () => UIState;
   dispatch: (action: UIAction) => void;
   selectors: {
     routeLabel: () => string;
     table: (name: string) => Array<Record<string, unknown>>;
+    canAdvance: () => AdvanceAvailability;
   };
 };
 
