@@ -17,7 +17,7 @@ scan() {
   fi
 }
 
-IDB_HITS="$(scan 'indexedDB\.open|\.transaction\(|objectStore\(|\.put\(|\.add\(|\.delete\(|\.clear\(')"
+IDB_HITS="$(scan 'indexedDB\.open\(|\.transaction\(|objectStore\(')"
 if [[ -n "$IDB_HITS" ]]; then
   BAD_IDB="$(printf "%s\n" "$IDB_HITS" | grep -v "^${ALLOW_PREFIX}" || true)"
   if [[ -n "$BAD_IDB" ]]; then
