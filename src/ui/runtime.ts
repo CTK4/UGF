@@ -1,6 +1,6 @@
 import { STAFF_ROLES, type StaffRole } from "@/domain/staffRoles";
 import { gameActions } from "@/engine/actions";
-import { advanceDay } from "@/engine/advance";
+import { advanceDay, getAdvanceBlocker } from "@/engine/advance";
 import type { GameState, StaffAssignment, Thread } from "@/engine/gameState";
 import { createNewGameState, reduceGameState } from "@/engine/reducer";
 import { generateBeatTasks } from "@/engine/tasks";
@@ -51,6 +51,17 @@ function loadSave(): { save: SaveData | null; corrupted: boolean } {
   } catch {
     return { save: null, corrupted: true };
   }
+}
+
+
+function getAdvanceAvailability(save: SaveData | null): { canAdvance: boolean; message?: string; route?: UIState["route"] } {
+  if (!save) {
+    return { canAdvance: false, message: "Load or start a save before advancing the day.", route: { key: "Start" } };
+  }
+
+  const blocked = getAdvanceBlocker(save.gameState);
+  if (!blocked) return { canAdvance: true };
+  return { canAdvance: false, message: blocked.message, route: blocked.route };
 }
 
 function openingState(): UIState["ui"]["opening"] {
@@ -496,6 +507,27 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
     const gameState = reduceGameState(state.save.gameState, action);
     setState({ ...state, save: { version: 1, gameState } });
     return gameState;
+  };
+
+
+  const openAdvanceBlockedModal = (availability: { canAdvance: boolean; message?: string; route?: UIState["route"] }) => {
+    if (availability.canAdvance) return;
+    console.warn("[runtime] advance blocked", availability);
+    const fallbackRoute = availability.route ?? { key: "Hub" as const };
+    setState({
+      ...state,
+      ui: {
+        ...state.ui,
+        activeModal: {
+          title: "Advance Blocked",
+          message: availability.message ?? "Advance is currently blocked.",
+          actions: [
+            { label: "Go to Required Screen", action: { type: "NAVIGATE", route: fallbackRoute } },
+            { label: "Close", action: { type: "CLOSE_MODAL" } },
+          ],
+        },
+      },
+    });
   };
 
   const controller: UIController = {
@@ -1302,23 +1334,13 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "ADVANCE_WEEK": {
-          if (!state.save) {
-            setState({
-              ...state,
-              ui: {
-                ...state.ui,
-                activeModal: {
-                  title: "No save loaded",
-                  message: "Load or start a save before advancing the day.",
-                  actions: [
-                    { label: "Back to Start", action: { type: "NAVIGATE", route: { key: "Start" } } },
-                    { label: "Create Coach", action: { type: "NAVIGATE", route: { key: "CreateCoach" } } },
-                  ],
-                },
-              },
-            });
+          const availability = getAdvanceAvailability(state.save);
+          if (!availability.canAdvance) {
+            openAdvanceBlockedModal(availability);
             return;
           }
+
+          if (!state.save) return;
 
           const before = {
             season: state.save.gameState.time.season,
@@ -1342,25 +1364,19 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           }
 
           if (!result.ok) {
-            setState({
-              ...state,
-              save: { version: 1, gameState: result.gameState },
-              ui: {
-                ...state.ui,
-                activeModal: {
-                  title: "Advance Blocked",
-                  message: result.blocked.message,
-                  actions: [
-                    { label: "Go Fix", action: { type: "NAVIGATE", route: result.blocked.route } },
-                    { label: "Close", action: { type: "CLOSE_MODAL" } },
-                  ],
-                },
-              },
+            openAdvanceBlockedModal({
+              canAdvance: false,
+              message: result.blocked.message,
+              route: result.blocked.route,
             });
             return;
           }
 
           setState({ ...state, save: { version: 1, gameState: result.gameState }, route: { key: "Hub" }, ui: { ...state.ui, activeModal: null } });
+          return;
+        }
+        case "OPEN_ADVANCE_BLOCKED_MODAL": {
+          openAdvanceBlockedModal(getAdvanceAvailability(state.save));
           return;
         }
         case "OPEN_PHONE_THREAD": {
@@ -1384,6 +1400,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
         }
         return [];
       },
+      canAdvance: () => getAdvanceAvailability(state.save),
     },
   };
 

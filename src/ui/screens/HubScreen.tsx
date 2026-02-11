@@ -18,6 +18,7 @@ export function HubScreen({ ui }: ScreenProps) {
   const save = ui.getState().save;
   const routeTab = ui.getState().route.key === "Hub" ? ui.getState().route.tab : undefined;
   const [hubTab, setHubTab] = useState<"summary" | "roster" | "contracts">(routeTab === "roster" || routeTab === "contracts" ? routeTab : "summary");
+  const advanceState = ui.selectors.canAdvance();
 
   useEffect(() => {
     if (routeTab === "roster" || routeTab === "contracts") {
@@ -26,7 +27,18 @@ export function HubScreen({ ui }: ScreenProps) {
   }, [routeTab]);
 
   if (!save) {
-    return <div className="ugf-card"><div className="ugf-card__body">Hub data loading / unavailable</div></div>;
+    return (
+      <div className="ugf-card">
+        <div className="ugf-card__header"><h2 className="ugf-card__title">Hub</h2></div>
+        <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
+          <div className="ugf-pill">No save loaded, so Hub actions are unavailable.</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Start" } })}>Back to Start</button>
+            <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CreateCoach" } })}>Create Coach</button>
+          </div>
+        </div>
+      </div>
+    );
   }
   const gs = save.gameState;
   const draftState = gs.draft ?? { discovered: {}, watchlist: [] };
@@ -89,6 +101,20 @@ export function HubScreen({ ui }: ScreenProps) {
         <div className="ugf-pill">Owner Mood: Neutral · Hot Seat: Warm (MVP placeholders)</div>
         <div>Coach: <b>{gs.coach.name || "Unnamed"}</b></div>
         <div>Franchise: {sanitizeForbiddenName(gs.franchise.ugfTeamKey || "Not selected")}</div>
+        {!advanceState.canAdvance ? (
+          <div className="ugf-card" style={{ borderColor: "rgba(255, 140, 0, 0.45)" }}>
+            <div className="ugf-card__body" style={{ display: "grid", gap: 6 }}>
+              <b>Advance is blocked</b>
+              <div>{advanceState.message ?? "Complete required tasks to continue."}</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {advanceState.route ? (
+                  <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: advanceState.route })}>Go to Required Screen</button>
+                ) : null}
+                <button onClick={() => ui.dispatch({ type: "OPEN_ADVANCE_BLOCKED_MODAL" })}>View Blocker Details</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <SegmentedTabs
           value={hubTab}
@@ -221,7 +247,13 @@ export function HubScreen({ ui }: ScreenProps) {
           <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "PhoneInbox" } })}>Phone</button>
           <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub" } })}>Scouting</button>
           <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub", tab: "contracts" } })}>Draft Board</button>
-          <button onClick={() => ui.dispatch({ type: "ADVANCE_WEEK" })}>Advance Day</button>
+          <button
+            aria-disabled={!advanceState.canAdvance}
+            title={advanceState.canAdvance ? "Advance to the next day" : advanceState.message ?? "Advance is blocked"}
+            onClick={() => ui.dispatch({ type: "ADVANCE_WEEK" })}
+          >
+            Advance Week
+          </button>
         </div>
           </>
         )}
