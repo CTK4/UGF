@@ -98,6 +98,12 @@ export function HubScreen({ ui }: ScreenProps) {
       <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
         <div className="ugf-pill">Season {gs.time.season} · January Week {gs.time.week} · {getJanuaryDayLabel(gs.time.dayIndex)}</div>
         <div className="ugf-pill">Phase: January Offseason</div>
+        <div className="ugf-card" style={{ borderColor: "rgba(120, 180, 255, 0.45)" }}>
+          <div className="ugf-card__body" style={{ display: "grid", gap: 6 }}>
+            <b>Next required task(s)</b>
+            <div>{advanceState.canAdvance ? "All required tasks complete. You can advance the calendar." : advanceState.message ?? "Complete required tasks to continue."}</div>
+          </div>
+        </div>
         <div className="ugf-pill">Owner Mood: Neutral · Hot Seat: Warm (MVP placeholders)</div>
         <div>Coach: <b>{gs.coach.name || "Unnamed"}</b></div>
         <div>Franchise: {sanitizeForbiddenName(gs.franchise.ugfTeamKey || "Not selected")}</div>

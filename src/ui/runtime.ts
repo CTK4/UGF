@@ -64,6 +64,59 @@ function getAdvanceAvailability(save: SaveData | null): { canAdvance: boolean; m
   return { canAdvance: false, message: blocked.message, route: blocked.route };
 }
 
+function assertAdvanceRoutingInvariant(save: SaveData | null): void {
+  if (!import.meta.env.DEV || !save) return;
+  const availability = getAdvanceAvailability(save);
+  const blocked = getAdvanceBlocker(save.gameState);
+  const expected = blocked
+    ? { canAdvance: false, message: blocked.message, routeKey: blocked.route.key }
+    : { canAdvance: true, message: undefined, routeKey: undefined };
+
+  const actual = {
+    canAdvance: availability.canAdvance,
+    message: availability.message,
+    routeKey: availability.route?.key,
+  };
+
+  console.assert(
+    JSON.stringify(actual) === JSON.stringify(expected),
+    "[runtime] blocker mismatch between Hub selector and advance handler",
+    { actual, expected },
+  );
+
+  if (availability.route) {
+    const routeKey = availability.route.key;
+    const knownRoute = routeKey === "Start" || routeKey === "CreateCoach" || routeKey === "CoachBackground" || routeKey === "Interviews" || routeKey === "OpeningInterview" || routeKey === "Offers" || routeKey === "HireCoordinators" || routeKey === "StaffMeeting" || routeKey === "Hub" || routeKey === "StaffTree" || routeKey === "HireMarket" || routeKey === "CandidateDetail" || routeKey === "PhoneInbox" || routeKey === "PhoneThread" || routeKey === "FreeAgency" || routeKey === "Roster";
+    console.assert(knownRoute, "[runtime] unknown route key for advance blocker CTA", availability.route);
+  }
+}
+
+function runBootAdvanceSelfCheck(save: SaveData | null): void {
+  if (!import.meta.env.DEV || !save) return;
+  const availability = getAdvanceAvailability(save);
+  const before = save.gameState.time;
+  const blockerRoute = availability.route?.key;
+  console.log("[runtime] advance self-check", {
+    phase: save.gameState.phase,
+    season: before.season,
+    week: before.week,
+    dayIndex: before.dayIndex,
+    canAdvance: availability.canAdvance,
+    blockerMessage: availability.message,
+    blockerRoute,
+  });
+
+  if (availability.canAdvance) {
+    const result = advanceDay(save.gameState);
+    console.assert(result.ok, "[runtime] self-check expected ADVANCE_WEEK to succeed when canAdvance is true");
+    if (result.ok) {
+      const after = result.gameState.time;
+      const changed = after.season !== before.season || after.week !== before.week || after.dayIndex !== before.dayIndex;
+      console.assert(changed, "[runtime] self-check expected time to change after advance");
+    }
+  }
+}
+
 function openingState(): UIState["ui"]["opening"] {
   return {
     coachName: "",
@@ -486,6 +539,8 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
     corruptedSave: corrupted,
     ui: { activeModal: null, notifications: [], opening: openingState() },
   };
+
+  runBootAdvanceSelfCheck(state.save);
 
   let writeTimer: number | null = null;
   const scheduleSave = () => {
@@ -1334,6 +1389,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "ADVANCE_WEEK": {
+          assertAdvanceRoutingInvariant(state.save);
           const availability = getAdvanceAvailability(state.save);
           if (!availability.canAdvance) {
             openAdvanceBlockedModal(availability);

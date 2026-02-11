@@ -297,7 +297,16 @@ export function StaffMeetingScreen({ ui }: ScreenProps) {
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Staff Meeting</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 12 }}>
-        <div>Staff Meeting is disabled for now.</div>
+        <div>Submit offseason priorities to clear the advance blocker.</div>
+        <button
+          type="button"
+          onClick={() => ui.dispatch({
+            type: "SUBMIT_STAFF_MEETING",
+            payload: { priorities: [], resignTargets: [], shopTargets: [], tradeNotes: "" },
+          })}
+        >
+          Submit Priorities
+        </button>
         <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub" } })}>Back to Hub</button>
       </div>
     </div>
