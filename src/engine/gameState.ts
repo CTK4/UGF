@@ -95,6 +95,7 @@ export type PlayerContractRow = {
   salary: number;
   teamKey: string | null;
   contractStatus: "ACTIVE" | "FREE_AGENT";
+  needsResign?: boolean;
 };
 
 export type PlayerContractState = {

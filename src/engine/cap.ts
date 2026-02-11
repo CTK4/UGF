@@ -1,6 +1,8 @@
+import { getSalaryCap } from "@/data/leagueDb";
+
 import type { LeaguePlayer } from "@/engine/gameState";
 
-export const DEFAULT_SALARY_CAP = 200_000_000;
+export const DEFAULT_SALARY_CAP = getSalaryCap();
 
 export function sumCapByTeam(playersById: Record<string, LeaguePlayer>): Record<string, number> {
   const capUsedByTeam: Record<string, number> = {};

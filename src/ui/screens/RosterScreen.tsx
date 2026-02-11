@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { ScreenProps } from "@/ui/types";
 import { sanitizeForbiddenName } from "@/services/rosterImport";
+import { getPlayers } from "@/data/leagueDb";
 
 type PositionFilter = "ALL" | "QB" | "RB" | "WR" | "TE" | "OL" | "DL" | "LB" | "DB" | "ST";
 
@@ -38,6 +39,7 @@ export function RosterScreen({ ui }: ScreenProps) {
   }
 
   const players = Object.values(save.gameState.roster?.players ?? {});
+  const pendingById = new Set(getPlayers().filter((p) => String(p.status ?? "").toUpperCase() === "PENDING_FREE_AGENT").map((p) => String(p.playerId)));
   const warning = save.gameState.roster?.warning;
   const cap = save.gameState.cap;
 
@@ -75,7 +77,7 @@ export function RosterScreen({ ui }: ScreenProps) {
           <div key={player.id} className="ugf-card">
             <div className="ugf-card__body" style={{ display: "grid", gridTemplateColumns: "1.5fr repeat(7, minmax(70px, 1fr)) 120px", gap: 8, alignItems: "center" }}>
               <div>
-                <b>{sanitizeForbiddenName(player.name)}</b>
+                <b>{sanitizeForbiddenName(player.name)}{pendingById.has(player.id) ? " (Pending FA)" : ""}</b>
                 {player.status === "RELEASED" ? <span className="ugf-pill" style={{ marginLeft: 8 }}>Released</span> : null}
               </div>
               <div>{player.pos}</div>

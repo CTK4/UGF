@@ -1,5 +1,5 @@
 import draftClassRaw from "@/data/generated/draftClass.json";
-import rostersRaw from "@/data/generated/rosters.json";
+import { getRosterRows } from "@/data/generatedData";
 import type { GameState } from "@/engine/gameState";
 
 export type ScoutingAction = { positions: string[] };
@@ -8,7 +8,7 @@ type DraftProspectRow = { "Player ID"?: string | number; Name?: string; POS?: st
 type RosterRow = { Team?: string; PositionGroup?: string; Rating?: number };
 
 const draftRows = draftClassRaw as DraftProspectRow[];
-const rosterRows = rostersRaw as RosterRow[];
+const rosterRows = getRosterRows() as unknown as RosterRow[];
 
 function normalizeKey(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");

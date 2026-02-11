@@ -1,7 +1,9 @@
+import { getRosterRows } from "@/data/generatedData";
+import { getSalaryCap } from "@/data/leagueDb";
 import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
 
-export const ROSTER_CAP_LIMIT = 255_000_000;
+export const ROSTER_CAP_LIMIT = getSalaryCap();
 
 export type RosterPlayerStatus = "ACTIVE" | "RELEASED";
 
@@ -44,41 +46,11 @@ function firstNumber(row: GenericRow, keys: string[]): number {
   return 0;
 }
 
-function parseRosterRows(payload: unknown): GenericRow[] {
-  if (Array.isArray(payload)) {
-    return payload.filter((row): row is GenericRow => typeof row === "object" && row !== null);
-  }
-  if (payload && typeof payload === "object") {
-    const obj = payload as Record<string, unknown>;
-    if (Array.isArray(obj.rows)) {
-      return obj.rows.filter((row): row is GenericRow => typeof row === "object" && row !== null);
-    }
-    if (Array.isArray(obj.players)) {
-      return obj.players.filter((row): row is GenericRow => typeof row === "object" && row !== null);
-    }
-  }
-  return [];
-}
-
 export async function loadRosterPlayersForTeam(teamLookup: string): Promise<{ players: RosterPlayerRecord[]; warning?: string }> {
   const resolvedTeamKey = resolveTeamKey(teamLookup);
-  const rosterRes = await fetch("/rosters");
-  if (!rosterRes.ok) {
-    const warning = `Roster data is unavailable (${rosterRes.status}).`;
-    if (import.meta.env.DEV) {
-      console.warn("[rosterAdapter] Failed to load /rosters", { status: rosterRes.status });
-    }
-    return { players: [], warning };
-  }
-
-  const raw = (await rosterRes.json()) as unknown;
-  const rows = parseRosterRows(raw);
+  const rows = getRosterRows() as GenericRow[];
   if (!rows.length) {
-    const warning = "Roster source loaded but no rows were found.";
-    if (import.meta.env.DEV) {
-      console.warn("[rosterAdapter] Parsed zero rows from /rosters.");
-    }
-    return { players: [], warning };
+    return { players: [], warning: "LeagueDB roster source has no rows." };
   }
 
   const teamRows = rows.filter((row) => {
@@ -88,12 +60,7 @@ export async function loadRosterPlayersForTeam(teamLookup: string): Promise<{ pl
   });
 
   if (!teamRows.length) {
-    const warning = `No roster rows matched team ${resolvedTeamKey}.`;
-    if (import.meta.env.DEV) {
-      const sampleTeams = rows.slice(0, 8).map((row) => firstString(row, ["Team", "team", "TeamName"]));
-      console.warn("[rosterAdapter] Team match failed.", { teamLookup, resolvedTeamKey, sampleTeams });
-    }
-    return { players: [], warning };
+    return { players: [], warning: `No roster rows matched team ${resolvedTeamKey}.` };
   }
 
   const players = teamRows.map((row, index): RosterPlayerRecord => {
