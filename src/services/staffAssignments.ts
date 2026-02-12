@@ -68,7 +68,7 @@ export function buildStaffAssignmentsForTeam(teamId: string | number, seed: numb
     byRole.get(role)?.push(r);
   }
 
-  const want: StaffRole[] = ["OC", "DC", "STC", "QB", "RB", "WR", "OL", "DL", "LB", "DB", "ASST"];
+  const want: StaffRole[] = ["OC", "DC", "STC", "QB", "WRRB", "OL", "DL", "LB", "DB"];
 
   const out: StaffAssignments = {};
   for (const role of want) {
@@ -76,6 +76,11 @@ export function buildStaffAssignmentsForTeam(teamId: string | number, seed: numb
     if (!pick) continue;
     out[role] = assignmentFromRow(role, pick);
   }
+
+  // ASST is generic; if you don't generate explicit ASST rows, keep it empty.
+  // If you *do* have explicit ASST rows, you can enable this:
+  // const asstPick = pickBest(byRole.get("ASST") ?? [], seed + 999);
+  // if (asstPick) out["ASST"] = assignmentFromRow("ASST", asstPick);
 
   return out;
 }
