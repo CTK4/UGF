@@ -92,6 +92,13 @@ export function CreateCoachScreen({ ui }: ScreenProps) {
   return (
     <div className="ugf-card">
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+        <select
+          value={opening.openingPath}
+          onChange={(e) => ui.dispatch({ type: "SET_OPENING_PATH", openingPath: e.target.value })}
+        >
+          <option value="FIXED_TRIAD">Story Start (Birmingham / Milwaukee / Atlanta)</option>
+          <option value="DYNAMIC">Dynamic Start (tiers + hometown)</option>
+        </select>
         <input
           value={opening.coachName}
           placeholder="Coach name"
