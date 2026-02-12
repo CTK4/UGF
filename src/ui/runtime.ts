@@ -77,7 +77,7 @@ function ensureCharacterRegistryState(gameState: GameState): Pick<GameState, "ch
     leagueSeed: gameState.world?.leagueSeed ?? gameState.time.season,
     coachName: gameState.coach.name || "You",
     coachAge: gameState.coach.age ?? 35,
-    coachPersonality: gameState.coach.personalityBaseline || "Balanced",
+    coachPersonality: gameState.coach.personalityBaseline || "Assertive Leader",
     userTeamKey: teamKey,
   });
   return {
@@ -361,8 +361,8 @@ function openingState(): UIState["ui"]["opening"] {
     openingPath: "FIXED_TRIAD",
     coachName: "",
     coachAge: 35,
-    coachPersonality: "Balanced",
-    background: "Former QB",
+    coachPersonality: "Assertive Leader",
+    background: "Offensive Coordinator → Head Coach",
     hometownId: "",
     hometownLabel: "",
     hometownTeamKey: "",
@@ -1108,10 +1108,10 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachName: String(action.coachName ?? "") } } });
           return;
         case "SET_COACH_AGE":
-          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachAge: Math.max(24, Math.min(85, Number(action.coachAge ?? 35) || 35)) } } });
+          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachAge: Math.max(30, Math.min(55, Number(action.coachAge ?? 35) || 35)) } } });
           return;
         case "SET_COACH_PERSONALITY":
-          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachPersonality: String(action.coachPersonality ?? "Balanced") } } });
+          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachPersonality: String(action.coachPersonality ?? "Assertive Leader") } } });
           return;
         case "SET_BACKGROUND":
           setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, background: String(action.background ?? "") } } });
