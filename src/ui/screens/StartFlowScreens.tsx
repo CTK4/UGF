@@ -43,8 +43,16 @@ const coordinatorCandidates = getPersonnel()
   }))
   .sort((a, b) => b.reputation - a.reputation || a.displayName.localeCompare(b.displayName) || a.personId.localeCompare(b.personId));
 
-const backgrounds = ["Former QB", "Defensive Architect", "Special Teams Ace", "CEO Program Builder"];
-const coachPersonalities = ["Balanced", "Players Coach", "Disciplinarian", "Analytics First"] as const;
+const backgrounds = [
+  "Offensive Coordinator → Head Coach",
+  "Defensive Coordinator → Head Coach",
+  "College Head Coach → Pro",
+  "Special Teams → Head Coach",
+  "Position Coach → Head Coach",
+  "Young Offensive Mind",
+] as const;
+
+const coachPersonalities = ["Assertive Leader", "Team Builder", "System Guru", "Players Coach"] as const;
 
 
 const tierLabelByCode = {
@@ -104,6 +112,14 @@ export function CreateCoachScreen({ ui }: ScreenProps) {
           placeholder="Coach name"
           onChange={(e) => ui.dispatch({ type: "SET_COACH_NAME", coachName: e.target.value })}
         />
+        <input
+          type="number"
+          min={30}
+          max={55}
+          value={opening.coachAge}
+          placeholder="Coach age"
+          onChange={(e) => ui.dispatch({ type: "SET_COACH_AGE", coachAge: Number(e.target.value) })}
+        />
         <select value={opening.coachAge} onChange={(e) => ui.dispatch({ type: "SET_COACH_AGE", coachAge: Number(e.target.value) })}>
           {Array.from({ length: 85 - 24 + 1 }, (_, i) => 24 + i).map((age) => (
             <option key={age} value={age}>{age}</option>
@@ -138,7 +154,24 @@ export function CreateCoachScreen({ ui }: ScreenProps) {
 
 export function CoachBackgroundScreen({ ui }: ScreenProps) {
   const selected = ui.getState().ui.opening.background;
-  return <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>{backgrounds.map((b) => <button key={b} type="button" onClick={() => ui.dispatch({ type: "SET_BACKGROUND", background: b })}>{selected === b ? "✓ " : ""}{b}</button>)}<button type="button" onClick={() => ui.dispatch({ type: "RUN_INTERVIEWS" })}>Continue to Invitations</button></div></div>;
+  return <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>{backgrounds.map((b) => <button key={b} type="button" onClick={() => ui.dispatch({ type: "SET_BACKGROUND", background: b })}>{selected === b ? "✓ " : ""}{b}</button>)}<button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CoachPersonality" } })}>Continue to Personality</button></div></div>;
+}
+
+export function CoachPersonalityScreen({ ui }: ScreenProps) {
+  const selected = ui.getState().ui.opening.coachPersonality;
+  return (
+    <div className="ugf-card">
+      <div className="ugf-card__header"><h2 className="ugf-card__title">Coaching Personality</h2></div>
+      <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+        {coachPersonalities.map((personality) => (
+          <button key={personality} type="button" onClick={() => ui.dispatch({ type: "SET_COACH_PERSONALITY", coachPersonality: personality })}>
+            {selected === personality ? "✓ " : ""}{personality}
+          </button>
+        ))}
+        <button type="button" onClick={() => ui.dispatch({ type: "RUN_INTERVIEWS" })}>Continue to Invitations</button>
+      </div>
+    </div>
+  );
 }
 
 export function InterviewsScreen({ ui }: ScreenProps) {
