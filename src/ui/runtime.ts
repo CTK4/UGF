@@ -2069,7 +2069,12 @@ function candidateFromFreeAgent(role: StaffRole, fa: CoachFreeAgent, leagueSeed:
 }
 
 function candidatesForRoleFromFreeAgents(role: StaffRole, leagueSeed: number): ReturnType<typeof createCandidate>[] {
-  const raw = FREE_AGENTS_CACHE.filter((fa) => uiRolesForFreeAgentRole(fa.role).includes(role));
+  // ASST is a generic opening: can be filled by any FA coach (non-HC).
+  const raw =
+    role === "ASST"
+      ? FREE_AGENTS_CACHE.filter((fa) => fa.role !== "HC")
+      : FREE_AGENTS_CACHE.filter((fa) => fa.role === role);
+
   const mapped = raw.map((fa) => candidateFromFreeAgent(role, fa, leagueSeed));
   mapped.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
   return mapped;

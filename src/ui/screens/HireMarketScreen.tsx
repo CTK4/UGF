@@ -7,7 +7,7 @@ type Group = "COORD" | "POS";
 type SortMode = "RATING" | "VALUE";
 
 const COORD_ROLES = ["OC", "DC", "STC"] as const;
-const POS_ROLES = ["QB", "RB", "WR", "OL", "DL", "LB", "DB", "ASST"] as const;
+const POS_ROLES = ["QB", "WRRB", "OL", "DL", "LB", "DB", "ASST"] as const;
 
 function isCoordRole(role: string): role is (typeof COORD_ROLES)[number] {
   return (COORD_ROLES as readonly string[]).includes(role);

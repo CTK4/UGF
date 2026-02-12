@@ -12,8 +12,7 @@ export type StaffRole =
   | "DC"
   | "STC"
   | "QB"
-  | "RB"
-  | "WR"
+  | "WRRB"
   | "OL"
   | "DL"
   | "LB"
@@ -53,18 +52,32 @@ export function normalizeStaffRole(raw: string): StaffRole | null {
   const r = String(raw ?? "").trim().toLowerCase();
   if (!r) return null;
 
+  // Combined WR/RB
+  // Your LeagueDB uses: "WR_RB_COACH"
+  if (
+    r === "wr_rb_coach" ||
+    r === "wrrb" ||
+    r.includes("wr/rb") ||
+    r.includes("wr_rb") ||
+    (r.includes("wide receiver") && r.includes("running back"))
+  ) return "WRRB";
+
+  // Coordinators
   if (r === "oc" || r.includes("offensive coordinator")) return "OC";
   if (r === "dc" || r.includes("defensive coordinator")) return "DC";
   if (r === "stc" || r.includes("special teams")) return "STC";
 
-  if (r === "qb" || r.includes("qb")) return "QB";
-  if (r === "rb" || r.includes("rb")) return "RB";
-  if (r === "wr" || r.includes("wr")) return "WR";
-  if (r === "ol" || r.includes("ol")) return "OL";
-  if (r === "dl" || r.includes("dl")) return "DL";
-  if (r === "lb" || r.includes("lb")) return "LB";
-  if (r === "db" || r.includes("db")) return "DB";
+  // Position coaches (handle "QB Coach", "Quarterbacks Coach", etc.)
+  if (r === "qb" || r.includes("qb coach") || r.includes("quarterback")) return "QB";
+  // RB/WR map into WRRB now
+  if (r === "rb" || r.includes("rb coach") || r.includes("running back")) return "WRRB";
+  if (r === "wr" || r.includes("wr coach") || r.includes("wide receiver")) return "WRRB";
+  if (r === "ol" || r.includes("ol coach") || r.includes("offensive line")) return "OL";
+  if (r === "dl" || r.includes("dl coach") || r.includes("defensive line")) return "DL";
+  if (r === "lb" || r.includes("lb coach") || r.includes("lineback")) return "LB";
+  if (r === "db" || r.includes("db coach") || r.includes("defensive back") || r.includes("secondary")) return "DB";
 
+  // Misc
   if (r === "hc" || r.includes("head coach")) return "HC";
   if (r === "asst" || r.includes("assistant")) return "ASST";
 
