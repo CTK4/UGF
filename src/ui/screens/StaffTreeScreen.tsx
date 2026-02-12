@@ -1,5 +1,5 @@
 import React from "react";
-import { STAFF_ROLE_LABELS, STAFF_ROLES, type StaffRole } from "@/domain/staffRoles";
+import { HIREABLE_STAFF_ROLES, STAFF_ROLE_LABELS, type HireableStaffRole } from "@/domain/staffRoles";
 import type { ScreenProps } from "@/ui/types";
 
 function axesText(axes: Array<"SCHEME" | "ASSISTANTS"> = []): string {
@@ -16,6 +16,11 @@ export function StaffTreeScreen({ ui }: ScreenProps) {
   if (!save) return null;
   const assignments = save.gameState.staff.assignments;
   const control = save.gameState.career.control;
+  const coachId = save.gameState.characters?.coachId;
+  const coachName =
+    coachId && save.gameState.characters?.byId?.[coachId]
+      ? save.gameState.characters.byId[coachId].fullName
+      : "You";
 
   const rows: Array<{ side: "offense" | "defense" | "specialTeams"; label: string }> = [
     { side: "offense", label: "Offense" },
@@ -27,6 +32,9 @@ export function StaffTreeScreen({ ui }: ScreenProps) {
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Staff Tree</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+          <div><b>Head Coach:</b> {coachName}</div>
+        </div>
         <div className="ugf-pill">Budget: ${save.gameState.staff.budgetUsed.toLocaleString()} / ${save.gameState.staff.budgetTotal.toLocaleString()}</div>
 
         <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
@@ -62,7 +70,7 @@ export function StaffTreeScreen({ ui }: ScreenProps) {
           })}
         </div></div>
 
-        {(STAFF_ROLES as StaffRole[]).map((role) => {
+        {(HIREABLE_STAFF_ROLES as HireableStaffRole[]).map((role) => {
           const assignment = assignments[role];
           return (
             <div key={role} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
