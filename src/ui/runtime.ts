@@ -17,7 +17,7 @@ import { normalizeExcelTeamKey } from "@/data/teamMap";
 import { deriveOfferTerms } from "@/engine/offers";
 import { FRANCHISES, resolveFranchiseLike } from "@/ui/data/franchises";
 import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
-import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, SaveData, UIAction, UIController, UIState } from "@/ui/types";
+import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, OpeningPath, SaveData, UIAction, UIController, UIState } from "@/ui/types";
 import { getLeagueDbHash, loadLeagueRosterForTeam } from "@/services/rosterImport";
 import { validateLeagueDb } from "@/services/validateLeagueDb";
 import { getCurrentSeason, getTeamSummaryProjectionRows } from "@/data/leagueDb";
@@ -358,6 +358,7 @@ function createLeagueInvalidAdvanceModal(errors: string[]) {
 
 function openingState(): UIState["ui"]["opening"] {
   return {
+    openingPath: "FIXED_TRIAD",
     coachName: "",
     coachAge: 35,
     coachPersonality: "Balanced",
@@ -618,6 +619,45 @@ function generateInterviewInvites(hometownTeamKey: string, leagueSeed: number): 
   }
 
   return invites.slice(0, 3);
+}
+
+const FIXED_TRIAD: Array<{ teamKey: string; tier: InterviewInviteTier }> = [
+  { teamKey: "BIRMINGHAM_VULCANS", tier: "CONTENDER" },
+  { teamKey: "MILWAUKEE_NORTHSHORE", tier: "REBUILD" },
+  { teamKey: "ATLANTA_APEX", tier: "FRINGE" },
+];
+
+function generateFixedTriadInvitesWithFallback(
+  leagueSeed: number,
+  fallbackHometownTeamKey: string,
+): { invites: InterviewInvite[]; usedFallback: boolean } {
+  try {
+    const metricsByTeamKey = buildTeamInviteMetricsByTeamKey(leagueSeed);
+
+    const invites: InterviewInvite[] = FIXED_TRIAD.map(({ teamKey, tier }) => {
+      const franchiseId = resolveTeamKey(teamKey);
+      const metrics = metricsByTeamKey.get(franchiseId);
+      if (!metrics) throw new Error(`Missing metrics for fixed triad team: ${franchiseId}`);
+
+      return {
+        franchiseId,
+        tier,
+        overall: metrics.overall ?? 0,
+        summaryLine: buildSummaryLine(franchiseId, tier, metrics.capSpace ?? null),
+      };
+    });
+
+    const uniq = new Map(invites.map((invite) => [invite.franchiseId, invite]));
+    if (uniq.size !== invites.length) throw new Error("Duplicate fixed triad franchiseId");
+
+    return { invites, usedFallback: false };
+  } catch (err) {
+    console.warn("[runtime] fixed triad generation failed; falling back to dynamic invites", err);
+    return {
+      invites: generateInterviewInvites(fallbackHometownTeamKey, leagueSeed),
+      usedFallback: true,
+    };
+  }
 }
 
 function createInitialInterviewResult(franchiseId: string): InterviewResult {
@@ -1058,6 +1098,12 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             }
           }
           return;
+        case "SET_OPENING_PATH": {
+          const openingPath = String(action.openingPath ?? "") as OpeningPath;
+          const safe: OpeningPath = openingPath === "DYNAMIC" ? "DYNAMIC" : "FIXED_TRIAD";
+          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, openingPath: safe } } });
+          return;
+        }
         case "SET_COACH_NAME":
           setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachName: String(action.coachName ?? "") } } });
           return;
@@ -1089,7 +1135,15 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "RUN_INTERVIEWS": {
-          const interviewInvites = generateInterviewInvites(state.ui.opening.hometownTeamKey, state.ui.opening.leagueSeed);
+          const opening = state.ui.opening;
+
+          const { invites, usedFallback } =
+            opening.openingPath === "FIXED_TRIAD"
+              ? generateFixedTriadInvitesWithFallback(opening.leagueSeed, opening.hometownTeamKey)
+              : { invites: generateInterviewInvites(opening.hometownTeamKey, opening.leagueSeed), usedFallback: false };
+
+          const interviewInvites = invites;
+
           const interviewResults = Object.fromEntries(
             interviewInvites.map((invite) => [
               invite.franchiseId,
@@ -1104,16 +1158,17 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               } satisfies OpeningInterviewResult,
             ]),
           );
+
           setState({
             ...state,
             ui: {
               ...state.ui,
               opening: {
-                ...state.ui.opening,
+                ...opening,
                 interviewInvites,
                 interviewResults,
                 offers: [],
-                lastOfferError: undefined,
+                lastOfferError: usedFallback ? "Fixed triad unavailable; using dynamic invites." : undefined,
                 lastInterviewError: undefined,
               },
             },

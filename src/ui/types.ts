@@ -9,6 +9,8 @@ export type SaveData = {
 
 export type InterviewInviteTier = "REBUILD" | "FRINGE" | "CONTENDER";
 
+export type OpeningPath = "FIXED_TRIAD" | "DYNAMIC";
+
 export type InterviewInvite = {
   franchiseId: string;
   tier: InterviewInviteTier;
@@ -42,6 +44,7 @@ export type UIState = {
     activeModal: ModalState | null;
     notifications: string[];
     opening: {
+      openingPath: OpeningPath;
       coachName: string;
       coachAge: number;
       coachPersonality: string;
