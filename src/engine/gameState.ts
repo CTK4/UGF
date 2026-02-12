@@ -1,6 +1,19 @@
 import type { StaffRole } from "@/domain/staffRoles";
 
-export type GamePhase = "PRECAREER" | "INTERVIEWS" | "COORD_HIRING" | "JANUARY_OFFSEASON";
+/**
+ * The phase of the game loop. The MVV requires us to progress from
+ * offseason into a playable regular season. To support a regular
+ * season loop, we introduce a new `REGULAR_SEASON` phase. When
+ * entering this phase the schedule is generated and the user can
+ * simulate games. Additional phases (e.g. postseason) can be added
+ * later.
+ */
+export type GamePhase =
+  | "PRECAREER"
+  | "INTERVIEWS"
+  | "COORD_HIRING"
+  | "JANUARY_OFFSEASON"
+  | "REGULAR_SEASON";
 export type Role = StaffRole;
 
 
@@ -210,6 +223,26 @@ export type GameState = {
   };
   completedGates: string[];
   lastUiError: string | null;
+
+  /**
+   * Regular season schedule and record. When the phase is
+   * REGULAR_SEASON this field is populated with an array of games
+   * (opponent team keys, whether the game is at home, and the result)
+   * and an aggregate record. Each game has a unique ID for
+   * referencing in UI and simulation. If undefined then a season has
+   * not yet been scheduled.
+   */
+  seasonSchedule?: {
+    games: {
+      id: string;
+      week: number;
+      opponentKey: string;
+      home: boolean;
+      played: boolean;
+      result: "W" | "L" | null;
+    }[];
+    record: { wins: number; losses: number };
+  };
 };
 
 export type CharacterRole = "COACH" | "OWNER" | "GM" | "PLAYER";
