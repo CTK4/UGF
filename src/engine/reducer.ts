@@ -3,6 +3,7 @@ import type { GameAction } from "@/engine/actions";
 import type { GamePhase, GameState, Role } from "@/engine/gameState";
 import { applyScoutingAction } from "@/engine/scouting";
 import { DEFAULT_SALARY_CAP, sumCapByTeam } from "@/engine/cap";
+import { mulberry32 } from "@/services/rng";
 
 function createDefaultSideControl() {
   return { schemeAuthority: 50, assistantsAuthority: 50, locked: false };
@@ -22,6 +23,8 @@ function phaseLabel(phase: GamePhase): string {
       return "Coordinator Hiring";
     case "JANUARY_OFFSEASON":
       return "January Offseason";
+    case "REGULAR_SEASON":
+      return "Regular Season";
   }
 }
 
@@ -105,6 +108,7 @@ export function createNewGameState(): GameState {
     cap: createEmptyCapState(),
     completedGates: [],
     lastUiError: null,
+    seasonSchedule: undefined,
   };
 }
 
@@ -269,6 +273,101 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
         lastUiError: null,
       };
     }
+
+
+    /**
+     * Transition into the regular season. This action should be dispatched
+     * once all January tasks are complete. It generates a simple 17-game
+     * schedule using a deterministic RNG seeded by the league seed and
+     * assigns an empty win/loss record. The phase and time counters
+     * are reset to the start of week 1. Existing offseason tasks are
+     * cleared.
+     */
+    case "ENTER_REGULAR_SEASON": {
+      const userTeamKey = prev.franchise.ugfTeamKey || prev.franchise.excelTeamKey;
+      const teamsById = prev.league.teamsById || {};
+      const seed = prev.world?.leagueSeed ?? prev.time.season;
+      const rng = mulberry32(seed);
+      const teamKeys = Object.keys(teamsById).filter((k) => k && k !== userTeamKey);
+      const shuffled = rng.shuffle(teamKeys);
+      const games = [] as {
+        id: string;
+        week: number;
+        opponentKey: string;
+        home: boolean;
+        played: boolean;
+        result: "W" | "L" | null;
+      }[];
+      const count = Math.min(shuffled.length, 17);
+      for (let i = 0; i < count; i += 1) {
+        const opp = shuffled[i];
+        games.push({
+          id: `game-${i + 1}`,
+          week: i + 1,
+          opponentKey: opp,
+          home: rng.next() > 0.5,
+          played: false,
+          result: null,
+        });
+      }
+      return {
+        ...prev,
+        phase: "REGULAR_SEASON",
+        time: {
+          ...prev.time,
+          week: 1,
+          dayIndex: 0,
+          phaseVersion: prev.time.phaseVersion + 1,
+          label: phaseLabel("REGULAR_SEASON"),
+        },
+        checkpoints: [...prev.checkpoints, { ts: Date.now(), label: phaseLabel("REGULAR_SEASON"), week: 1, phaseVersion: prev.time.phaseVersion + 1 }],
+        tasks: [],
+        seasonSchedule: { games, record: { wins: 0, losses: 0 } },
+      };
+    }
+
+    /**
+     * Simulate the next unplayed game on the regular season schedule.
+     * A deterministic RNG seeded by the league seed and week decides
+     * whether the team wins (>0.5) or loses. The record and current
+     * week advance accordingly. When all games are played no further
+     * changes occur.
+     */
+    case "SIMULATE_GAME": {
+      if (prev.phase !== "REGULAR_SEASON" || !prev.seasonSchedule) {
+        return prev;
+      }
+      const schedule = prev.seasonSchedule;
+      const nextGame = schedule.games.find((g) => !g.played);
+      if (!nextGame) return prev;
+      const weekIndex = nextGame.week;
+      const rng = mulberry32((prev.world?.leagueSeed ?? prev.time.season) + weekIndex);
+      const win = rng.next() > 0.5;
+      const newGames = schedule.games.map((g) =>
+        g.id === nextGame.id ? { ...g, played: true, result: win ? "W" : "L" } : g,
+      );
+      const record = {
+        wins: schedule.record.wins + (win ? 1 : 0),
+        losses: schedule.record.losses + (win ? 0 : 1),
+      };
+      const newWeek = prev.time.week + 1;
+      const newPhaseVersion = prev.time.phaseVersion + 1;
+      const label = `Week ${newWeek}`;
+      return {
+        ...prev,
+        seasonSchedule: { games: newGames, record },
+        time: {
+          ...prev.time,
+          week: newWeek,
+          dayIndex: 0,
+          phaseVersion: newPhaseVersion,
+          label,
+        },
+        checkpoints: [...prev.checkpoints, { ts: Date.now(), label, week: newWeek, phaseVersion: newPhaseVersion }],
+        lastUiError: null,
+      };
+    }
+
     default:
       return prev;
   }

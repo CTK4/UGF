@@ -98,8 +98,17 @@ export function HubScreen({ ui }: ScreenProps) {
     <div className="ugf-card">
       <div className="ugf-card__header"><h2 className="ugf-card__title">Hub</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
-        <div className="ugf-pill">Season {gs.time.season} · January Week {gs.time.week} · {getJanuaryDayLabel(gs.time.dayIndex)}</div>
-        <div className="ugf-pill">Phase: January Offseason</div>
+        {gs.phase === "REGULAR_SEASON" ? (
+          <>
+            <div className="ugf-pill">Season {gs.time.season} · Week {gs.time.week}</div>
+            <div className="ugf-pill">Phase: Regular Season</div>
+          </>
+        ) : (
+          <>
+            <div className="ugf-pill">Season {gs.time.season} · January Week {gs.time.week} · {getJanuaryDayLabel(gs.time.dayIndex)}</div>
+            <div className="ugf-pill">Phase: January Offseason</div>
+          </>
+        )}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <span className="ugf-pill">Offense: {gs.delegation.offenseControl}</span>
           <span className="ugf-pill">Defense: {gs.delegation.defenseControl}</span>
@@ -144,6 +153,30 @@ export function HubScreen({ ui }: ScreenProps) {
         />
 
         <div className="ugf-pill">Cap Used: {money(capUsed)} / {money(gs.league.cap.salaryCap)} · Cap Space: <b>{money(capSpace)}</b></div>
+        {gs.phase === "REGULAR_SEASON" && gs.seasonSchedule ? (
+          <div className="ugf-card">
+            <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
+              <b>Regular Season Schedule</b>
+              <div>Record: {gs.seasonSchedule.record.wins} – {gs.seasonSchedule.record.losses}</div>
+              {gs.seasonSchedule.games.map((game) => (
+                <div key={game.id} className="ugf-card">
+                  <div className="ugf-card__body" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>
+                      Week {game.week}: {resolveTeamKey(game.opponentKey) || game.opponentKey}
+                    </span>
+                    <span>
+                      {game.played ? (
+                        <span>{game.result === "W" ? "Win" : "Loss"}</span>
+                      ) : (
+                        <button onClick={() => ui.dispatch({ type: "SIMULATE_GAME" })}>Play</button>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Roster" } })}>Open Roster</button>
           <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "FreeAgency" } })}>Open Free Agency</button>
@@ -196,7 +229,8 @@ export function HubScreen({ ui }: ScreenProps) {
 
         {hubTab !== "summary" ? null : (
           <>
-
+            {gs.phase !== "REGULAR_SEASON" && (
+              <>
         <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
           <b>January Calendar</b>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(36px, 1fr))", gap: 6 }}>
@@ -246,6 +280,8 @@ export function HubScreen({ ui }: ScreenProps) {
             </div>
           ))}
         </div></div>
+              </>
+            )}
 
         <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
           <b>Standings Snapshot</b>

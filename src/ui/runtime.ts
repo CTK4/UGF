@@ -1497,7 +1497,49 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             const assignment: StaffAssignment = { candidateId: `${role}-${pick}`, coachName: pick, salary: 1_200_000, years: 3, hiredWeek: nowWeek };
             gameState = reduceGameState(gameState, gameActions.hireCoach(role, assignment));
           });
+          // Enter January Offseason to trigger initial calendar generation
           gameState = reduceGameState(gameState, gameActions.enterJanuaryOffseason());
+
+          /**
+           * Build a unified character registry for the new save. The MVV
+           * requires that the user-controlled coach, owners and GMs all live
+           * inside a single `characters.byId` map. Without this registry
+           * successive systems (e.g. reputation, media, hiring) cannot look
+           * up characters consistently. We derive the registry here rather
+           * than on first load so that the save persists proper IDs on
+           * initial creation.
+           */
+          try {
+            const userTeamKey = gameState.franchise.ugfTeamKey || gameState.franchise.excelTeamKey;
+            if (userTeamKey) {
+              const registry = buildCharacterRegistry({
+                leagueSeed: gameState.world?.leagueSeed ?? gameState.time.season,
+                coachName: gameState.coach.name || "You",
+                coachAge: gameState.coach.age ?? 35,
+                coachPersonality: gameState.coach.personalityBaseline || "Balanced",
+                userTeamKey,
+              });
+              gameState = {
+                ...gameState,
+                characters: {
+                  byId: registry.byId,
+                  coachId: registry.coachId,
+                  ownersByTeamKey: registry.ownersByTeamKey,
+                  gmsByTeamKey: registry.gmsByTeamKey,
+                },
+                teamFrontOffice: registry.teamFrontOffice,
+              };
+            }
+          } catch (err) {
+            if (import.meta.env.DEV) {
+              console.error("[runtime] Failed to build character registry", err);
+            }
+          }
+
+          // Rebuild derived league mappings (rosters and cap usage) now that all
+          // roster players have been hydrated. This must happen after any
+          // modifications to the league data because derived maps depend on
+          // playersById.
           const finalizedDerivedLeague = rebuildLeagueDerivedMaps(gameState.league.playersById ?? {});
           gameState = {
             ...gameState,
@@ -1819,25 +1861,32 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           }
 
           const derivedLeagueState = rebuildLeagueDerivedMaps(result.gameState.league.playersById ?? {});
-          const nextSave = {
-            version: 1 as const,
-            gameState: {
-              ...result.gameState,
-              world: {
-                ...result.gameState.world,
-                leagueDbVersion: "v1",
-                leagueDbHash: getLeagueDbHash(),
-              },
-              league: {
-                ...result.gameState.league,
-                teamRosters: derivedLeagueState.teamRosters,
-                cap: {
-                  salaryCap: Number(result.gameState.league.cap?.salaryCap ?? DEFAULT_SALARY_CAP),
-                  capUsedByTeam: derivedLeagueState.cap.capUsedByTeam,
-                },
+          // Rebuild the game state with derived league information
+          let nextGameState: GameState = {
+            ...result.gameState,
+            world: {
+              ...result.gameState.world,
+              leagueDbVersion: "v1",
+              leagueDbHash: getLeagueDbHash(),
+            },
+            league: {
+              ...result.gameState.league,
+              teamRosters: derivedLeagueState.teamRosters,
+              cap: {
+                salaryCap: Number(result.gameState.league.cap?.salaryCap ?? DEFAULT_SALARY_CAP),
+                capUsedByTeam: derivedLeagueState.cap.capUsedByTeam,
               },
             },
           };
+
+          // Automatically transition into the regular season once the January
+          // Offseason has progressed past week 4. This prevents the user
+          // from getting stuck after completing offseason tasks.
+          if (nextGameState.phase === "JANUARY_OFFSEASON" && nextGameState.time.week > 4) {
+            nextGameState = reduceGameState(nextGameState, gameActions.enterRegularSeason());
+          }
+
+          const nextSave = { version: 1 as const, gameState: nextGameState };
           assertCityTeamLeagueInvariants(nextSave);
           const validationModal = runLeagueValidation(nextSave);
           setState({
@@ -1845,6 +1894,37 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             save: nextSave,
             route: { key: "Hub" },
             ui: { ...state.ui, activeModal: validationModal ?? null },
+          });
+          return;
+        }
+        case "SIMULATE_GAME": {
+          // Only simulate when a save is loaded
+          if (!state.save) return;
+          const prevGameState = state.save.gameState;
+          // Dispatch the simulateGame engine action
+          const nextGameState = reduceGameState(prevGameState, gameActions.simulateGame());
+          // Persist derived league maps and update save
+          const derivedLeagueStateSim = rebuildLeagueDerivedMaps(nextGameState.league.playersById ?? {});
+          const hydratedGameState: GameState = {
+            ...nextGameState,
+            world: {
+              ...nextGameState.world,
+              leagueDbVersion: "v1",
+              leagueDbHash: getLeagueDbHash(),
+            },
+            league: {
+              ...nextGameState.league,
+              teamRosters: derivedLeagueStateSim.teamRosters,
+              cap: {
+                salaryCap: Number(nextGameState.league.cap?.salaryCap ?? DEFAULT_SALARY_CAP),
+                capUsedByTeam: derivedLeagueStateSim.cap.capUsedByTeam,
+              },
+            },
+          };
+          const saveNext = { version: 1 as const, gameState: hydratedGameState };
+          setState({
+            ...state,
+            save: saveNext,
           });
           return;
         }
