@@ -26,6 +26,10 @@ import { ROSTER_CAP_LIMIT, calculateRosterCap, loadRosterPlayersForTeam } from "
 import { buildCharacterRegistry } from "@/engine/characters";
 import { DEFAULT_SALARY_CAP, sumCapByTeam } from "@/engine/cap";
 import { clearLocalSave, loadLocalSave, persistLocalSave } from "@/domainE/persistence/localSave";
+import { loadCoachFreeAgents, type CoachFreeAgent } from "@/services/staffFreeAgents";
+import { buildLeagueCoordinatorAssignments, buildStaffAssignmentsForTeam } from "@/services/staffAssignments";
+import { buildExistingContractsIndex, createNewCoachContract, salaryForContractInSeason, type CoachContract } from "@/services/coachContracts";
+import { instantFillLeagueStaff } from "@/services/instantStaffFill";
 
 /**
  * Verification Checklist
@@ -621,8 +625,8 @@ function generateInterviewInvites(hometownTeamKey: string, leagueSeed: number): 
   return invites.slice(0, 3);
 }
 
-const FIXED_TRIAD: Array<{ teamKey: string; tier: InterviewInviteTier }> = [
-  { teamKey: "BIRMINGHAM_VULCANS", tier: "CONTENDER" },
+const FIXED_TRIAD: Array<{ teamKey: string; tier: InterviewInviteTier; legendRetiredOpening?: boolean }> = [
+  { teamKey: "BIRMINGHAM_VULCANS", tier: "CONTENDER", legendRetiredOpening: true },
   { teamKey: "MILWAUKEE_NORTHSHORE", tier: "REBUILD" },
   { teamKey: "ATLANTA_APEX", tier: "FRINGE" },
 ];
@@ -634,16 +638,18 @@ function generateFixedTriadInvitesWithFallback(
   try {
     const metricsByTeamKey = buildTeamInviteMetricsByTeamKey(leagueSeed);
 
-    const invites: InterviewInvite[] = FIXED_TRIAD.map(({ teamKey, tier }) => {
+    const invites: InterviewInvite[] = FIXED_TRIAD.map(({ teamKey, tier, legendRetiredOpening }) => {
       const franchiseId = resolveTeamKey(teamKey);
       const metrics = metricsByTeamKey.get(franchiseId);
       if (!metrics) throw new Error(`Missing metrics for fixed triad team: ${franchiseId}`);
 
+      const base = buildSummaryLine(franchiseId, tier, metrics.capSpace ?? null);
       return {
         franchiseId,
         tier,
         overall: metrics.overall ?? 0,
-        summaryLine: buildSummaryLine(franchiseId, tier, metrics.capSpace ?? null),
+        summaryLine: legendRetiredOpening ? `${base} • Legend retired opening` : base,
+        legendRetiredOpening,
       };
     });
 
@@ -764,6 +770,128 @@ function requirementForCandidateId(id: number): CandidateRequirement {
 function requirementForAssignmentId(candidateId: string): CandidateRequirement {
   const suffix = Number(String(candidateId).split("-").at(-1));
   return Number.isFinite(suffix) ? requirementForCandidateId(suffix) : {};
+}
+
+const FREE_AGENTS_CACHE: CoachFreeAgent[] = loadCoachFreeAgents();
+const EXISTING_CONTRACTS_BY_ID = buildExistingContractsIndex();
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+function seededJitter(seed: number, id: string): number {
+  let h = seed ^ 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  h >>>= 0;
+  return (h % 5) - 2;
+}
+
+function ageCurve(age: number | null): number {
+  if (!age) return 0;
+  const d = Math.abs(age - 48);
+  if (d <= 7) return 2;
+  if (d <= 14) return 0;
+  if (d <= 22) return -2;
+  return -5;
+}
+
+function deriveCoachRating(fa: CoachFreeAgent, role: StaffRole, leagueSeed: number): number {
+  const rep = Number(fa.reputation ?? 60);
+  const curve = ageCurve(fa.age ?? null);
+  const j = seededJitter(leagueSeed, `${role}:${fa.id}`);
+  return clamp(Math.round(rep + curve + j), 50, 99);
+}
+
+function salaryFor(role: StaffRole, rating: number): number {
+  const base =
+    role === "OC" || role === "DC" ? 2_200_000 :
+    role === "STC" ? 1_200_000 :
+    role === "QB" ? 950_000 :
+    role === "ASST" ? 700_000 :
+    800_000;
+  const bump = Math.round((rating - 70) * 18_000);
+  return Math.max(350_000, base + bump);
+}
+
+function candidateFromFreeAgent(role: StaffRole, fa: CoachFreeAgent, leagueSeed: number) {
+  const rating = deriveCoachRating(fa, role, leagueSeed);
+  const demand = salaryFor(role, rating);
+  return {
+    id: fa.id,
+    name: fa.name,
+    rating,
+    role,
+    primaryRole: role,
+    traits: ["Staffer"],
+    philosophy: fa.scheme ?? "Balanced",
+    fitLabel: rating >= 86 ? "Natural Fit" : rating >= 74 ? "Good Fit" : "Reach",
+    salaryDemand: demand,
+    recommendedOffer: Math.round(demand * 1.08),
+    availability: "FREE_AGENT" as const,
+    standardsNote: fa.age ? `Age ${fa.age}` : "Standard",
+    perceivedRisk: Math.max(5, Math.min(70, 95 - rating)),
+    defaultContractYears: role === "OC" || role === "DC" ? 3 : 2,
+    requirement: {},
+  };
+}
+
+function candidatesForRoleFromFreeAgents(role: StaffRole, leagueSeed: number) {
+  return FREE_AGENTS_CACHE
+    .filter((fa) => fa.role === role)
+    .map((fa) => candidateFromFreeAgent(role, fa, leagueSeed))
+    .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+}
+
+function hydrateAllTeamsCoordinators(save: SaveData) {
+  const seed = Number((save.gameState as any)?.seed ?? save.gameState.world?.leagueSeed ?? 1337);
+  const map = buildLeagueCoordinatorAssignments(seed);
+  (save.gameState as any).staff = (save.gameState as any).staff ?? {};
+  (save.gameState as any).staff.leagueAssignmentsByTeamId = map;
+}
+
+function hydrateUserTeamStaff(save: SaveData) {
+  const seed = Number((save.gameState as any)?.seed ?? save.gameState.world?.leagueSeed ?? 1337);
+  const teamId =
+    (save.gameState as any).career?.teamId ??
+    (save.gameState as any).franchiseId ??
+    (save.gameState as any).teamId ??
+    save.gameState.franchise?.excelTeamKey;
+
+  if (teamId == null) return;
+
+  const assignments = buildStaffAssignmentsForTeam(teamId, seed);
+  const staff = ((save.gameState as any).staff = (save.gameState as any).staff ?? {});
+  staff.assignments = { ...(staff.assignments ?? {}), ...assignments };
+}
+
+function recomputeStaffBudgetUsed(save: SaveData) {
+  const season = Number(save.gameState.time?.season ?? 2026);
+  const staff = (save.gameState as any).staff;
+  if (!staff) return;
+
+  const assignments = staff.assignments ?? {};
+  const runtimeContracts: Record<string, CoachContract> = staff.coachContractsById ?? {};
+
+  let used = 0;
+  for (const a of Object.values(assignments) as any[]) {
+    if (!a) continue;
+    const contractId = String(a.contractId ?? a.coachContractId ?? "");
+    if (!contractId) continue;
+
+    const runtime = runtimeContracts[contractId];
+    if (runtime) {
+      used += salaryForContractInSeason(runtime, season);
+      continue;
+    }
+
+    const existing = EXISTING_CONTRACTS_BY_ID.get(contractId);
+    if (existing) used += salaryForContractInSeason(existing, season);
+  }
+
+  staff.budgetUsed = used;
 }
 
 function createCandidate(role: StaffRole, id: number) {
@@ -1430,6 +1558,10 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               draft: gameState.draft ?? { discovered: {}, watchlist: [] },
             };
             const save = { version: 1 as const, gameState };
+            instantFillLeagueStaff((save as any).gameState);
+            hydrateAllTeamsCoordinators(save);
+            hydrateUserTeamStaff(save);
+            recomputeStaffBudgetUsed(save);
             persistLocalSave(save);
             setState({
               ...state,
@@ -1673,6 +1805,26 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           const assignment: StaffAssignment = { candidateId, coachName, salary: candidate?.salaryDemand ?? 1_300_000, years: candidate?.defaultContractYears ?? 3, hiredWeek: nextGameState.time.week };
           nextGameState = reduceGameState(nextGameState, gameActions.hireCoach(role, assignment));
 
+          const staffAny = (nextGameState as any).staff ?? ((nextGameState as any).staff = {});
+          staffAny.coachContractsById = staffAny.coachContractsById ?? {};
+          staffAny.nextCoachContractId = Number(staffAny.nextCoachContractId ?? 1);
+          const teamId = (nextGameState as any).career?.teamId ?? (nextGameState as any).franchiseId ?? nextGameState.franchise?.excelTeamKey ?? "TEAM";
+          const contractId = `COACH_CONTRACT_${staffAny.nextCoachContractId++}`;
+          const cc = createNewCoachContract({
+            contractId,
+            entityId: String(candidateId),
+            teamId: String(teamId),
+            startSeason: Number(nextGameState.time?.season ?? 2026),
+            years: Number(candidate?.defaultContractYears ?? 2),
+            salaryY1: Number(candidate?.salaryDemand ?? assignment.salary),
+          });
+          staffAny.coachContractsById[contractId] = cc;
+          if (staffAny.assignments?.[role]) staffAny.assignments[role].contractId = contractId;
+
+          const nextSaveWithBudget: SaveData = { version: 1, gameState: nextGameState };
+          recomputeStaffBudgetUsed(nextSaveWithBudget);
+          nextGameState = nextSaveWithBudget.gameState;
+
           if (side && requirement.locksOnHire) {
             const lockAxes = requirement.lockAxes ?? [];
             const labels = axesLabel(lockAxes);
@@ -1881,7 +2033,26 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
 }
 
 export function buildMarketForRole(role: StaffRole) {
-  return { weekKey: "2026-1", role, candidates: [createCandidate(role, 1), createCandidate(role, 2), createCandidate(role, 3)] };
+  if (role === "HC") return { weekKey: "2026-1", role, candidates: [] as Array<ReturnType<typeof createCandidate>> };
+
+  const leagueSeed = 1337;
+  const fromFreeAgents = candidatesForRoleFromFreeAgents(role, leagueSeed);
+  const candidates: Array<ReturnType<typeof createCandidate>> = [];
+
+  for (const c of fromFreeAgents as Array<ReturnType<typeof createCandidate>>) {
+    if (candidates.length >= 6) break;
+    candidates.push(c);
+  }
+
+  let id = 1;
+  while (candidates.length < 3) {
+    const padded = createCandidate(role, id++);
+    if (padded.rating == null) (padded as any).rating = 68;
+    candidates.push(padded);
+  }
+
+  candidates.sort((a, b) => ((b as any).rating ?? 0) - ((a as any).rating ?? 0));
+  return { weekKey: "2026-1", role, candidates };
 }
 
 export function marketByWeekFor(state: GameState) {

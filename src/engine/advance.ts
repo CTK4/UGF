@@ -3,6 +3,8 @@ import type { GameState } from "@/engine/gameState";
 import type { GateFailure } from "@/engine/gates";
 import { validateBeatGates } from "@/engine/gates";
 import { syncJanuaryTasks } from "@/engine/tasks";
+import { applyContractExpiryTurnover } from "@/services/staffTurnover";
+import { runCpuStaffHiring } from "@/services/cpuStaffHiring";
 
 export type AdvanceOutcome =
   | { ok: true; gameState: GameState }
@@ -37,11 +39,16 @@ export function advanceDay(state: GameState): AdvanceOutcome {
     lastUiError: null,
   };
 
+  let advanced: GameState = {
+    ...nextState,
+    tasks: syncJanuaryTasks(nextState),
+  };
+
+  applyContractExpiryTurnover(advanced as any);
+  runCpuStaffHiring(advanced as any);
+
   return {
     ok: true,
-    gameState: {
-      ...nextState,
-      tasks: syncJanuaryTasks(nextState),
-    },
+    gameState: advanced,
   };
 }

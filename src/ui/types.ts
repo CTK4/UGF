@@ -16,6 +16,8 @@ export type InterviewInvite = {
   tier: InterviewInviteTier;
   overall: number;
   summaryLine: string;
+  /** True when the job opened because a franchise legend retired. */
+  legendRetiredOpening?: boolean;
 };
 
 export type OpeningInterviewResult = {

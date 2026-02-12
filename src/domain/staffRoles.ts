@@ -1,6 +1,12 @@
 export const STAFF_ROLES = ["HC", "OC", "DC", "STC", "QB", "RB", "WR", "OL", "DL", "LB", "DB", "ASST"] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
+/**
+ * The user is the Head Coach; HC is not hireable via the staff market UI.
+ */
+export const HIREABLE_STAFF_ROLES = ["OC", "DC", "STC", "QB", "RB", "WR", "OL", "DL", "LB", "DB", "ASST"] as const;
+export type HireableStaffRole = (typeof HIREABLE_STAFF_ROLES)[number];
+
 export const MANDATORY_STAFF_ROLES: StaffRole[] = ["OC", "DC", "STC"];
 
 export const ASSISTANT_STAFF_ROLES: StaffRole[] = ["QB", "RB", "WR", "OL", "DL", "LB", "DB", "ASST"];
