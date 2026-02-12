@@ -31,7 +31,9 @@ export type GameAction =
   | { type: "ENTER_JANUARY_OFFSEASON" }
   | { type: "COMPLETE_TASK"; payload: { taskId: string; positions?: string[] } }
   | { type: "MARK_THREAD_READ"; payload: { threadId: string } }
-  | { type: "ADVANCE_WEEK"; payload?: { label?: string } };
+  | { type: "ADVANCE_WEEK"; payload?: { label?: string } }
+  | { type: "ENTER_REGULAR_SEASON" }
+  | { type: "SIMULATE_GAME" };
 
 export const gameActions = {
   loadState: (state: GameState): GameAction => ({ type: "LOAD_STATE", payload: { state } }),
@@ -46,4 +48,15 @@ export const gameActions = {
   completeTask: (taskId: string, positions?: string[]): GameAction => ({ type: "COMPLETE_TASK", payload: { taskId, positions } }),
   markThreadRead: (threadId: string): GameAction => ({ type: "MARK_THREAD_READ", payload: { threadId } }),
   advanceWeek: (label?: string): GameAction => ({ type: "ADVANCE_WEEK", payload: { label } }),
+  /**
+   * Transition into the regular season. Generates a schedule and resets
+   * the record. This should be dispatched by the UI once offseason
+   * tasks are complete. See reducer for details.
+   */
+  enterRegularSeason: (): GameAction => ({ type: "ENTER_REGULAR_SEASON" }),
+  /**
+   * Simulate the next unplayed game on the schedule. The reducer
+   * will update wins/losses and mark the game as played.
+   */
+  simulateGame: (): GameAction => ({ type: "SIMULATE_GAME" }),
 };

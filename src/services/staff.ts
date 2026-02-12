@@ -6,7 +6,6 @@
  * - Never use Math.random().
  */
 import type { TableRegistry } from "@/data/TableRegistry";
-import { loadCoachFreeAgents } from "@/services/staffFreeAgents";
 
 export type StaffRole = "HC" | "OC" | "DC" | "QB_COACH" | "WR_RB" | "OL" | "DL" | "LB" | "DB" | "ASST" | "ST";
 export type StaffPosition = "Owner" | "GM" | "Head Coach" | "Offensive Coordinator" | "Defensive Coordinator";

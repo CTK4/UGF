@@ -26,6 +26,9 @@ import { ROSTER_CAP_LIMIT, calculateRosterCap, loadRosterPlayersForTeam } from "
 import { buildCharacterRegistry } from "@/engine/characters";
 import { DEFAULT_SALARY_CAP, sumCapByTeam } from "@/engine/cap";
 import { clearLocalSave, loadLocalSave, persistLocalSave } from "@/domainE/persistence/localSave";
+import { loadCoachFreeAgents, type CoachFreeAgent } from "@/services/staffFreeAgents";
+import { buildLeagueCoordinatorAssignments, buildStaffAssignmentsForTeam } from "@/services/staffAssignments";
+import { buildExistingContractsIndex, contractRowToCoachContract, createNewCoachContract, findExistingCoachContractRow, salaryForContractInSeason, type CoachContract } from "@/services/coachContracts";
 
 /**
  * Verification Checklist
@@ -621,8 +624,8 @@ function generateInterviewInvites(hometownTeamKey: string, leagueSeed: number): 
   return invites.slice(0, 3);
 }
 
-const FIXED_TRIAD: Array<{ teamKey: string; tier: InterviewInviteTier }> = [
-  { teamKey: "BIRMINGHAM_VULCANS", tier: "CONTENDER" },
+const FIXED_TRIAD: Array<{ teamKey: string; tier: InterviewInviteTier; legendRetiredOpening?: boolean }> = [
+  { teamKey: "BIRMINGHAM_VULCANS", tier: "CONTENDER", legendRetiredOpening: true },
   { teamKey: "MILWAUKEE_NORTHSHORE", tier: "REBUILD" },
   { teamKey: "ATLANTA_APEX", tier: "FRINGE" },
 ];
@@ -634,16 +637,18 @@ function generateFixedTriadInvitesWithFallback(
   try {
     const metricsByTeamKey = buildTeamInviteMetricsByTeamKey(leagueSeed);
 
-    const invites: InterviewInvite[] = FIXED_TRIAD.map(({ teamKey, tier }) => {
+    const invites: InterviewInvite[] = FIXED_TRIAD.map(({ teamKey, tier, legendRetiredOpening }) => {
       const franchiseId = resolveTeamKey(teamKey);
       const metrics = metricsByTeamKey.get(franchiseId);
       if (!metrics) throw new Error(`Missing metrics for fixed triad team: ${franchiseId}`);
 
+      const base = buildSummaryLine(franchiseId, tier, metrics.capSpace ?? null);
       return {
         franchiseId,
         tier,
         overall: metrics.overall ?? 0,
-        summaryLine: buildSummaryLine(franchiseId, tier, metrics.capSpace ?? null),
+        summaryLine: legendRetiredOpening ? `${base} • Legend retired opening` : base,
+        legendRetiredOpening,
       };
     });
 
@@ -1430,6 +1435,8 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               draft: gameState.draft ?? { discovered: {}, watchlist: [] },
             };
             const save = { version: 1 as const, gameState };
+            hydrateAllTeamsCoordinators(save);
+            hydrateUserTeamStaff(save);
             persistLocalSave(save);
             setState({
               ...state,
@@ -1497,7 +1504,49 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             const assignment: StaffAssignment = { candidateId: `${role}-${pick}`, coachName: pick, salary: 1_200_000, years: 3, hiredWeek: nowWeek };
             gameState = reduceGameState(gameState, gameActions.hireCoach(role, assignment));
           });
+          // Enter January Offseason to trigger initial calendar generation
           gameState = reduceGameState(gameState, gameActions.enterJanuaryOffseason());
+
+          /**
+           * Build a unified character registry for the new save. The MVV
+           * requires that the user-controlled coach, owners and GMs all live
+           * inside a single `characters.byId` map. Without this registry
+           * successive systems (e.g. reputation, media, hiring) cannot look
+           * up characters consistently. We derive the registry here rather
+           * than on first load so that the save persists proper IDs on
+           * initial creation.
+           */
+          try {
+            const userTeamKey = gameState.franchise.ugfTeamKey || gameState.franchise.excelTeamKey;
+            if (userTeamKey) {
+              const registry = buildCharacterRegistry({
+                leagueSeed: gameState.world?.leagueSeed ?? gameState.time.season,
+                coachName: gameState.coach.name || "You",
+                coachAge: gameState.coach.age ?? 35,
+                coachPersonality: gameState.coach.personalityBaseline || "Balanced",
+                userTeamKey,
+              });
+              gameState = {
+                ...gameState,
+                characters: {
+                  byId: registry.byId,
+                  coachId: registry.coachId,
+                  ownersByTeamKey: registry.ownersByTeamKey,
+                  gmsByTeamKey: registry.gmsByTeamKey,
+                },
+                teamFrontOffice: registry.teamFrontOffice,
+              };
+            }
+          } catch (err) {
+            if (import.meta.env.DEV) {
+              console.error("[runtime] Failed to build character registry", err);
+            }
+          }
+
+          // Rebuild derived league mappings (rosters and cap usage) now that all
+          // roster players have been hydrated. This must happen after any
+          // modifications to the league data because derived maps depend on
+          // playersById.
           const finalizedDerivedLeague = rebuildLeagueDerivedMaps(gameState.league.playersById ?? {});
           gameState = {
             ...gameState,
@@ -1673,6 +1722,30 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           const assignment: StaffAssignment = { candidateId, coachName, salary: candidate?.salaryDemand ?? 1_300_000, years: candidate?.defaultContractYears ?? 3, hiredWeek: nextGameState.time.week };
           nextGameState = reduceGameState(nextGameState, gameActions.hireCoach(role, assignment));
 
+          const nextStateWithContracts = nextGameState as GameState & {
+            staff: GameState["staff"] & {
+              coachContractsById?: Record<string, CoachContract>;
+              nextCoachContractId?: number;
+            };
+          };
+          const season = Number(nextStateWithContracts.time.season ?? 2026);
+          nextStateWithContracts.staff.nextCoachContractId = Number(nextStateWithContracts.staff.nextCoachContractId ?? 1);
+          const contractId = `COACH_CONTRACT_${nextStateWithContracts.staff.nextCoachContractId++}`;
+          const teamId = String(nextStateWithContracts.franchise?.ugfTeamKey || nextStateWithContracts.franchise?.excelTeamKey || "UNKNOWN_TEAM");
+          const cc = createNewCoachContract({
+            contractId,
+            entityId: candidateId,
+            teamId,
+            startSeason: season,
+            years: Number(candidate?.defaultContractYears ?? 2),
+            salaryY1: Number(candidate?.salaryDemand ?? 700_000),
+          });
+          nextStateWithContracts.staff.coachContractsById = nextStateWithContracts.staff.coachContractsById ?? {};
+          nextStateWithContracts.staff.coachContractsById[contractId] = cc;
+          const assigned = nextStateWithContracts.staff.assignments[role] as StaffAssignment & { coachContractId?: string };
+          if (assigned) assigned.coachContractId = contractId;
+          recomputeStaffBudgetUsed({ version: 1, gameState: nextStateWithContracts });
+
           if (side && requirement.locksOnHire) {
             const lockAxes = requirement.lockAxes ?? [];
             const labels = axesLabel(lockAxes);
@@ -1695,6 +1768,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             nextGameState = { ...nextGameState, inbox };
           }
 
+          persistLocalSave({ version: 1, gameState: nextGameState });
           setState({ ...state, save: { version: 1, gameState: nextGameState }, route: { key: "StaffTree" }, ui: { ...state.ui, activeModal: null } });
           return;
         }
@@ -1819,25 +1893,32 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           }
 
           const derivedLeagueState = rebuildLeagueDerivedMaps(result.gameState.league.playersById ?? {});
-          const nextSave = {
-            version: 1 as const,
-            gameState: {
-              ...result.gameState,
-              world: {
-                ...result.gameState.world,
-                leagueDbVersion: "v1",
-                leagueDbHash: getLeagueDbHash(),
-              },
-              league: {
-                ...result.gameState.league,
-                teamRosters: derivedLeagueState.teamRosters,
-                cap: {
-                  salaryCap: Number(result.gameState.league.cap?.salaryCap ?? DEFAULT_SALARY_CAP),
-                  capUsedByTeam: derivedLeagueState.cap.capUsedByTeam,
-                },
+          // Rebuild the game state with derived league information
+          let nextGameState: GameState = {
+            ...result.gameState,
+            world: {
+              ...result.gameState.world,
+              leagueDbVersion: "v1",
+              leagueDbHash: getLeagueDbHash(),
+            },
+            league: {
+              ...result.gameState.league,
+              teamRosters: derivedLeagueState.teamRosters,
+              cap: {
+                salaryCap: Number(result.gameState.league.cap?.salaryCap ?? DEFAULT_SALARY_CAP),
+                capUsedByTeam: derivedLeagueState.cap.capUsedByTeam,
               },
             },
           };
+
+          // Automatically transition into the regular season once the January
+          // Offseason has progressed past week 4. This prevents the user
+          // from getting stuck after completing offseason tasks.
+          if (nextGameState.phase === "JANUARY_OFFSEASON" && nextGameState.time.week > 4) {
+            nextGameState = reduceGameState(nextGameState, gameActions.enterRegularSeason());
+          }
+
+          const nextSave = { version: 1 as const, gameState: nextGameState };
           assertCityTeamLeagueInvariants(nextSave);
           const validationModal = runLeagueValidation(nextSave);
           setState({
@@ -1845,6 +1926,37 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             save: nextSave,
             route: { key: "Hub" },
             ui: { ...state.ui, activeModal: validationModal ?? null },
+          });
+          return;
+        }
+        case "SIMULATE_GAME": {
+          // Only simulate when a save is loaded
+          if (!state.save) return;
+          const prevGameState = state.save.gameState;
+          // Dispatch the simulateGame engine action
+          const nextGameState = reduceGameState(prevGameState, gameActions.simulateGame());
+          // Persist derived league maps and update save
+          const derivedLeagueStateSim = rebuildLeagueDerivedMaps(nextGameState.league.playersById ?? {});
+          const hydratedGameState: GameState = {
+            ...nextGameState,
+            world: {
+              ...nextGameState.world,
+              leagueDbVersion: "v1",
+              leagueDbHash: getLeagueDbHash(),
+            },
+            league: {
+              ...nextGameState.league,
+              teamRosters: derivedLeagueStateSim.teamRosters,
+              cap: {
+                salaryCap: Number(nextGameState.league.cap?.salaryCap ?? DEFAULT_SALARY_CAP),
+                capUsedByTeam: derivedLeagueStateSim.cap.capUsedByTeam,
+              },
+            },
+          };
+          const saveNext = { version: 1 as const, gameState: hydratedGameState };
+          setState({
+            ...state,
+            save: saveNext,
           });
           return;
         }
@@ -1880,8 +1992,166 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
   return controller;
 }
 
+const FREE_AGENTS_CACHE: CoachFreeAgent[] = loadCoachFreeAgents();
+const EXISTING_CONTRACTS_BY_ID = buildExistingContractsIndex();
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+function seededJitter(seed: number, id: string): number {
+  let h = seed ^ 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  h >>>= 0;
+  return (h % 5) - 2;
+}
+
+function ageCurve(age: number | null): number {
+  if (!age) return 0;
+  const d = Math.abs(age - 48);
+  if (d <= 7) return 2;
+  if (d <= 14) return 0;
+  if (d <= 22) return -2;
+  return -5;
+}
+
+function deriveCoachRating(fa: CoachFreeAgent, role: StaffRole, leagueSeed: number): number {
+  const rep = Number(fa.reputation ?? 60);
+  const curve = ageCurve(fa.age ?? null);
+  const j = seededJitter(leagueSeed, `${role}:${fa.id}`);
+  return clamp(Math.round(rep + curve + j), 50, 99);
+}
+
+function uiRolesForFreeAgentRole(role: CoachFreeAgent["role"]): StaffRole[] {
+  return [role as StaffRole];
+}
+
+function fitLabelForRating(rating: number): "Natural Fit" | "Good Fit" | "Reach" {
+  if (rating >= 86) return "Natural Fit";
+  if (rating >= 74) return "Good Fit";
+  return "Reach";
+}
+
+function salaryFor(role: StaffRole, rating: number): number {
+  const base =
+    role === "OC" || role === "DC" ? 2_200_000 :
+    role === "STC" ? 1_200_000 :
+    role === "QB" ? 950_000 :
+    role === "ASST" ? 700_000 :
+    800_000;
+  const bump = Math.round((rating - 70) * 18_000);
+  return Math.max(350_000, base + bump);
+}
+
+function candidateFromFreeAgent(role: StaffRole, fa: CoachFreeAgent, leagueSeed: number): ReturnType<typeof createCandidate> {
+  const rating = deriveCoachRating(fa, role, leagueSeed);
+  const demand = salaryFor(role, rating);
+  return {
+    id: fa.id,
+    name: fa.name,
+    rating,
+    role,
+    primaryRole: role,
+    traits: ["Staffer"],
+    philosophy: fa.scheme ?? "Balanced",
+    fitLabel: fitLabelForRating(rating),
+    salaryDemand: demand,
+    recommendedOffer: Math.round(demand * 1.08),
+    availability: "FREE_AGENT" as const,
+    standardsNote: fa.age ? `Age ${fa.age}` : "Standard",
+    perceivedRisk: Math.max(5, Math.min(70, 95 - rating)),
+    defaultContractYears: role === "OC" || role === "DC" ? 3 : 2,
+    requirement: {},
+  };
+}
+
+function candidatesForRoleFromFreeAgents(role: StaffRole, leagueSeed: number): ReturnType<typeof createCandidate>[] {
+  const raw = FREE_AGENTS_CACHE.filter((fa) => uiRolesForFreeAgentRole(fa.role).includes(role));
+  const mapped = raw.map((fa) => candidateFromFreeAgent(role, fa, leagueSeed));
+  mapped.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  return mapped;
+}
+
+function recomputeStaffBudgetUsed(save: SaveData): void {
+  const gameState = save.gameState as GameState & { staff: GameState["staff"] & { coachContractsById?: Record<string, CoachContract> } };
+  const season = Number(gameState.time?.season ?? 2026);
+  const assignments = gameState.staff.assignments ?? {};
+  const runtimeContracts = gameState.staff.coachContractsById ?? {};
+  let used = 0;
+
+  for (const a of Object.values(assignments)) {
+    if (!a) continue;
+    const contractId = String((a as any).coachContractId ?? (a as any).contractId ?? "");
+    if (!contractId) continue;
+
+    const runtime = runtimeContracts[contractId];
+    if (runtime) {
+      used += salaryForContractInSeason(runtime, season);
+      continue;
+    }
+
+    const existing = EXISTING_CONTRACTS_BY_ID.get(contractId);
+    if (existing) {
+      used += salaryForContractInSeason(existing, season);
+      continue;
+    }
+
+    const row = findExistingCoachContractRow(contractId);
+    const cc = row ? contractRowToCoachContract(row) : null;
+    if (cc) used += salaryForContractInSeason(cc, season);
+  }
+
+  gameState.staff.budgetUsed = used;
+}
+
+function hydrateAllTeamsCoordinators(save: SaveData): void {
+  const gameState = save.gameState as GameState & { staff: GameState["staff"] & { leagueAssignmentsByTeamId?: Record<string, unknown> } };
+  const seed = Number(gameState.world?.leagueSeed ?? 1337);
+  gameState.staff.leagueAssignmentsByTeamId = buildLeagueCoordinatorAssignments(seed);
+}
+
+function hydrateUserTeamStaff(save: SaveData): void {
+  const gameState = save.gameState as GameState & { staff: GameState["staff"] & { assignments: Record<string, unknown> } };
+  const seed = Number(gameState.world?.leagueSeed ?? 1337);
+  const teamId = gameState.franchise?.ugfTeamKey ?? gameState.franchise?.excelTeamKey;
+  if (!teamId) return;
+
+  const assn = buildStaffAssignmentsForTeam(teamId, seed);
+  gameState.staff.assignments = { ...(gameState.staff.assignments ?? {}), ...(assn as any) };
+
+  for (const [role, a] of Object.entries(assn)) {
+    const cur = (gameState.staff.assignments as any)[role];
+    if (!cur || !a) continue;
+    if (a.contractId && !cur.contractId) cur.contractId = a.contractId;
+  }
+
+  recomputeStaffBudgetUsed(save);
+}
+
 export function buildMarketForRole(role: StaffRole) {
-  return { weekKey: "2026-1", role, candidates: [createCandidate(role, 1), createCandidate(role, 2), createCandidate(role, 3)] };
+  if (role === "HC") return { weekKey: "2026-1", role, candidates: [] as ReturnType<typeof createCandidate>[] };
+
+  const leagueSeed = 1337;
+  const fromFreeAgents = candidatesForRoleFromFreeAgents(role, leagueSeed);
+  const candidates: ReturnType<typeof createCandidate>[] = [];
+
+  for (const c of fromFreeAgents) {
+    if (candidates.length >= 6) break;
+    candidates.push(c);
+  }
+
+  let id = 1;
+  while (candidates.length < 3) {
+    const padded = createCandidate(role, id++);
+    if (padded.rating == null) padded.rating = 68;
+    candidates.push(padded);
+  }
+
+  candidates.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  return { weekKey: "2026-1", role, candidates };
 }
 
 export function marketByWeekFor(state: GameState) {

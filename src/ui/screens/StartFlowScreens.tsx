@@ -120,6 +120,16 @@ export function CreateCoachScreen({ ui }: ScreenProps) {
           placeholder="Coach age"
           onChange={(e) => ui.dispatch({ type: "SET_COACH_AGE", coachAge: Number(e.target.value) })}
         />
+        <select value={opening.coachAge} onChange={(e) => ui.dispatch({ type: "SET_COACH_AGE", coachAge: Number(e.target.value) })}>
+          {Array.from({ length: 85 - 24 + 1 }, (_, i) => 24 + i).map((age) => (
+            <option key={age} value={age}>{age}</option>
+          ))}
+        </select>
+        <select value={opening.coachPersonality} onChange={(e) => ui.dispatch({ type: "SET_COACH_PERSONALITY", coachPersonality: e.target.value })}>
+          {coachPersonalities.map((personality) => (
+            <option key={personality} value={personality}>{personality}</option>
+          ))}
+        </select>
         <select value={opening.hometownId} onChange={(e) => ui.dispatch({ type: "SET_HOMETOWN", hometownId: e.target.value })}>
           <option value="">Select hometown…</option>
           {statesInOrder.map((state) => (
