@@ -91,7 +91,7 @@ export function loadPersonnelRows(): CoachRow[] {
 
 function isFreeAgentRow(row: Pick<CoachRow, "teamId" | "status">): boolean {
   const s = String(row.status ?? "").trim().toLowerCase();
-  if (s === "fa" || s === "free agent" || s === "freeagent") return true;
+  if (s === "fa" || s === "free agent" || s === "freeagent" || s === "free_agent") return true;
   return row.teamId === null || row.teamId === undefined || String(row.teamId).trim() === "";
 }
 
