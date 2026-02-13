@@ -8,10 +8,10 @@ function normalizeRow(player: any, season: number) {
   const contract = leagueDb.contracts.find(
     (c) =>
       c.entityType === "PLAYER" &&
-      c.entityId === player.playerId
+      (c.entityId === player.playerId || c.personId === player.playerId)
   );
 
-  const amount = contract?.amount ?? 0;
+  const amount = contract?.amount ?? contract?.salaryY1 ?? 0;
   const yearsLeft = contract?.yearsLeft ?? 0;
 
   return {
