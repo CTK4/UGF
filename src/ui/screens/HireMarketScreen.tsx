@@ -59,7 +59,7 @@ export function HireMarketScreen({ ui }: ScreenProps) {
     return group === "COORD" ? "OC" : "QB";
   }, [group, rolesForGroup, selectedRole]);
 
-  const marketRole = effectiveRole === "RB" || effectiveRole === "WR" ? "WRRB" : effectiveRole;
+  const marketRole = effectiveRole;
   const sessionKey = `${save.gameState.time.season}-${save.gameState.time.week}:${marketRole}`;
   const session = marketByWeekFor(save.gameState)[sessionKey];
 

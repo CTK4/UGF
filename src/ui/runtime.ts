@@ -1736,7 +1736,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           const teamId = String(nextStateWithContracts.franchise?.ugfTeamKey || nextStateWithContracts.franchise?.excelTeamKey || "UNKNOWN_TEAM");
           const cc = createNewCoachContract({
             contractId,
-            entityId: candidateId,
+            personId: candidateId,
             teamId,
             startSeason: season,
             years: Number(candidate?.defaultContractYears ?? 2),

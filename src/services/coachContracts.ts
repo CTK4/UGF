@@ -11,7 +11,7 @@ import leagueDb from "@/data/leagueDb/leagueDB.json";
 export type ContractRow = {
   contractId?: string | number;
   entityType?: string;
-  entityId?: string | number;
+  personId?: string | number;
   teamId?: string | number | null;
   startSeason?: number | null;
   endSeason?: number | null;
@@ -26,7 +26,7 @@ type LeagueDbJson = { tables?: { Contracts?: ContractRow[] } };
 export type CoachContract = {
   contractId: string;
   entityType: "PERSONNEL";
-  entityId: string;
+  personId: string;
   teamId: string;
   startSeason: number;
   endSeason: number;
@@ -53,12 +53,12 @@ export function contractRowToCoachContract(row: ContractRow): CoachContract | nu
   if (entityType && entityType !== "PERSONNEL") return null;
 
   const contractId = String(row.contractId ?? "");
-  const entityId = String(row.entityId ?? "");
+  const personId = String(row.personId ?? "");
   const teamId = String(row.teamId ?? "");
   const startSeason = Number(row.startSeason ?? NaN);
   const endSeason = Number(row.endSeason ?? NaN);
 
-  if (!contractId || !entityId || !teamId) return null;
+  if (!contractId || !personId || !teamId) return null;
   if (!Number.isFinite(startSeason) || !Number.isFinite(endSeason)) return null;
 
   const salaryBySeason: Record<number, number> = {};
@@ -72,7 +72,7 @@ export function contractRowToCoachContract(row: ContractRow): CoachContract | nu
   if (endSeason >= startSeason + 2) salaryBySeason[startSeason + 2] = s3;
   if (endSeason >= startSeason + 3) salaryBySeason[startSeason + 3] = s4;
 
-  return { contractId, entityType: "PERSONNEL", entityId, teamId, startSeason, endSeason, salaryBySeason };
+  return { contractId, entityType: "PERSONNEL", personId, teamId, startSeason, endSeason, salaryBySeason };
 }
 
 export function salaryForContractInSeason(contract: CoachContract, season: number): number {
@@ -92,7 +92,7 @@ export function buildExistingContractsIndex(): Map<string, CoachContract> {
 
 export function createNewCoachContract(args: {
   contractId: string;
-  entityId: string;
+  personId: string;
   teamId: string;
   startSeason: number;
   years: number;
@@ -111,7 +111,7 @@ export function createNewCoachContract(args: {
   return {
     contractId: args.contractId,
     entityType: "PERSONNEL",
-    entityId: args.entityId,
+    personId: args.personId,
     teamId: args.teamId,
     startSeason: args.startSeason,
     endSeason,
