@@ -1,4 +1,4 @@
-import leagueDbRaw from "@/data/ugf_leagueDb.json";
+import leagueDbRaw from "@/data/leagueDb/leagueDB.json";
 
 type LeagueSheetRow = {
   leagueId: string;
