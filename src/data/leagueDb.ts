@@ -1,4 +1,4 @@
-import leagueDbJson from "@/data/ugf_leagueDb.json";
+import leagueDbJson from "@/data/leagueDb/leagueDB.json";
 
 export type LeagueRow = {
   leagueId: string;
