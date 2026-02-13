@@ -12,12 +12,15 @@ export type StaffRole =
   | "DC"
   | "STC"
   | "QB"
-  | "WRRB"
+  | "RB"
+  | "WR"
   | "OL"
   | "DL"
   | "LB"
   | "DB"
-  | "ASST";
+  | "ASST"
+  | "GM"
+  | "OWNER";
 
 export type CoachRow = {
   personId?: string | number;
@@ -42,6 +45,10 @@ export type CoachFreeAgent = {
   teamId: string | number | null;
 };
 
+function isCoachPoolRole(role: StaffRole): role is Exclude<StaffRole, "GM" | "OWNER"> {
+  return role !== "GM" && role !== "OWNER";
+}
+
 type LeagueDbJson = {
   tables?: {
     Personnel?: CoachRow[];
@@ -49,37 +56,54 @@ type LeagueDbJson = {
 };
 
 export function normalizeStaffRole(raw: string): StaffRole | null {
-  const r = String(raw ?? "").trim().toLowerCase();
+  const r = String(raw ?? "").trim().toUpperCase();
   if (!r) return null;
 
-  // Combined WR/RB
-  // Your LeagueDB uses: "WR_RB_COACH"
-  if (
-    r === "wr_rb_coach" ||
-    r === "wrrb" ||
-    r.includes("wr/rb") ||
-    r.includes("wr_rb") ||
-    (r.includes("wide receiver") && r.includes("running back"))
-  ) return "WRRB";
+  const aliases: Record<string, StaffRole> = {
+    HEAD_COACH: "HC",
+    HC: "HC",
+    OFF_COORDINATOR: "OC",
+    OC: "OC",
+    DEF_COORDINATOR: "DC",
+    DC: "DC",
+    ST_COORDINATOR: "STC",
+    STC: "STC",
+    QB_COACH: "QB",
+    QB: "QB",
+    RB_COACH: "RB",
+    RB: "RB",
+    WR_COACH: "WR",
+    WR: "WR",
+    OL_COACH: "OL",
+    OL: "OL",
+    DL_COACH: "DL",
+    DL: "DL",
+    LB_COACH: "LB",
+    LB: "LB",
+    DB_COACH: "DB",
+    DB: "DB",
+    ASSISTANT_COACH: "ASST",
+    ASST: "ASST",
+    GENERAL_MANAGER: "GM",
+    GM: "GM",
+    OWNER: "OWNER",
+  };
 
-  // Coordinators
-  if (r === "oc" || r.includes("offensive coordinator")) return "OC";
-  if (r === "dc" || r.includes("defensive coordinator")) return "DC";
-  if (r === "stc" || r.includes("special teams")) return "STC";
+  if (aliases[r]) return aliases[r];
 
-  // Position coaches (handle "QB Coach", "Quarterbacks Coach", etc.)
-  if (r === "qb" || r.includes("qb coach") || r.includes("quarterback")) return "QB";
-  // RB/WR map into WRRB now
-  if (r === "rb" || r.includes("rb coach") || r.includes("running back")) return "WRRB";
-  if (r === "wr" || r.includes("wr coach") || r.includes("wide receiver")) return "WRRB";
-  if (r === "ol" || r.includes("ol coach") || r.includes("offensive line")) return "OL";
-  if (r === "dl" || r.includes("dl coach") || r.includes("defensive line")) return "DL";
-  if (r === "lb" || r.includes("lb coach") || r.includes("lineback")) return "LB";
-  if (r === "db" || r.includes("db coach") || r.includes("defensive back") || r.includes("secondary")) return "DB";
-
-  // Misc
-  if (r === "hc" || r.includes("head coach")) return "HC";
-  if (r === "asst" || r.includes("assistant")) return "ASST";
+  if (r.includes("OFFENSIVE COORDINATOR")) return "OC";
+  if (r.includes("DEFENSIVE COORDINATOR")) return "DC";
+  if (r.includes("SPECIAL TEAMS")) return "STC";
+  if (r.includes("HEAD COACH")) return "HC";
+  if (r.includes("QUARTERBACK")) return "QB";
+  if (r.includes("RUNNING BACK")) return "RB";
+  if (r.includes("WIDE RECEIVER")) return "WR";
+  if (r.includes("OFFENSIVE LINE")) return "OL";
+  if (r.includes("DEFENSIVE LINE")) return "DL";
+  if (r.includes("LINEBACK")) return "LB";
+  if (r.includes("DEFENSIVE BACK") || r.includes("SECONDARY")) return "DB";
+  if (r.includes("ASSISTANT")) return "ASST";
+  if (r.includes("GENERAL MANAGER")) return "GM";
 
   return null;
 }
@@ -101,7 +125,7 @@ export function loadCoachFreeAgents(): CoachFreeAgent[] {
 
   for (const row of rows) {
     const role = normalizeStaffRole(String(row.role ?? ""));
-    if (!role) continue;
+    if (!role || !isCoachPoolRole(role)) continue;
     if (!isFreeAgentRow(row)) continue;
 
     const id = String(row.personId ?? "");

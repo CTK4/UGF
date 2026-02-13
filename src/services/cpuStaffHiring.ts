@@ -75,7 +75,7 @@ export function runCpuStaffHiring(gameState: GameState): GameState {
 
       const years = role === "OC" || role === "DC" ? 3 : 2;
       const contractId = `CPU_COACH_CONTRACT_${teamId}_${bucket.nextCoachContractId++}`;
-      const cc = createNewCoachContract({ contractId, entityId: chosen.fa.id, teamId, startSeason: season, years, salaryY1: chosen.salary });
+      const cc = createNewCoachContract({ contractId, personId: chosen.fa.id, teamId, startSeason: season, years, salaryY1: chosen.salary });
       bucket.coachContractsById[contractId] = cc;
       bucket.budgetUsed += chosen.salary;
       bucket.assignments[role] = {

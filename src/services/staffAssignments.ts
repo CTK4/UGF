@@ -20,6 +20,10 @@ export type StaffAssignment = {
 
 export type StaffAssignments = Partial<Record<StaffRole, StaffAssignment>>;
 
+function isTeamStaffRole(role: string): role is StaffRole {
+  return ["HC", "OC", "DC", "STC", "QB", "RB", "WR", "OL", "DL", "LB", "DB", "ASST"].includes(role);
+}
+
 function seededTieBreak(seed: number, s: string): number {
   let h = seed ^ 0x9e3779b9;
   for (let i = 0; i < s.length; i++) {
@@ -63,12 +67,12 @@ export function buildStaffAssignmentsForTeam(teamId: string | number, seed: numb
   const byRole = new Map<StaffRole, CoachRow[]>();
   for (const r of teamRows) {
     const role = normalizeStaffRole(String(r.role ?? ""));
-    if (!role) continue;
+    if (!role || !isTeamStaffRole(role)) continue;
     if (!byRole.has(role)) byRole.set(role, []);
     byRole.get(role)?.push(r);
   }
 
-  const want: StaffRole[] = ["OC", "DC", "STC", "QB", "WRRB", "OL", "DL", "LB", "DB"];
+  const want: StaffRole[] = ["OC", "DC", "STC", "QB", "RB", "WR", "OL", "DL", "LB", "DB", "ASST"];
 
   const out: StaffAssignments = {};
   for (const role of want) {
@@ -76,12 +80,6 @@ export function buildStaffAssignmentsForTeam(teamId: string | number, seed: numb
     if (!pick) continue;
     out[role] = assignmentFromRow(role, pick);
   }
-
-  // ASST is generic; if you don't generate explicit ASST rows, keep it empty.
-  // If you *do* have explicit ASST rows, you can enable this:
-  // const asstPick = pickBest(byRole.get("ASST") ?? [], seed + 999);
-  // if (asstPick) out["ASST"] = assignmentFromRow("ASST", asstPick);
-
   return out;
 }
 
@@ -95,7 +93,7 @@ export function buildLeagueCoordinatorAssignments(seed: number): Record<string, 
     const byRole = new Map<StaffRole, CoachRow[]>();
     for (const r of teamRows) {
       const role = normalizeStaffRole(String(r.role ?? ""));
-      if (!role) continue;
+      if (!role || !isTeamStaffRole(role)) continue;
       if (!byRole.has(role)) byRole.set(role, []);
       byRole.get(role)?.push(r);
     }
