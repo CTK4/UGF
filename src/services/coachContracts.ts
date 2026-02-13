@@ -1,17 +1,18 @@
 /**
  * Coach contract helpers.
  *
- * - Reads existing contracts from leagueDB.json tables.Contracts.
+ * - Reads existing contracts from canonical league db contracts.
  * - Provides "active contract" salary for a season.
  * - Creates new coach contracts on hire and stores them in gameState.staff.coachContractsById.
  */
 
-import leagueDb from "@/data/leagueDb/leagueDB.json";
+import { getContracts } from "@/data/leagueDb";
 
 export type ContractRow = {
   contractId?: string | number;
   entityType?: string;
   personId?: string | number;
+  entityId?: string | number;
   teamId?: string | number | null;
   startSeason?: number | null;
   endSeason?: number | null;
@@ -20,8 +21,6 @@ export type ContractRow = {
   salaryY3?: number | null;
   salaryY4?: number | null;
 };
-
-type LeagueDbJson = { tables?: { Contracts?: ContractRow[] } };
 
 export type CoachContract = {
   contractId: string;
@@ -34,8 +33,7 @@ export type CoachContract = {
 };
 
 function rows(): ContractRow[] {
-  const db = leagueDb as unknown as LeagueDbJson;
-  return db.tables?.Contracts ?? [];
+  return getContracts() as unknown as ContractRow[];
 }
 
 function normEntityType(s: string | null | undefined): string {
@@ -53,7 +51,7 @@ export function contractRowToCoachContract(row: ContractRow): CoachContract | nu
   if (entityType && entityType !== "PERSONNEL") return null;
 
   const contractId = String(row.contractId ?? "");
-  const personId = String(row.personId ?? "");
+  const personId = String(row.personId ?? row.entityId ?? "");
   const teamId = String(row.teamId ?? "");
   const startSeason = Number(row.startSeason ?? NaN);
   const endSeason = Number(row.endSeason ?? NaN);

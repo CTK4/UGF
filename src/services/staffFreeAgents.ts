@@ -1,10 +1,10 @@
 /**
- * Coach pool sourced from src/data/leagueDb/leagueDB.json (converted LeagueDB template).
+ * Coach pool sourced from the canonical league db dataset.
  *
  * Why: ensures assistant coach hiring uses real league data (QB/RB/WR/etc).
  */
 
-import leagueDb from "@/data/leagueDb/leagueDB.json";
+import { getPersonnel } from "@/data/leagueDb";
 
 export type StaffRole =
   | "HC"
@@ -48,12 +48,6 @@ export type CoachFreeAgent = {
 function isCoachPoolRole(role: StaffRole): role is Exclude<StaffRole, "GM" | "OWNER"> {
   return role !== "GM" && role !== "OWNER";
 }
-
-type LeagueDbJson = {
-  tables?: {
-    Personnel?: CoachRow[];
-  };
-};
 
 export function normalizeStaffRole(raw: string): StaffRole | null {
   const r = String(raw ?? "").trim().toUpperCase();
@@ -114,8 +108,7 @@ export function normalizeStaffRole(raw: string): StaffRole | null {
 }
 
 export function loadPersonnelRows(): CoachRow[] {
-  const db = leagueDb as unknown as LeagueDbJson;
-  return db.tables?.Personnel ?? [];
+  return getPersonnel() as unknown as CoachRow[];
 }
 
 function isFreeAgentRow(row: Pick<CoachRow, "teamId" | "status">): boolean {
