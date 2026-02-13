@@ -24,7 +24,7 @@ const SEASON_2026_BEATS: BeatDef[] = [
     index: 1,
     label: "January Week 1",
     description: "Kick off offseason planning and roster review.",
-    gates: ["GATE.COORDINATORS_HIRED", "GATE.DELEGATION_SETUP_DONE", "GATE.STAFF_MEETING_DONE"],
+    gates: ["GATE.COORDINATORS_HIRED", "GATE.DELEGATION_SETUP_DONE"],
     uiVisible: true,
   },
   {

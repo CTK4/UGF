@@ -1,6 +1,6 @@
 import { STAFF_ROLES, type StaffRole } from "@/domain/staffRoles";
 import { gameActions } from "@/engine/actions";
-import { advanceDay, getAdvanceBlocker } from "@/engine/advance";
+import { advanceDay, getAdvanceBlocker, getMissingGates } from "@/engine/advance";
 import type { GameState, StaffAssignment, Thread } from "@/engine/gameState";
 import { createNewGameState, reduceGameState } from "@/engine/reducer";
 import { generateBeatTasks } from "@/engine/tasks";
@@ -104,6 +104,14 @@ function loadSave(): { save: SaveData | null; corrupted: boolean } {
 function getAdvanceAvailability(save: SaveData | null): { canAdvance: boolean; message?: string; route?: UIState["route"] } {
   if (!save) {
     return { canAdvance: false, message: "Load or start a save before advancing the day.", route: { key: "Start" } };
+  }
+
+  const missing = getMissingGates(save.gameState);
+  if (missing.length) {
+    return {
+      canAdvance: true,
+      message: `Missing: ${missing.map((gate) => gate.label).join(", ")}. Advance Week will prompt for auto-resolve.`,
+    };
   }
 
   const blocked = getAdvanceBlocker(save.gameState);
@@ -849,6 +857,46 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
     const gameState = reduceGameState(state.save.gameState, action);
     setState({ ...state, save: { version: 1, gameState } });
     return gameState;
+  };
+
+  const autoResolveMissingGateState = (gameState: GameState): GameState => {
+    let next = gameState;
+    for (const gate of getMissingGates(next)) {
+      if (gate.autoResolveAction === "AUTO_RESOLVE_STAFF_MEETING") {
+        next = reduceGameState(next, gameActions.setOffseasonPlan({ priorities: ["Balanced"], resignTargets: [], shopTargets: [], tradeNotes: "" }));
+        continue;
+      }
+
+      if (gate.autoResolveAction === "AUTO_RESOLVE_DEPTH_CHART") {
+        if (!next.completedGates.includes("DEPTH_CHART_FINALIZED")) {
+          next = { ...next, completedGates: [...next.completedGates, "DEPTH_CHART_FINALIZED"] };
+        }
+        continue;
+      }
+
+      if (gate.autoResolveAction === "AUTO_RESOLVE_GAME") {
+        next = reduceGameState(next, gameActions.simulateGame());
+      }
+    }
+    return next;
+  };
+
+  const openAdvanceConfirmModal = (missingLabels: string[]) => {
+    setState({
+      ...state,
+      ui: {
+        ...state.ui,
+        activeModal: {
+          title: "Advance Week Confirmation",
+          message: "The following items are incomplete:",
+          lines: missingLabels,
+          actions: [
+            { label: "Yes, Auto-Resolve & Advance", action: { type: "CONFIRM_ADVANCE_WITH_AUTOFIX" } },
+            { label: "No", action: { type: "CLOSE_MODAL" } },
+          ],
+        },
+      },
+    });
   };
 
 
@@ -1836,13 +1884,19 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
         }
         case "ADVANCE_WEEK": {
           assertAdvanceRoutingInvariant(state.save);
+          if (!state.save) return;
+
+          const missingGates = getMissingGates(state.save.gameState);
+          if (missingGates.length) {
+            openAdvanceConfirmModal(missingGates.map((gate) => gate.label));
+            return;
+          }
+
           const availability = getAdvanceAvailability(state.save);
           if (!availability.canAdvance) {
             openAdvanceBlockedModal(availability);
             return;
           }
-
-          if (!state.save) return;
 
           const preAdvanceErrors = getLeagueValidationErrors(state.save);
           if (preAdvanceErrors.length) {
@@ -1852,6 +1906,34 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
                 ...state.ui,
                 activeModal: createLeagueInvalidAdvanceModal(preAdvanceErrors),
               },
+            });
+            return;
+          }
+
+          if (state.save.gameState.phase === "REGULAR_SEASON") {
+            const nextGameState = reduceGameState(state.save.gameState, gameActions.simulateGame());
+            const derivedLeagueStateSim = rebuildLeagueDerivedMaps(nextGameState.league.playersById ?? {});
+            const hydratedGameState: GameState = {
+              ...nextGameState,
+              world: {
+                ...nextGameState.world,
+                leagueDbVersion: "v1",
+                leagueDbHash: getLeagueDbHash(),
+              },
+              league: {
+                ...nextGameState.league,
+                teamRosters: derivedLeagueStateSim.teamRosters,
+                cap: {
+                  salaryCap: Number(nextGameState.league.cap?.salaryCap ?? DEFAULT_SALARY_CAP),
+                  capUsedByTeam: derivedLeagueStateSim.cap.capUsedByTeam,
+                },
+              },
+            };
+            setState({
+              ...state,
+              save: { version: 1, gameState: hydratedGameState },
+              route: { key: "Hub" },
+              ui: { ...state.ui, activeModal: null },
             });
             return;
           }
@@ -1932,6 +2014,22 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           });
           return;
         }
+        case "CONFIRM_ADVANCE_WITH_AUTOFIX": {
+          if (!state.save) return;
+
+          const missingBefore = getMissingGates(state.save.gameState);
+          const autoResolved = autoResolveMissingGateState(state.save.gameState);
+          setState({
+            ...state,
+            save: { version: 1, gameState: autoResolved },
+            ui: { ...state.ui, activeModal: null },
+          });
+          const resolvedGameGate = missingBefore.some((gate) => gate.key === "game_not_played");
+          if (!resolvedGameGate) {
+            controller.dispatch({ type: "ADVANCE_WEEK" });
+          }
+          return;
+        }
         case "SIMULATE_GAME": {
           // Only simulate when a save is loaded
           if (!state.save) return;
@@ -1964,6 +2062,11 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "OPEN_ADVANCE_BLOCKED_MODAL": {
+          const missing = state.save ? getMissingGates(state.save.gameState) : [];
+          if (missing.length) {
+            openAdvanceConfirmModal(missing.map((gate) => gate.label));
+            return;
+          }
           openAdvanceBlockedModal(getAdvanceAvailability(state.save));
           return;
         }

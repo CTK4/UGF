@@ -9,6 +9,7 @@ import {
   StatPillsRow,
 } from "@/ui/mobile/components";
 import { getJanuaryDayLabel } from "@/engine/calendar";
+import { getMissingGates } from "@/engine/advance";
 
 /*
 Verification checklist:
@@ -34,6 +35,7 @@ export function MobileHubScreen({ ui }: ScreenProps) {
   }
 
   const gs = save.gameState;
+  const missingGates = getMissingGates(gs);
   const openTasks = gs.tasks.filter((task) => task.status !== "DONE");
 
   return (
@@ -68,8 +70,10 @@ export function MobileHubScreen({ ui }: ScreenProps) {
             ? "All required tasks complete. You can advance the calendar."
             : advanceState.message ?? "Complete required tasks to continue."}
         </div>
-        {openTasks.length === 0 ? (
+        {openTasks.length === 0 && !missingGates.length ? (
           <div className="mobile-hub-screen__empty">No open tasks.</div>
+        ) : openTasks.length === 0 && missingGates.length ? (
+          <div className="mobile-hub-screen__empty">Advance Week will prompt to auto-resolve missing requirements.</div>
         ) : (
           openTasks.slice(0, 3).map((task) => (
             <ListRow
@@ -88,7 +92,7 @@ export function MobileHubScreen({ ui }: ScreenProps) {
         <ListRow title="Staff" subtitle="Manage coordinators" icon="🧠" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffTree" } })} />
         <ListRow title="Roster" subtitle="Review players" icon="🧾" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "Hub", tab: "roster" } })} />
         <div className="mobile-hub-screen__cta-row">
-          <SecondaryActionButton label="Advance" disabled={!advanceState.canAdvance} title={advanceState.message ?? "Advance calendar"} onClick={() => ui.dispatch({ type: "ADVANCE_WEEK" })} />
+          <SecondaryActionButton label={missingGates.length ? "Resolve & Advance" : "Advance"} disabled={!advanceState.canAdvance} title={advanceState.message ?? "Advance calendar"} onClick={() => ui.dispatch({ type: "ADVANCE_WEEK" })} />
           <PrimaryActionButton label="Advance Week" disabled={!advanceState.canAdvance} title={advanceState.message ?? "Advance calendar"} onClick={() => ui.dispatch({ type: "ADVANCE_WEEK" })} />
         </div>
       </SectionCard>

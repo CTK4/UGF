@@ -9,6 +9,7 @@ import { SegmentedTabs } from "@/ui/components/SegmentedTabs";
 import { sanitizeForbiddenName } from "@/services/rosterImport";
 import { capSpaceForTeam } from "@/engine/cap";
 import { JANUARY_DAY_LABELS, getJanuaryDayLabel } from "@/engine/calendar";
+import { getMissingGates } from "@/engine/advance";
 
 function money(n: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
@@ -41,6 +42,7 @@ export function HubScreen({ ui }: ScreenProps) {
     );
   }
   const gs = save.gameState;
+  const missingGates = getMissingGates(gs);
   const draftState = gs.draft ?? { discovered: {}, watchlist: [] };
 
   const discoveredEntries = Object.entries(draftState.discovered).sort((a, b) => a[1].level - b[1].level || a[0].localeCompare(b[0]));
@@ -133,6 +135,7 @@ export function HubScreen({ ui }: ScreenProps) {
                 {advanceState.route ? (
                   <button onClick={() => ui.dispatch({ type: "NAVIGATE", route: advanceState.route })}>Go to Required Screen</button>
                 ) : null}
+                {missingGates.length ? <button onClick={() => ui.dispatch({ type: "ADVANCE_WEEK" })}>Resolve &amp; Advance</button> : null}
                 <button onClick={() => ui.dispatch({ type: "OPEN_ADVANCE_BLOCKED_MODAL" })}>View Blocker Details</button>
               </div>
             </div>
@@ -243,7 +246,8 @@ export function HubScreen({ ui }: ScreenProps) {
 
         <div className="ugf-card"><div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
           <b>Tasks</b>
-          {gs.tasks.length === 0 && <div>No tasks available this week.</div>}
+          {gs.tasks.length === 0 && !missingGates.length && <div>No tasks available this week.</div>}
+          {gs.tasks.length === 0 && missingGates.length ? <div>Advance Week will prompt to auto-resolve missing requirements.</div> : null}
           {gs.tasks.map((task) => (
             <div key={task.id} className="ugf-card" style={{ opacity: task.status === "DONE" ? 0.7 : 1 }}>
               <div className="ugf-card__body" style={{ display: "grid", gap: 6 }}>
