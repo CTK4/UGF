@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["vite/client"]
+  },
+  "include": [
+    "src/typecheck-entry.ts",
+    "src/domain/staffRoles.ts",
+    "src/services/staffFreeAgents.ts",
+    "src/services/staffAssignments.ts",
+    "src/services/cpuStaffHiring.ts",
+    "src/ui/helpers/format.ts",
+    "src/ui/helpers/teamDisplay.ts"
+  ]
+}

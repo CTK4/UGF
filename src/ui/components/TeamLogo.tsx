@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { getTeamDisplayName } from "@/ui/helpers/teamDisplay";
 
 export type TeamLogoProps = {
   teamKey: string;
+  displayName?: string;
   size?: number;
   variant?: "list" | "standings" | "header";
   className?: string;
@@ -39,10 +41,11 @@ export function getTeamInitials(teamKey: string): string {
   return picks.map((token) => token[0] ?? "").join("") || "UGF";
 }
 
-export function TeamLogo({ teamKey, size, variant = "list", className }: TeamLogoProps) {
+export function TeamLogo({ teamKey, displayName, size, variant = "list", className }: TeamLogoProps) {
   const [candidateIndex, setCandidateIndex] = useState(0);
   const candidates = useMemo(() => resolveTeamLogoCandidates(teamKey), [teamKey]);
   const initials = useMemo(() => getTeamInitials(teamKey), [teamKey]);
+  const teamLabel = useMemo(() => getTeamDisplayName(displayName ? { name: displayName } : undefined, teamKey), [displayName, teamKey]);
   const resolvedSize = size ?? DEFAULT_SIZE_BY_VARIANT[variant];
   const activeSrc = candidates[candidateIndex] ?? null;
 
@@ -54,8 +57,8 @@ export function TeamLogo({ teamKey, size, variant = "list", className }: TeamLog
     return (
       <span
         className={className}
-        aria-label={`${teamKey} logo fallback`}
-        title={teamKey}
+        aria-label={`${teamLabel} logo fallback`}
+        title={teamLabel}
         style={{
           width: resolvedSize,
           height: resolvedSize,
@@ -84,7 +87,7 @@ export function TeamLogo({ teamKey, size, variant = "list", className }: TeamLog
     <img
       className={className}
       src={activeSrc}
-      alt={`${teamKey} logo`}
+      alt={`${teamLabel} logo`}
       width={resolvedSize}
       height={resolvedSize}
       loading="lazy"

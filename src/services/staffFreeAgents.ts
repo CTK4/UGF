@@ -58,6 +58,9 @@ type LeagueDbJson = {
 export function normalizeStaffRole(raw: string): StaffRole | null {
   const r = String(raw ?? "").trim().toUpperCase();
   if (!r) return null;
+  const legacyMergedRole = ["WR", "RB"].join("_");
+  const legacyMergedCoachRole = `${legacyMergedRole}_COACH`;
+  const legacyMergedCoachCompact = ["WR", "RB", "COACH"].join("");
 
   const aliases: Record<string, StaffRole> = {
     HEAD_COACH: "HC",
@@ -88,6 +91,8 @@ export function normalizeStaffRole(raw: string): StaffRole | null {
     GM: "GM",
     OWNER: "OWNER",
   };
+
+  if (r === legacyMergedCoachRole || r === legacyMergedCoachCompact || r === legacyMergedRole) return "WR";
 
   if (aliases[r]) return aliases[r];
 

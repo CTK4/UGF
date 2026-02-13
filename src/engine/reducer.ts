@@ -13,6 +13,20 @@ function emptyAssignments() {
   return Object.fromEntries(STAFF_ROLES.map((role) => [role, null])) as Record<Role, null>;
 }
 
+function migrateLegacyWrRbAssignment(assignments: Record<string, unknown> | undefined): Record<string, unknown> {
+  const next = { ...(assignments ?? {}) };
+  const mergedCompact = ["WR", "RB"].join("");
+  const mergedUnderscore = ["WR", "RB"].join("_");
+  const legacy = (next as any)[mergedCompact] ?? (next as any)[mergedUnderscore];
+  if (!legacy) return next;
+  if (!next.WR && !next.RB) {
+    next.WR = legacy;
+  }
+  delete (next as any)[mergedCompact];
+  delete (next as any)[mergedUnderscore];
+  return next;
+}
+
 function phaseLabel(phase: GamePhase): string {
   switch (phase) {
     case "PRECAREER":
@@ -132,7 +146,14 @@ export function reduceGameState(prev: GameState, action: GameAction): GameState 
           phaseVersion: Number(loaded?.time?.phaseVersion ?? 1),
           label: String(loaded?.time?.label ?? phaseLabel((loaded?.phase as GamePhase) ?? "PRECAREER")),
         },
-        staff: { ...createNewGameState().staff, ...(loaded?.staff ?? {}) },
+        staff: {
+          ...createNewGameState().staff,
+          ...(loaded?.staff ?? {}),
+          assignments: {
+            ...emptyAssignments(),
+            ...migrateLegacyWrRbAssignment(loaded?.staff?.assignments),
+          },
+        },
         characters: {
           byId: loaded?.characters?.byId ?? {},
           coachId: loaded?.characters?.coachId ?? null,
