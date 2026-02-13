@@ -178,24 +178,25 @@ export function InterviewsScreen({ ui }: ScreenProps) {
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
         {lastInterviewError ? <div className="ugf-pill" style={{ color: "#ffd7d7", borderColor: "#b04545" }}>{lastInterviewError}</div> : null}
         {interviewInvites.map((invite) => {
-          const franchise = resolveFranchiseLike(invite.franchiseId);
+          const inviteTeamKey = resolveTeamKey(invite.franchiseId);
+          const franchise = resolveFranchiseLike(inviteTeamKey);
           const result = opening.interviewResults[invite.franchiseId];
           return (
             <button
               key={invite.franchiseId}
               type="button"
               onClick={() => {
-                const id = String(invite.franchiseId);
+                const id = String(inviteTeamKey);
                 if (import.meta.env.DEV) console.log("[ui] interview invite clicked", { franchiseId: id });
                 ui.dispatch({ type: "OPENING_START_INTERVIEW", franchiseId: id });
               }}
               style={{ display: "grid", gridTemplateColumns: "64px 1fr", alignItems: "center", gap: 10, textAlign: "left" }}
             >
               <span style={{ display: "inline-flex", width: 64, minWidth: 64, justifyContent: "center", alignItems: "center" }}>
-                <TeamIcon teamKey={invite.franchiseId} displayName={franchise?.fullName} size={44} />
+                <TeamIcon teamKey={inviteTeamKey} displayName={franchise?.fullName} size={44} />
               </span>
               <span>
-                <div><b>{(() => { const name = franchise?.fullName ?? humanizeId(invite.franchiseId); devGuardForbiddenTeamName(name); return name; })()}</b>{result?.completed ? " • Completed" : ""}</div>
+                <div><b>{(() => { const name = franchise?.fullName ?? humanizeId(inviteTeamKey); devGuardForbiddenTeamName(name); return name; })()}</b>{result?.completed ? " • Completed" : ""}</div>
                 <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[invite.tier]}</div>
                 <div style={{ fontSize: 12, opacity: 0.9 }}>{invite.summaryLine}</div>
               </span>
@@ -312,14 +313,15 @@ export function OffersScreen({ ui }: ScreenProps) {
         ) : null}
         {offers.map((offer) => (
           <button type="button" key={offer.franchiseId} onClick={() => {
-              const resolved = resolveFranchiseLike(offer.franchiseId);
+              const offerTeamKey = resolveTeamKey(offer.franchiseId);
+              const resolved = resolveFranchiseLike(offerTeamKey);
               ui.dispatch({
                 type: "ACCEPT_OFFER",
-                franchiseId: offer.franchiseId,
-                excelTeamKey: normalizeExcelTeamKey(resolved?.fullName ?? offer.franchiseId),
+                franchiseId: offerTeamKey,
+                excelTeamKey: normalizeExcelTeamKey(resolved?.fullName ?? offerTeamKey),
               });
             }}>
-            <div><b>{(() => { const name = resolveFranchiseLike(offer.franchiseId)?.fullName ?? humanizeId(offer.franchiseId); devGuardForbiddenTeamName(name); return name; })()}</b></div>
+            <div><b>{(() => { const offerTeamKey = resolveTeamKey(offer.franchiseId); const name = resolveFranchiseLike(offerTeamKey)?.fullName ?? humanizeId(offerTeamKey); devGuardForbiddenTeamName(name); return name; })()}</b></div>
             <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[offer.tier]}</div>
             <div style={{ fontSize: 12, opacity: 0.9 }}>{offer.summaryLine}</div>
           </button>

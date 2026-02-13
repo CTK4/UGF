@@ -668,19 +668,32 @@ const FIXED_TRIAD: Array<{ teamKey: string; tier: InterviewInviteTier; legendRet
   { teamKey: "ATLANTA_APEX", tier: "FRINGE" },
 ];
 
+function assertFixedTriadTeamKeysResolve(): void {
+  if (!import.meta.env.DEV) return;
+  for (const { teamKey } of FIXED_TRIAD) {
+    const resolved = resolveTeamKey(teamKey);
+    console.assert(
+      resolved === teamKey,
+      "[runtime] fixed triad key must resolve to the same mascot key",
+      { teamKey, resolved },
+    );
+  }
+}
+
 function generateFixedTriadInvitesWithFallback(
   leagueSeed: number,
   fallbackHometownTeamKey: string,
 ): { invites: InterviewInvite[]; usedFallback: boolean } {
   try {
+    assertFixedTriadTeamKeysResolve();
     const metricsByTeamKey = buildTeamInviteMetricsByTeamKey(leagueSeed);
 
     const invites: InterviewInvite[] = FIXED_TRIAD.map(({ teamKey, tier, legendRetiredOpening }) => {
-      const franchiseId = resolveTeamKey(teamKey);
-      const metrics = metricsByTeamKey.get(franchiseId);
-      if (!metrics) throw new Error(`Missing metrics for fixed triad team: ${franchiseId}`);
+      const franchiseId = teamKey;
+      const metrics = metricsByTeamKey.get(teamKey);
+      if (!metrics) throw new Error(`Missing metrics for fixed triad team: ${teamKey}`);
 
-      const base = buildSummaryLine(franchiseId, tier, metrics.capSpace ?? null);
+      const base = buildSummaryLine(teamKey, tier, metrics.capSpace ?? null);
       return {
         franchiseId,
         tier,
