@@ -16,6 +16,8 @@
     "start": "npm run build && npm run preview",
     "start:prod": "npm run start",
     "smoke": "bash scripts/smoke.sh",
+    "smoke:test": "node scripts/smoke.mjs",
+    "typecheck:ci": "tsc -p tsconfig.ci.json --noEmit",
     "guard:persistence": "bash scripts/guard-persistence-writers.sh src"
   },
   "keywords": [],

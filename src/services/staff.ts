@@ -7,7 +7,7 @@
  */
 import type { TableRegistry } from "@/data/TableRegistry";
 
-export type StaffRole = "HC" | "OC" | "DC" | "QB_COACH" | "WR_RB" | "OL" | "DL" | "LB" | "DB" | "ASST" | "ST";
+export type StaffRole = "HC" | "OC" | "DC" | "QB_COACH" | "RB_COACH" | "WR_COACH" | "OL" | "DL" | "LB" | "DB" | "ASST" | "ST";
 export type StaffPosition = "Owner" | "GM" | "Head Coach" | "Offensive Coordinator" | "Defensive Coordinator";
 
 export type StaffMember = {
@@ -21,7 +21,7 @@ export type StaffMember = {
   archetype?: string;
 };
 
-export type TeamStaff = { HC?: string; OC?: string; DC?: string; QB_COACH?: string; WR_RB?: string; OL?: string; DL?: string; LB?: string; DB?: string; ST?: string; ASST?: string };
+export type TeamStaff = { HC?: string; OC?: string; DC?: string; QB_COACH?: string; RB_COACH?: string; WR_COACH?: string; OL?: string; DL?: string; LB?: string; DB?: string; ST?: string; ASST?: string };
 
 export type StaffState = {
   staffById: Record<string, StaffMember>;
@@ -169,7 +169,8 @@ const ensureSlotCoach = (teamId: string, role: StaffRole, label: string): string
 // fill missing position-coach slots
 for (const teamId of Object.keys(teamStaff)) {
   const s = teamStaff[teamId];
-  s.WR_RB = s.WR_RB ?? ensureSlotCoach(teamId, "WR_RB", "WR/RB Coach");
+  s.RB_COACH = s.RB_COACH ?? ensureSlotCoach(teamId, "RB_COACH", "RB Coach");
+  s.WR_COACH = s.WR_COACH ?? ensureSlotCoach(teamId, "WR_COACH", "WR Coach");
   s.OL = s.OL ?? ensureSlotCoach(teamId, "OL", "OL Coach");
   s.DL = s.DL ?? ensureSlotCoach(teamId, "DL", "DL Coach");
   s.LB = s.LB ?? ensureSlotCoach(teamId, "LB", "LB Coach");

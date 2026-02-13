@@ -15,8 +15,10 @@ function posKeyFromRole(role: StaffRole): string | null {
   switch (role) {
     case "QB_COACH":
       return "QB";
-    case "WR_RB":
-      return "WR/RB";
+    case "RB_COACH":
+      return "RB";
+    case "WR_COACH":
+      return "WR";
     case "OL":
       return "OL";
     case "DL":
@@ -61,7 +63,7 @@ export function computeTeamStaffEffects(staff: StaffState | undefined, teamId: s
   const defenseBonus = clamp(dcB + Math.round(hcB * 0.5), -10, 10);
 
   const devByPos: Record<string, number> = {};
-  const roles: StaffRole[] = ["QB_COACH", "WR_RB", "OL", "DL", "LB", "DB"];
+  const roles: StaffRole[] = ["QB_COACH", "RB_COACH", "WR_COACH", "OL", "DL", "LB", "DB"];
   for (const r of roles) {
     const key = posKeyFromRole(r);
     if (!key) continue;
@@ -70,7 +72,7 @@ export function computeTeamStaffEffects(staff: StaffState | undefined, teamId: s
     devByPos[key] = m ? ratingToDev(m.rating) : 0;
   }
 
-  const summary: TeamStaffEffects["summary"] = (["HC", "OC", "DC", "QB_COACH", "WR_RB", "OL", "DL", "LB", "DB", "ST"] as StaffRole[]).map((role) => {
+  const summary: TeamStaffEffects["summary"] = (["HC", "OC", "DC", "QB_COACH", "RB_COACH", "WR_COACH", "OL", "DL", "LB", "DB", "ST"] as StaffRole[]).map((role) => {
     const id = (slots as any)[role] as string | undefined;
     const m = id ? byId[id] : undefined;
     return { role, coach: m ? { id: m.id, name: m.name, rating: m.rating, tier: m.tier } : undefined };

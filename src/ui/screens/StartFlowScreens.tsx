@@ -77,13 +77,14 @@ function devGuardForbiddenTeamName(_teamName: string) {
 
 export function StartScreen({ ui }: ScreenProps) {
   const state = ui.getState();
-  const hasSave = !!state.save;
+  const save = state.save;
+  const hasSave = !!save;
 
   return (
     <div className="ugf-card" style={{ minHeight: "70vh", display: "grid", placeItems: "center" }}>
       <div className="ugf-card__body" style={{ display: "grid", gap: 12, textAlign: "center", maxWidth: 640 }}>
         <h2 className="ugf-card__title" style={{ fontSize: 24 }}>Start Your Career</h2>
-        {hasSave ? <div className="ugf-pill">Resume available: Week {state.save.gameState.time.week} • {state.save.gameState.phase}</div> : null}
+        {hasSave ? <div className="ugf-pill">Resume available: Week {save?.gameState.time.week} • {save?.gameState.phase}</div> : null}
         <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
           {hasSave ? <button onClick={() => ui.dispatch({ type: "LOAD_GAME" })}>Resume Career</button> : null}
           <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CreateCoach" } })}>Start New Career</button>
@@ -191,7 +192,7 @@ export function InterviewsScreen({ ui }: ScreenProps) {
               style={{ display: "grid", gridTemplateColumns: "64px 1fr", alignItems: "center", gap: 10, textAlign: "left" }}
             >
               <span style={{ display: "inline-flex", width: 64, minWidth: 64, justifyContent: "center", alignItems: "center" }}>
-                <TeamIcon teamKey={invite.franchiseId} size={44} />
+                <TeamIcon teamKey={invite.franchiseId} displayName={franchise?.fullName} size={44} />
               </span>
               <span>
                 <div><b>{(() => { const name = franchise?.fullName ?? humanizeId(invite.franchiseId); devGuardForbiddenTeamName(name); return name; })()}</b>{result?.completed ? " • Completed" : ""}</div>
@@ -232,7 +233,7 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
   const questionIndex = result.answers.length;
   const questionId = script.questionIds[questionIndex];
   const current = questionId ? INTERVIEW_QUESTION_BANK[questionId] : undefined;
-  const prompt = questionId ? script.phrasing?.[questionId] ?? current?.prompt : undefined;
+  const prompt = questionId ? ((script as { phrasing?: Record<string, string> }).phrasing?.[questionId] ?? current?.prompt) : undefined;
   const isDone = result.completed || questionIndex >= script.questionIds.length;
 
   if (!current && !isDone) {

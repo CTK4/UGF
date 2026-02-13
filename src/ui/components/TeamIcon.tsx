@@ -2,6 +2,7 @@ import { TeamLogo, type TeamLogoProps, getTeamInitials, resolveTeamLogoCandidate
 
 export type TeamIconProps = {
   teamKey: string;
+  displayName?: string;
   size?: number;
   className?: string;
   variant?: "square" | "circle";
@@ -13,8 +14,8 @@ export function resolveTeamIconCandidates(teamKey: string): string[] {
 
 export { getTeamInitials };
 
-export function TeamIcon({ teamKey, size, className }: TeamIconProps) {
-  const props: TeamLogoProps = { teamKey, size, className, variant: "list" };
+export function TeamIcon({ teamKey, displayName, size, className }: TeamIconProps) {
+  const props: TeamLogoProps = { teamKey, displayName, size, className, variant: "list" };
   return <TeamLogo {...props} />;
 }
 

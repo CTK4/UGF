@@ -65,7 +65,7 @@ export function StaffTreeScreen({ ui }: ScreenProps) {
           })}
         </div></div>
 
-        {(HIREABLE_STAFF_ROLES as HireableStaffRole[]).map((role) => {
+        {[...HIREABLE_STAFF_ROLES].map((role) => {
           const assignment = assignments[role];
           return (
             <div key={role} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
