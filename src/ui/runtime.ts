@@ -29,6 +29,8 @@ import { clearLocalSave, loadLocalSave, persistLocalSave } from "@/domainE/persi
 import { loadCoachFreeAgents, type CoachFreeAgent } from "@/services/staffFreeAgents";
 import { buildLeagueCoordinatorAssignments, buildStaffAssignmentsForTeam } from "@/services/staffAssignments";
 import { buildExistingContractsIndex, contractRowToCoachContract, createNewCoachContract, findExistingCoachContractRow, salaryForContractInSeason, type CoachContract } from "@/services/coachContracts";
+import { hydrateLeagueStaffFromPersonnel, hydrateUserStaffFromTeamBucket } from "@/services/instantStaffFill";
+import { runCpuStaffHiring } from "@/services/cpuStaffHiring";
 
 /**
  * Verification Checklist
@@ -1113,7 +1115,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachName: String(action.coachName ?? "") } } });
           return;
         case "SET_COACH_AGE":
-          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachAge: Math.max(30, Math.min(55, Number(action.coachAge ?? 35) || 35)) } } });
+          setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachAge: Math.max(24, Math.min(85, Number(action.coachAge ?? 35) || 35)) } } });
           return;
         case "SET_COACH_PERSONALITY":
           setState({ ...state, ui: { ...state.ui, opening: { ...state.ui.opening, coachPersonality: String(action.coachPersonality ?? "Assertive Leader") } } });
@@ -1435,8 +1437,8 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               draft: gameState.draft ?? { discovered: {}, watchlist: [] },
             };
             const save = { version: 1 as const, gameState };
-            hydrateAllTeamsCoordinators(save);
-            hydrateUserTeamStaff(save);
+            hydrateLeagueStaffFromPersonnel(save.gameState);
+            hydrateUserStaffFromTeamBucket(save.gameState, franchiseId);
             persistLocalSave(save);
             setState({
               ...state,
@@ -1918,6 +1920,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             nextGameState = reduceGameState(nextGameState, gameActions.enterRegularSeason());
           }
 
+          nextGameState = runCpuStaffHiring(nextGameState);
           const nextSave = { version: 1 as const, gameState: nextGameState };
           assertCityTeamLeagueInvariants(nextSave);
           const validationModal = runLeagueValidation(nextSave);
@@ -2146,13 +2149,6 @@ export function buildMarketForRole(role: StaffRole) {
   for (const c of fromFreeAgents) {
     if (candidates.length >= 6) break;
     candidates.push(c);
-  }
-
-  let id = 1;
-  while (candidates.length < 3) {
-    const padded = createCandidate(role, id++);
-    if (padded.rating == null) padded.rating = 68;
-    candidates.push(padded);
   }
 
   candidates.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));

@@ -371,3 +371,9 @@ export const INTERVIEW_SCRIPTS: Record<string, TeamInterviewScript> = {
     gmTraits: [] as const,
   },
 };
+
+INTERVIEW_SCRIPTS.BIRMINGHAM_VULCANS__LEGEND = {
+  ...INTERVIEW_SCRIPTS.BIRMINGHAM_VULCANS,
+  teamKey: "BIRMINGHAM_VULCANS__LEGEND",
+  thresholds: { ownerMin: 48, gmMin: 48, maxRisk: 58 },
+};

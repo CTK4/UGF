@@ -10,6 +10,7 @@ import { TeamIcon } from "@/ui/components/TeamIcon";
 import { INTERVIEW_QUESTION_BANK } from "@/data/interviewBank";
 import { INTERVIEW_SCRIPTS } from "@/data/interviewScripts";
 import { coordinatorCandidateMeta, type CoordinatorRole } from "@/ui/helpers/deterministic";
+import { humanizeId } from "@/ui/helpers/format";
 
 type CoordinatorCandidate = {
   personId: string;
@@ -112,14 +113,6 @@ export function CreateCoachScreen({ ui }: ScreenProps) {
           placeholder="Coach name"
           onChange={(e) => ui.dispatch({ type: "SET_COACH_NAME", coachName: e.target.value })}
         />
-        <input
-          type="number"
-          min={30}
-          max={55}
-          value={opening.coachAge}
-          placeholder="Coach age"
-          onChange={(e) => ui.dispatch({ type: "SET_COACH_AGE", coachAge: Number(e.target.value) })}
-        />
         <select value={opening.coachAge} onChange={(e) => ui.dispatch({ type: "SET_COACH_AGE", coachAge: Number(e.target.value) })}>
           {Array.from({ length: 85 - 24 + 1 }, (_, i) => 24 + i).map((age) => (
             <option key={age} value={age}>{age}</option>
@@ -201,7 +194,7 @@ export function InterviewsScreen({ ui }: ScreenProps) {
                 <TeamIcon teamKey={invite.franchiseId} size={44} />
               </span>
               <span>
-                <div><b>{(() => { const name = franchise?.fullName ?? invite.franchiseId; devGuardForbiddenTeamName(name); return name; })()}</b>{result?.completed ? " • Completed" : ""}</div>
+                <div><b>{(() => { const name = franchise?.fullName ?? humanizeId(invite.franchiseId); devGuardForbiddenTeamName(name); return name; })()}</b>{result?.completed ? " • Completed" : ""}</div>
                 <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[invite.tier]}</div>
                 <div style={{ fontSize: 12, opacity: 0.9 }}>{invite.summaryLine}</div>
               </span>
@@ -234,7 +227,8 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
     );
   }
   const scriptTeamKey = resolveTeamKey(franchiseId);
-  const script = INTERVIEW_SCRIPTS[scriptTeamKey] ?? INTERVIEW_SCRIPTS.ATLANTA_APEX;
+  const legendScriptKey = `${scriptTeamKey}__LEGEND`;
+  const script = (invite.legendRetiredOpening ? INTERVIEW_SCRIPTS[legendScriptKey] : undefined) ?? INTERVIEW_SCRIPTS[scriptTeamKey] ?? INTERVIEW_SCRIPTS.ATLANTA_APEX;
   const questionIndex = result.answers.length;
   const questionId = script.questionIds[questionIndex];
   const current = questionId ? INTERVIEW_QUESTION_BANK[questionId] : undefined;
@@ -248,7 +242,7 @@ export function OpeningInterviewScreen({ ui }: ScreenProps) {
 
   return (
     <div className="ugf-card">
-      <div className="ugf-card__header"><h2 className="ugf-card__title">Interview: {(() => { const name = franchise?.fullName ?? franchiseId; devGuardForbiddenTeamName(name); return name; })()}</h2></div>
+      <div className="ugf-card__header"><h2 className="ugf-card__title">Interview: {(() => { const name = franchise?.fullName ?? humanizeId(franchiseId); devGuardForbiddenTeamName(name); return name; })()}</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
         <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[invite.tier]} • {invite.summaryLine}</div>
         {current ? <div><b>{current.label}</b> {prompt}</div> : null}
@@ -324,7 +318,7 @@ export function OffersScreen({ ui }: ScreenProps) {
                 excelTeamKey: normalizeExcelTeamKey(resolved?.fullName ?? offer.franchiseId),
               });
             }}>
-            <div><b>{(() => { const name = resolveFranchiseLike(offer.franchiseId)?.fullName ?? offer.franchiseId; devGuardForbiddenTeamName(name); return name; })()}</b></div>
+            <div><b>{(() => { const name = resolveFranchiseLike(offer.franchiseId)?.fullName ?? humanizeId(offer.franchiseId); devGuardForbiddenTeamName(name); return name; })()}</b></div>
             <div style={{ fontSize: 12, opacity: 0.9 }}>{tierLabelByCode[offer.tier]}</div>
             <div style={{ fontSize: 12, opacity: 0.9 }}>{offer.summaryLine}</div>
           </button>

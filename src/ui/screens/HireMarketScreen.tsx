@@ -7,7 +7,7 @@ type Group = "COORD" | "POS";
 type SortMode = "RATING" | "VALUE";
 
 const COORD_ROLES = ["OC", "DC", "STC"] as const;
-const POS_ROLES = ["QB", "WRRB", "OL", "DL", "LB", "DB", "ASST"] as const;
+const POS_ROLES = ["QB", "RB", "WR", "OL", "DL", "LB", "DB", "ASST"] as const;
 
 function isCoordRole(role: string): role is (typeof COORD_ROLES)[number] {
   return (COORD_ROLES as readonly string[]).includes(role);
@@ -59,7 +59,8 @@ export function HireMarketScreen({ ui }: ScreenProps) {
     return group === "COORD" ? "OC" : "QB";
   }, [group, rolesForGroup, selectedRole]);
 
-  const sessionKey = `${save.gameState.time.season}-${save.gameState.time.week}:${effectiveRole}`;
+  const marketRole = effectiveRole === "RB" || effectiveRole === "WR" ? "WRRB" : effectiveRole;
+  const sessionKey = `${save.gameState.time.season}-${save.gameState.time.week}:${marketRole}`;
   const session = marketByWeekFor(save.gameState)[sessionKey];
 
   const candidates = useMemo(() => {
@@ -76,7 +77,7 @@ export function HireMarketScreen({ ui }: ScreenProps) {
     return list;
   }, [session, sortMode]);
 
-  const title = (STAFF_ROLE_LABELS as any)[effectiveRole] ?? effectiveRole;
+  const title = effectiveRole === "RB" ? "RB Coach" : effectiveRole === "WR" ? "WR Coach" : (STAFF_ROLE_LABELS as any)[effectiveRole] ?? effectiveRole;
 
   const onSetGroup = (next: Group) => {
     setGroup(next);
@@ -103,7 +104,7 @@ export function HireMarketScreen({ ui }: ScreenProps) {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {(rolesForGroup as readonly string[]).map((r) => (
             <button key={r} style={miniTabStyle(r === effectiveRole)} onClick={() => setSelectedRole(r)}>
-              {(STAFF_ROLE_LABELS as any)[r] ?? r}
+              {r === "RB" ? "RB Coach" : r === "WR" ? "WR Coach" : (STAFF_ROLE_LABELS as any)[r] ?? r}
             </button>
           ))}
         </div>
@@ -113,7 +114,7 @@ export function HireMarketScreen({ ui }: ScreenProps) {
             <button
               key={c.id}
               onClick={() =>
-                ui.dispatch({ type: "NAVIGATE", route: { key: "CandidateDetail", role: effectiveRole, candidateId: c.id } })
+                ui.dispatch({ type: "NAVIGATE", route: { key: "CandidateDetail", role: marketRole, candidateId: c.id } })
               }
               style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}
             >

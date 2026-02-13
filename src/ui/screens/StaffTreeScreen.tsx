@@ -16,11 +16,6 @@ export function StaffTreeScreen({ ui }: ScreenProps) {
   if (!save) return null;
   const assignments = save.gameState.staff.assignments;
   const control = save.gameState.career.control;
-  const coachId = save.gameState.characters?.coachId;
-  const coachName =
-    coachId && save.gameState.characters?.byId?.[coachId]
-      ? save.gameState.characters.byId[coachId].fullName
-      : "You";
 
   const rows: Array<{ side: "offense" | "defense" | "specialTeams"; label: string }> = [
     { side: "offense", label: "Offense" },
@@ -33,7 +28,7 @@ export function StaffTreeScreen({ ui }: ScreenProps) {
       <div className="ugf-card__header"><h2 className="ugf-card__title">Staff Tree</h2></div>
       <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-          <div><b>Head Coach:</b> {coachName}</div>
+          <div><b>Head Coach:</b> You</div>
         </div>
         <div className="ugf-pill">Budget: ${save.gameState.staff.budgetUsed.toLocaleString()} / ${save.gameState.staff.budgetTotal.toLocaleString()}</div>
 

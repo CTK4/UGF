@@ -1,4 +1,5 @@
 import type { StaffRole } from "@/domain/staffRoles";
+import type { CoachContract } from "@/services/coachContracts";
 
 /**
  * The phase of the game loop. The MVV requires us to progress from
@@ -186,6 +187,11 @@ export type GameState = {
     budgetTotal: number;
     budgetUsed: number;
     blockedHireAttemptsRecent?: number;
+    coachContractsById?: Record<string, CoachContract>;
+    nextCoachContractId?: number;
+    leagueAssignmentsByTeamId?: Record<string, unknown>;
+    byTeamId?: Record<string, unknown>;
+    lastCpuHiringWeek?: number;
   };
   offseasonPlan: {
     priorities: string[];
