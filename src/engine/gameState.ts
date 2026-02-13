@@ -228,6 +228,7 @@ export type GameState = {
     capLimit: number;
   };
   completedGates: string[];
+  depthChartFinalized?: boolean;
   lastUiError: string | null;
 
   /**

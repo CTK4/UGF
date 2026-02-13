@@ -9,6 +9,7 @@ import {
   StatPillsRow,
 } from "@/ui/mobile/components";
 import { getJanuaryDayLabel } from "@/engine/calendar";
+import { getMissingGates } from "@/engine/advance";
 
 /*
 Verification checklist:
@@ -34,6 +35,7 @@ export function MobileHubScreen({ ui }: ScreenProps) {
   }
 
   const gs = save.gameState;
+  const missingGates = getMissingGates(gs);
   const openTasks = gs.tasks.filter((task) => task.status !== "DONE");
 
   return (
@@ -68,7 +70,7 @@ export function MobileHubScreen({ ui }: ScreenProps) {
             ? "All required tasks complete. You can advance the calendar."
             : advanceState.message ?? "Complete required tasks to continue."}
         </div>
-        {openTasks.length === 0 ? (
+        {openTasks.length === 0 && missingGates.length === 0 ? (
           <div className="mobile-hub-screen__empty">No open tasks.</div>
         ) : (
           openTasks.slice(0, 3).map((task) => (
@@ -81,6 +83,9 @@ export function MobileHubScreen({ ui }: ScreenProps) {
             />
           ))
         )}
+        {missingGates.length > 0 ? (
+          <SecondaryActionButton label="Resolve & Advance" onClick={() => ui.dispatch({ type: "ADVANCE_WEEK" })} />
+        ) : null}
       </SectionCard>
 
       <SectionCard title="Primary actions">

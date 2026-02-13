@@ -1,6 +1,6 @@
 import { STAFF_ROLES, type StaffRole } from "@/domain/staffRoles";
 import { gameActions } from "@/engine/actions";
-import { advanceDay, getAdvanceBlocker } from "@/engine/advance";
+import { advanceDay, getAdvanceBlocker, getMissingGates, type MissingGate } from "@/engine/advance";
 import type { GameState, StaffAssignment, Thread } from "@/engine/gameState";
 import { createNewGameState, reduceGameState } from "@/engine/reducer";
 import { generateBeatTasks } from "@/engine/tasks";
@@ -106,16 +106,52 @@ function getAdvanceAvailability(save: SaveData | null): { canAdvance: boolean; m
     return { canAdvance: false, message: "Load or start a save before advancing the day.", route: { key: "Start" } };
   }
 
+  const missingGates = getMissingGates(save.gameState);
+  if (missingGates.length > 0) {
+    return {
+      canAdvance: true,
+      message: `Missing: ${missingGates.map((gate) => gate.label).join(", ")}. Confirm to auto-resolve and advance.`,
+      route: { key: "Hub" },
+    };
+  }
+
   const blocked = getAdvanceBlocker(save.gameState);
   if (!blocked) return { canAdvance: true };
   return { canAdvance: false, message: blocked.message, route: blocked.route };
 }
 
+function autoResolveAdvanceGate(gameState: GameState, gate: MissingGate): { gameState: GameState; advancedViaSimulation?: boolean } {
+  if (gate.autoResolveAction === "AUTO_RESOLVE_STAFF_MEETING") {
+    return {
+      gameState: reduceGameState(
+        gameState,
+        gameActions.setOffseasonPlan({ priorities: ["Balanced"], resignTargets: [], shopTargets: [], tradeNotes: "" }),
+      ),
+    };
+  }
+
+  if (gate.autoResolveAction === "AUTO_RESOLVE_DEPTH_CHART") {
+    return {
+      gameState: {
+        ...gameState,
+        depthChartFinalized: true,
+        completedGates: Array.from(new Set([...(gameState.completedGates ?? []), "DEPTH_CHART_FINALIZED"])),
+      },
+    };
+  }
+
+  const simulated = reduceGameState(gameState, gameActions.simulateGame());
+  return { gameState: simulated, advancedViaSimulation: simulated !== gameState };
+}
+
 function assertAdvanceRoutingInvariant(save: SaveData | null): void {
   if (!import.meta.env.DEV || !save) return;
   const availability = getAdvanceAvailability(save);
+  const missing = getMissingGates(save.gameState);
   const blocked = getAdvanceBlocker(save.gameState);
-  const expected = blocked
+  const expected = missing.length > 0
+    ? { canAdvance: true, message: `Missing: ${missing.map((gate) => gate.label).join(", ")}. Confirm to auto-resolve and advance.`, routeKey: "Hub" }
+    : blocked
     ? { canAdvance: false, message: blocked.message, routeKey: blocked.route.key }
     : { canAdvance: true, message: undefined, routeKey: undefined };
 
@@ -866,6 +902,25 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           actions: [
             { label: "Go to Required Screen", action: { type: "NAVIGATE", route: fallbackRoute } },
             { label: "Close", action: { type: "CLOSE_MODAL" } },
+          ],
+        },
+      },
+    });
+  };
+
+  const openAdvanceConfirmModal = (missingGates: MissingGate[]) => {
+    const lines = missingGates.map((gate) => `• ${gate.label}`);
+    setState({
+      ...state,
+      ui: {
+        ...state.ui,
+        activeModal: {
+          title: "Confirm Advance Week",
+          message: "The following items are incomplete and will be auto-resolved:",
+          lines,
+          actions: [
+            { label: "Yes, Resolve & Advance", action: { type: "CONFIRM_ADVANCE_WITH_MISSING_GATES" } },
+            { label: "No", action: { type: "CLOSE_MODAL" } },
           ],
         },
       },
@@ -1836,13 +1891,18 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
         }
         case "ADVANCE_WEEK": {
           assertAdvanceRoutingInvariant(state.save);
+          if (!state.save) return;
+          const missingGates = getMissingGates(state.save.gameState);
+          if (missingGates.length > 0) {
+            openAdvanceConfirmModal(missingGates);
+            return;
+          }
+
           const availability = getAdvanceAvailability(state.save);
           if (!availability.canAdvance) {
             openAdvanceBlockedModal(availability);
             return;
           }
-
-          if (!state.save) return;
 
           const preAdvanceErrors = getLeagueValidationErrors(state.save);
           if (preAdvanceErrors.length) {
@@ -1929,6 +1989,53 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             save: nextSave,
             route: { key: "Hub" },
             ui: { ...state.ui, activeModal: validationModal ?? null },
+          });
+          return;
+        }
+        case "CONFIRM_ADVANCE_WITH_MISSING_GATES": {
+          if (!state.save) return;
+
+          const missingGates = getMissingGates(state.save.gameState);
+          let nextGameState = state.save.gameState;
+          let advancedViaSimulation = false;
+          for (const gate of missingGates) {
+            const resolved = autoResolveAdvanceGate(nextGameState, gate);
+            nextGameState = resolved.gameState;
+            advancedViaSimulation = advancedViaSimulation || Boolean(resolved.advancedViaSimulation);
+          }
+
+          if (!advancedViaSimulation) {
+            const result = advanceDay(nextGameState);
+            if (!result.ok) {
+              openAdvanceBlockedModal({ canAdvance: false, message: result.blocked.message, route: result.blocked.route });
+              return;
+            }
+            nextGameState = result.gameState;
+          }
+
+          const derivedLeagueState = rebuildLeagueDerivedMaps(nextGameState.league.playersById ?? {});
+          const hydratedGameState: GameState = {
+            ...nextGameState,
+            world: {
+              ...nextGameState.world,
+              leagueDbVersion: "v1",
+              leagueDbHash: getLeagueDbHash(),
+            },
+            league: {
+              ...nextGameState.league,
+              teamRosters: derivedLeagueState.teamRosters,
+              cap: {
+                salaryCap: Number(nextGameState.league.cap?.salaryCap ?? DEFAULT_SALARY_CAP),
+                capUsedByTeam: derivedLeagueState.cap.capUsedByTeam,
+              },
+            },
+          };
+
+          setState({
+            ...state,
+            save: { version: 1, gameState: hydratedGameState },
+            route: { key: "Hub" },
+            ui: { ...state.ui, activeModal: null },
           });
           return;
         }

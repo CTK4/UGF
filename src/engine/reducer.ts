@@ -121,6 +121,7 @@ export function createNewGameState(): GameState {
     freeAgency: createEmptyFreeAgencyState(),
     cap: createEmptyCapState(),
     completedGates: [],
+    depthChartFinalized: false,
     lastUiError: null,
     seasonSchedule: undefined,
   };

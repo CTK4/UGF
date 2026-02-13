@@ -9,6 +9,7 @@ import { SegmentedTabs } from "@/ui/components/SegmentedTabs";
 import { sanitizeForbiddenName } from "@/services/rosterImport";
 import { capSpaceForTeam } from "@/engine/cap";
 import { JANUARY_DAY_LABELS, getJanuaryDayLabel } from "@/engine/calendar";
+import { getMissingGates } from "@/engine/advance";
 
 function money(n: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
@@ -41,6 +42,7 @@ export function HubScreen({ ui }: ScreenProps) {
     );
   }
   const gs = save.gameState;
+  const missingGates = getMissingGates(gs);
   const draftState = gs.draft ?? { discovered: {}, watchlist: [] };
 
   const discoveredEntries = Object.entries(draftState.discovered).sort((a, b) => a[1].level - b[1].level || a[0].localeCompare(b[0]));
@@ -135,6 +137,15 @@ export function HubScreen({ ui }: ScreenProps) {
                 ) : null}
                 <button onClick={() => ui.dispatch({ type: "OPEN_ADVANCE_BLOCKED_MODAL" })}>View Blocker Details</button>
               </div>
+            </div>
+          </div>
+        ) : null}
+        {missingGates.length > 0 ? (
+          <div className="ugf-card" style={{ borderColor: "rgba(255, 191, 71, 0.45)" }}>
+            <div className="ugf-card__body" style={{ display: "grid", gap: 6 }}>
+              <b>Resolve & Advance</b>
+              <div>{missingGates.map((gate) => gate.label).join(" · ")}</div>
+              <button onClick={() => ui.dispatch({ type: "ADVANCE_WEEK" })}>Resolve & Advance</button>
             </div>
           </div>
         ) : null}
