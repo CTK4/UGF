@@ -83,22 +83,25 @@ export type TeamSummaryProjectionRow = {
   "Cap Space": number;
 };
 
+type LeagueDbTables = {
+  League?: LeagueRow[];
+  Conferences?: ConferenceRow[];
+  Divisions?: DivisionRow[];
+  Teams?: TeamRow[];
+  Personnel?: PersonnelRow[];
+  Players?: PlayerRow[];
+  Contracts?: ContractRow[];
+  DraftOrder?: DraftOrderRow[];
+  TeamFinances?: TeamFinanceRow[];
+};
+
 type LeagueDbRoot = {
-  sheets?: {
-    League?: LeagueRow[];
-    Conferences?: ConferenceRow[];
-    Divisions?: DivisionRow[];
-    Teams?: TeamRow[];
-    Personnel?: PersonnelRow[];
-    Players?: PlayerRow[];
-    Contracts?: ContractRow[];
-    DraftOrder?: DraftOrderRow[];
-    TeamFinances?: TeamFinanceRow[];
-  };
+  sheets?: LeagueDbTables;
+  tables?: LeagueDbTables;
 };
 
 const root = leagueDbJson as LeagueDbRoot;
-const sheets = root.sheets ?? {};
+const sheets = root.sheets ?? root.tables ?? {};
 
 const league = Object.freeze([...(sheets.League ?? [])]);
 const conferences = Object.freeze([...(sheets.Conferences ?? [])]);

@@ -101,8 +101,7 @@ type DraftPickSheetRow = {
   isUsed?: boolean;
 };
 
-type LeagueDb = {
-  sheets: {
+type LeagueDbTables = {
     League: LeagueSheetRow[];
     Conferences: ConferenceSheetRow[];
     Divisions: DivisionSheetRow[];
@@ -113,56 +112,61 @@ type LeagueDb = {
     DraftOrder: DraftOrderSheetRow[];
     DraftPicks: DraftPickSheetRow[];
     TeamFinances: TeamFinanceSheetRow[];
-  };
+};
+
+type LeagueDb = {
+  sheets?: LeagueDbTables;
+  tables?: LeagueDbTables;
 };
 
 const leagueDb = leagueDbRaw as LeagueDb;
+const dbTables = leagueDb.sheets ?? leagueDb.tables ?? {};
 
 function copyRows<T extends object>(rows: T[]): T[] {
   return rows.map((row) => ({ ...row }));
 }
 
 export function getLeague(): LeagueSheetRow[] {
-  return copyRows(leagueDb.sheets.League ?? []);
+  return copyRows(dbTables.League ?? []);
 }
 
 export function getConferences(): ConferenceSheetRow[] {
-  return copyRows(leagueDb.sheets.Conferences ?? []);
+  return copyRows(dbTables.Conferences ?? []);
 }
 
 export function getDivisions(): DivisionSheetRow[] {
-  return copyRows(leagueDb.sheets.Divisions ?? []);
+  return copyRows(dbTables.Divisions ?? []);
 }
 
 export function getTeams(): TeamSheetRow[] {
-  return copyRows(leagueDb.sheets.Teams ?? []);
+  return copyRows(dbTables.Teams ?? []);
 }
 
 export function getPersonnel(): PersonnelSheetRow[] {
-  return copyRows(leagueDb.sheets.Personnel ?? []);
+  return copyRows(dbTables.Personnel ?? []);
 }
 
 export function getPlayers(): PlayerSheetRow[] {
-  return copyRows(leagueDb.sheets.Players ?? []);
+  return copyRows(dbTables.Players ?? []);
 }
 
 export function getContracts(): ContractSheetRow[] {
-  return copyRows(leagueDb.sheets.Contracts ?? []);
+  return copyRows(dbTables.Contracts ?? []);
 }
 
 export function getDraftOrder(): DraftOrderSheetRow[] {
-  return copyRows(leagueDb.sheets.DraftOrder ?? []);
+  return copyRows(dbTables.DraftOrder ?? []);
 }
 
 export function getDraftPicks(): DraftPickSheetRow[] {
-  return copyRows(leagueDb.sheets.DraftPicks ?? []);
+  return copyRows(dbTables.DraftPicks ?? []);
 }
 
 export function getFinances(): TeamFinanceSheetRow[] {
-  return copyRows(leagueDb.sheets.TeamFinances ?? []);
+  return copyRows(dbTables.TeamFinances ?? []);
 }
 
 export function getSalaryCap(fallback = 255_400_000): number {
-  const value = Number(leagueDb.sheets.League?.[0]?.salaryCap);
+  const value = Number(dbTables.League?.[0]?.salaryCap);
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }

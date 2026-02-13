@@ -543,10 +543,14 @@ function buildTeamInviteMetricsByTeamKey(leagueSeed: number): Map<string, TeamIn
 function rankTeamsByOverall(
   metricsByTeamKey: Map<string, TeamInviteMetrics>,
 ): Array<{ teamKey: string; overall: number; rank: number; tier: InterviewInviteTier }> {
-  const ranked = sortedFranchises()
-    .map((franchise) => ({
-      teamKey: resolveTeamKey(franchise.fullName),
-      overall: metricsByTeamKey.get(resolveTeamKey(franchise.fullName))?.overall ?? 0,
+  const franchiseTeamKeys = sortedFranchises().map((franchise) => resolveTeamKey(franchise.id));
+  const candidateTeamKeys = franchiseTeamKeys.length > 0 ? franchiseTeamKeys : [...metricsByTeamKey.keys()];
+
+  const ranked = candidateTeamKeys
+    .filter((teamKey) => teamKey && teamKey !== "UNKNOWN_TEAM")
+    .map((teamKey) => ({
+      teamKey,
+      overall: metricsByTeamKey.get(teamKey)?.overall ?? 0,
     }))
     .sort((a, b) => a.overall - b.overall || a.teamKey.localeCompare(b.teamKey));
 
@@ -583,6 +587,23 @@ function buildInvite(
   };
 }
 
+function buildFallbackInvite(teamKey: string, tier: InterviewInviteTier): InterviewInvite {
+  return {
+    franchiseId: teamKey,
+    tier,
+    overall: 0,
+    summaryLine: buildSummaryLine(teamKey, tier, null),
+  };
+}
+
+function resolveInviteFranchiseId(franchiseIdLike: string, invites: InterviewInvite[]): string {
+  const raw = String(franchiseIdLike ?? "").trim();
+  const resolved = resolveTeamKey(raw);
+  if (invites.some((invite) => invite.franchiseId === resolved)) return resolved;
+  if (invites.some((invite) => invite.franchiseId === raw)) return raw;
+  return resolved;
+}
+
 function generateInterviewInvites(hometownTeamKey: string, leagueSeed: number): InterviewInvite[] {
   const metricsByTeamKey = buildTeamInviteMetricsByTeamKey(leagueSeed);
   const ranked = rankTeamsByOverall(metricsByTeamKey);
@@ -597,13 +618,20 @@ function generateInterviewInvites(hometownTeamKey: string, leagueSeed: number): 
   } satisfies Record<InterviewInviteTier, Array<{ teamKey: string; overall: number; rank: number; tier: InterviewInviteTier }>>;
 
   const selected = new Set<string>();
-  const hometown = resolveTeamKey(hometownTeamKey || "UNKNOWN_TEAM");
-  selected.add(hometown);
+  const resolvedHometown = resolveTeamKey(hometownTeamKey || "UNKNOWN_TEAM");
+  const hometownTeam = ranked.find((team) => team.teamKey === resolvedHometown);
+  const fallbackTeam = ranked[0] ?? null;
+  const seedTeam = hometownTeam ?? fallbackTeam;
+  const invites: InterviewInvite[] = [];
 
-  const hometownTeam = ranked.find((team) => team.teamKey === hometown);
-  const invites: InterviewInvite[] = hometownTeam
-    ? [buildInvite(hometownTeam, metricsByTeamKey)]
-    : [{ franchiseId: hometown, tier: "FRINGE", overall: 0, summaryLine: buildSummaryLine(hometown, "FRINGE", null) }];
+  if (seedTeam) {
+    selected.add(seedTeam.teamKey);
+    invites.push(buildInvite(seedTeam, metricsByTeamKey));
+  }
+
+  if (invites.length === 0) {
+    return FIXED_TRIAD.map(({ teamKey, tier }) => buildFallbackInvite(teamKey, tier));
+  }
 
   const representedTiers = new Set<InterviewInviteTier>(invites.map((invite) => invite.tier));
   for (const tier of ["REBUILD", "FRINGE", "CONTENDER"] as const) {
@@ -639,25 +667,37 @@ function generateFixedTriadInvitesWithFallback(
   try {
     const metricsByTeamKey = buildTeamInviteMetricsByTeamKey(leagueSeed);
 
-    const invites: InterviewInvite[] = FIXED_TRIAD.map(({ teamKey, tier, legendRetiredOpening }) => {
-      const franchiseId = resolveTeamKey(teamKey);
-      const metrics = metricsByTeamKey.get(franchiseId);
-      if (!metrics) throw new Error(`Missing metrics for fixed triad team: ${franchiseId}`);
+    const invites: InterviewInvite[] = FIXED_TRIAD.flatMap(({ teamKey, tier, legendRetiredOpening }) => {
+      const resolvedTeamKey = resolveTeamKey(teamKey);
+      const franchiseId = resolvedTeamKey === "UNKNOWN_TEAM" ? teamKey : resolvedTeamKey;
+      const metrics = metricsByTeamKey.get(franchiseId) ?? metricsByTeamKey.get(teamKey);
+      if (!metrics) {
+        console.warn("[runtime] fixed triad team missing metrics; skipping", { teamKey, franchiseId });
+        return [];
+      }
 
       const base = buildSummaryLine(franchiseId, tier, metrics.capSpace ?? null);
-      return {
+      return [{
         franchiseId,
         tier,
         overall: metrics.overall ?? 0,
         summaryLine: legendRetiredOpening ? `${base} • Legend retired opening` : base,
         legendRetiredOpening,
-      };
+      }];
     });
 
-    const uniq = new Map(invites.map((invite) => [invite.franchiseId, invite]));
-    if (uniq.size !== invites.length) throw new Error("Duplicate fixed triad franchiseId");
+    const uniq = Array.from(new Map(invites.map((invite) => [invite.franchiseId, invite])).values());
+    if (uniq.length === 0) {
+      return {
+        invites: FIXED_TRIAD.map(({ teamKey, tier, legendRetiredOpening }) => ({
+          ...buildFallbackInvite(teamKey, tier),
+          legendRetiredOpening,
+        })),
+        usedFallback: true,
+      };
+    }
 
-    return { invites, usedFallback: false };
+    return { invites: uniq.slice(0, 3), usedFallback: false };
   } catch (err) {
     console.warn("[runtime] fixed triad generation failed; falling back to dynamic invites", err);
     return {
@@ -1184,7 +1224,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "OPENING_START_INTERVIEW": {
-          const franchiseId = resolveTeamKey(String(action.franchiseId ?? ""));
+          const franchiseId = resolveInviteFranchiseId(String(action.franchiseId ?? ""), state.ui.opening.interviewInvites);
           const invite = state.ui.opening.interviewInvites.find((item) => item.franchiseId === franchiseId);
           if (!invite) {
             if (import.meta.env.DEV) {
@@ -1233,7 +1273,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "OPENING_ANSWER_INTERVIEW": {
-          const franchiseId = resolveTeamKey(String(action.franchiseId ?? ""));
+          const franchiseId = resolveInviteFranchiseId(String(action.franchiseId ?? ""), state.ui.opening.interviewInvites);
           const answerIndex = Number(action.answerIndex ?? -1);
           const current = state.ui.opening.interviewResults[franchiseId];
           const invite = state.ui.opening.interviewInvites.find((item) => item.franchiseId === franchiseId);
