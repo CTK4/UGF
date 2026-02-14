@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Football Simulation Engine - Alpha v0.1</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a1929;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4fc3f7;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
+        }
+        
+        .game-controls {
+            background: #1e3a5f;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        
+        .control-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            background: #4fc3f7;
+            color: #0a1929;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: #81d4fa;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(79, 195, 247, 0.4);
+        }
+        
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        select {
+            background: #0a1929;
+            color: #e0e0e0;
+            border: 2px solid #4fc3f7;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .scoreboard {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 20px;
+            background: linear-gradient(135deg, #1a237e, #0d47a1);
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+        }
+        
+        .team-score {
+            text-align: center;
+        }
+        
+        .team-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #4fc3f7;
+        }
+        
+        .score {
+            font-size: 3em;
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        .game-info {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            padding: 0 20px;
+            border-left: 2px solid rgba(255,255,255,0.2);
+            border-right: 2px solid rgba(255,255,255,0.2);
+        }
+        
+        .quarter {
+            font-size: 1.2em;
+            color: #ffeb3b;
+        }
+        
+        .clock {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .down-distance {
+            font-size: 1.1em;
+            color: #4fc3f7;
+        }
+        
+        .field-position {
+            font-size: 1em;
+            color: #aaa;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+        
+        .play-by-play {
+            background: #1e3a5f;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        
+        .play-by-play h2 {
+            color: #4fc3f7;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        
+        .play-log {
+            height: 600px;
+            overflow-y: auto;
+            background: #0a1929;
+            padding: 15px;
+            border-radius: 6px;
+            border: 2px solid #2c5282;
+        }
+        
+        .play-entry {
+            margin-bottom: 15px;
+            padding: 12px;
+            background: #1a2332;
+            border-radius: 6px;
+            border-left: 4px solid #4fc3f7;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .play-entry.touchdown {
+            border-left-color: #4caf50;
+            background: #1a2e1a;
+        }
+        
+        .play-entry.turnover {
+            border-left-color: #f44336;
+            background: #2e1a1a;
+        }
+        
+        .play-entry.first-down {
+            border-left-color: #ffeb3b;
+            background: #2e2a1a;
+        }
+        
+        .play-meta {
+            color: #888;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        
+        .play-description {
+            color: #e0e0e0;
+            line-height: 1.5;
+        }
+        
+        .stats-panel {
+            background: #1e3a5f;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        
+        .stats-panel h2 {
+            color: #4fc3f7;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        
+        .stat-section {
+            background: #0a1929;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        
+        .stat-section h3 {
+            color: #81d4fa;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #2c5282;
+        }
+        
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+        
+        .stat-label {
+            color: #aaa;
+        }
+        
+        .stat-value {
+            color: #fff;
+            font-weight: bold;
+        }
+        
+        .possession-indicator {
+            width: 12px;
+            height: 12px;
+            background: #4caf50;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 10px;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        .play-log::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .play-log::-webkit-scrollbar-track {
+            background: #0a1929;
+        }
+        
+        .play-log::-webkit-scrollbar-thumb {
+            background: #4fc3f7;
+            border-radius: 4px;
+        }
+        
+        .debug-panel {
+            background: #1e3a5f;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .debug-panel h3 {
+            color: #ffeb3b;
+            margin-bottom: 10px;
+        }
+        
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .speed-control label {
+            color: #aaa;
+        }
+        
+        input[type="range"] {
+            flex: 1;
+            max-width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏈 Football Simulation Engine - Alpha v0.1</h1>
+        
+        <div class="game-controls">
+            <div class="control-row">
+                <button id="newGameBtn">New Game</button>
+                <button id="playBtn">Run Play</button>
+                <button id="autoPlayBtn">Auto Play</button>
+                <button id="pauseBtn" disabled>Pause</button>
+                <div class="speed-control">
+                    <label>Speed:</label>
+                    <input type="range" id="speedSlider" min="100" max="2000" value="1000" step="100">
+                    <span id="speedValue">1.0x</span>
+                </div>
+            </div>
+            <div class="control-row">
+                <label style="color: #aaa;">Offensive Strategy:</label>
+                <select id="offStrategy">
+                    <option value="balanced">Balanced</option>
+                    <option value="pass_heavy">Pass Heavy</option>
+                    <option value="run_heavy">Run Heavy</option>
+                    <option value="aggressive">Aggressive</option>
+                    <option value="conservative">Conservative</option>
+                </select>
+                <label style="color: #aaa;">Defensive Strategy:</label>
+                <select id="defStrategy">
+                    <option value="base">Base Defense</option>
+                    <option value="pressure">Heavy Pressure</option>
+                    <option value="coverage">Tight Coverage</option>
+                    <option value="run_stop">Run Stop</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="scoreboard">
+            <div class="team-score">
+                <div class="team-name" id="homeTeam">Home Team<span class="possession-indicator" id="homePossession" style="display:none;"></span></div>
+                <div class="score" id="homeScore">0</div>
+            </div>
+            <div class="game-info">
+                <div class="quarter" id="quarter">Q1</div>
+                <div class="clock" id="clock">15:00</div>
+                <div class="down-distance" id="downDistance">1st & 10</div>
+                <div class="field-position" id="fieldPos">Own 25</div>
+            </div>
+            <div class="team-score">
+                <div class="team-name" id="awayTeam">Away Team<span class="possession-indicator" id="awayPossession" style="display:none;"></span></div>
+                <div class="score" id="awayScore">0</div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="play-by-play">
+                <h2>Play-by-Play</h2>
+                <div class="play-log" id="playLog"></div>
+            </div>
+            
+            <div class="stats-panel">
+                <h2>Game Stats</h2>
+                <div class="stat-section">
+                    <h3>Offense</h3>
+                    <div class="stat-row">
+                        <span class="stat-label">Total Yards</span>
+                        <span class="stat-value" id="totalYards">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Pass Yards</span>
+                        <span class="stat-value" id="passYards">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Rush Yards</span>
+                        <span class="stat-value" id="rushYards">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">1st Downs</span>
+                        <span class="stat-value" id="firstDowns">0</span>
+                    </div>
+                </div>
+                
+                <div class="stat-section">
+                    <h3>Current Drive</h3>
+                    <div class="stat-row">
+                        <span class="stat-label">Plays</span>
+                        <span class="stat-value" id="drivePlays">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Yards</span>
+                        <span class="stat-value" id="driveYards">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">TOP</span>
+                        <span class="stat-value" id="driveTime">0:00</span>
+                    </div>
+                </div>
+                
+                <div class="stat-section">
+                    <h3>Turnovers</h3>
+                    <div class="stat-row">
+                        <span class="stat-label">Interceptions</span>
+                        <span class="stat-value" id="interceptions">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Fumbles Lost</span>
+                        <span class="stat-value" id="fumblesLost">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="debug-panel" id="debugPanel" style="display:none;">
+            <h3>Debug Info (Last Play)</h3>
+            <div id="debugContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // GAME STATE & CONFIGURATION
+        // ============================================================================
+        
+        class GameState {
+            constructor() {
+                this.reset();
+            }
+            
+            reset() {
+                this.quarter = 1;
+                this.clockMs = 15 * 60 * 1000; // 15 minutes
+                this.homeScore = 0;
+                this.awayScore = 0;
+                this.possession = 'home';
+                this.down = 1;
+                this.distance = 10;
+                this.yardline100 = 75; // 25 yard line
+                this.playId = 0;
+                this.driveId = 0;
+                this.timeouts = { home: 3, away: 3 };
+                this.stats = {
+                    home: { totalYards: 0, passYards: 0, rushYards: 0, firstDowns: 0, turnovers: 0 },
+                    away: { totalYards: 0, passYards: 0, rushYards: 0, firstDowns: 0, turnovers: 0 }
+                };
+                this.currentDrive = {
+                    plays: 0,
+                    yards: 0,
+                    startTime: this.clockMs,
+                    turnovers: { interceptions: 0, fumbles: 0 }
+                };
+                this.playLog = [];
+            }
+        }
+        
+        // Physics constants
+        const PHYSICS = {
+            surfaceMu: 0.78,
+            contactE: 0.18, // coefficient of restitution
+            contactMu: 0.42, // friction coefficient
+            gravity: 9.81
+        };
+        
+        // Player archetypes
+        const PLAYER_TEMPLATES = {
+            QB: { mass: 102, speed: 7.5, strength: 75, technique: 85, agility: 75 },
+            RB: { mass: 95, speed: 8.5, strength: 80, technique: 75, agility: 85 },
+            WR: { mass: 88, speed: 9.0, strength: 65, technique: 80, agility: 90 },
+            TE: { mass: 115, speed: 7.0, strength: 85, technique: 75, agility: 70 },
+            OL: { mass: 145, speed: 5.5, strength: 95, technique: 80, agility: 50 },
+            DL: { mass: 135, speed: 6.5, strength: 92, technique: 82, agility: 60 },
+            LB: { mass: 110, speed: 7.5, strength: 85, technique: 80, agility: 75 },
+            CB: { mass: 85, speed: 9.2, strength: 65, technique: 85, agility: 92 },
+            S: { mass: 95, speed: 8.5, strength: 75, technique: 80, agility: 85 }
+        };
+        
+        // ============================================================================
+        // PLAY CALLING AI
+        // ============================================================================
+        
+        class PlayCaller {
+            static selectOffensivePlay(gameState, strategy) {
+                const situation = this.analyzeSituation(gameState);
+                const playProbabilities = this.getPlayProbabilities(situation, strategy);
+                
+                const rand = Math.random();
+                let cumulative = 0;
+                
+                for (let [playType, prob] of Object.entries(playProbabilities)) {
+                    cumulative += prob;
+                    if (rand <= cumulative) {
+                        return this.generateOffensiveCall(playType, situation);
+                    }
+                }
+                
+                return this.generateOffensiveCall('PASS', situation);
+            }
+            
+            static selectDefensivePlay(gameState, strategy, offensiveCall) {
+                const situation = this.analyzeSituation(gameState);
+                return this.generateDefensiveCall(strategy, situation, offensiveCall);
+            }
+            
+            static analyzeSituation(gameState) {
+                return {
+                    down: gameState.down,
+                    distance: gameState.distance,
+                    yardline: 100 - gameState.yardline100,
+                    quarter: gameState.quarter,
+                    scoreDiff: gameState[gameState.possession + 'Score'] - gameState[gameState.possession === 'home' ? 'away' : 'home' + 'Score'],
+                    clockMs: gameState.clockMs,
+                    isRedZone: gameState.yardline100 <= 20,
+                    isGoalLine: gameState.yardline100 <= 5,
+                    isShortYardage: gameState.distance <= 2,
+                    isMediumYardage: gameState.distance >= 3 && gameState.distance <= 7,
+                    isLongYardage: gameState.distance > 7
+                };
+            }
+            
+            static getPlayProbabilities(situation, strategy) {
+                let base = { RUN: 0.45, PASS: 0.50, RPO: 0.05 };
+                
+                // Down and distance adjustments
+                if (situation.down === 1) {
+                    base.RUN += 0.10;
+                    base.PASS -= 0.10;
+                } else if (situation.down === 2 && situation.isMediumYardage) {
+                    base.PASS += 0.05;
+                    base.RUN -= 0.05;
+                } else if (situation.down === 3 && situation.isLongYardage) {
+                    base.PASS += 0.25;
+                    base.RUN -= 0.20;
+                    base.RPO -= 0.05;
+                } else if (situation.down === 3 && situation.isShortYardage) {
+                    base.RUN += 0.15;
+                    base.PASS -= 0.15;
+                }
+                
+                // Strategy adjustments
+                if (strategy === 'run_heavy') {
+                    base.RUN += 0.20;
+                    base.PASS -= 0.15;
+                    base.RPO -= 0.05;
+                } else if (strategy === 'pass_heavy') {
+                    base.PASS += 0.20;
+                    base.RUN -= 0.15;
+                    base.RPO -= 0.05;
+                }
+                
+                // Normalize
+                const total = Object.values(base).reduce((a, b) => a + b, 0);
+                Object.keys(base).forEach(key => base[key] /= total);
+                
+                return base;
+            }
+            
+            static generateOffensiveCall(playType, situation) {
+                const formations = ['SHOTGUN', 'I_FORM', 'SINGLEBACK', 'PISTOL', 'TRIPS'];
+                const runConcepts = ['INSIDE_ZONE', 'OUTSIDE_ZONE', 'POWER', 'COUNTER', 'DRAW'];
+                const passConcepts = ['MESH', 'DAGGER', 'STICK', 'FLOOD', 'VERTICALS', 'SLANT_FLAT', 'CURL'];
+                
+                return {
+                    family: playType,
+                    formation: formations[Math.floor(Math.random() * formations.length)],
+                    concept: playType === 'RUN' ? runConcepts[Math.floor(Math.random() * runConcepts.length)] 
+                                                : passConcepts[Math.floor(Math.random() * passConcepts.length)],
+                    personnel: '11', // 1 RB, 1 TE, 3 WR
+                    protection: playType === 'PASS' ? 'SLIDE_R' : null
+                };
+            }
+            
+            static generateDefensiveCall(strategy, situation, offensiveCall) {
+                const fronts = ['4-3', '3-4', 'NICKEL', 'DIME'];
+                const coverages = ['COVER_2', 'COVER_3', 'COVER_4', 'COVER_1', 'COVER_6'];
+                const pressures = ['BASE_4', 'NICKEL_BLITZ', 'ZONE_BLITZ', 'COVER_0'];
+                
+                let front = fronts[Math.floor(Math.random() * fronts.length)];
+                let coverage = coverages[Math.floor(Math.random() * coverages.length)];
+                let pressure = 'BASE_4';
+                
+                if (strategy === 'pressure') {
+                    pressure = pressures[Math.floor(Math.random() * pressures.length)];
+                } else if (strategy === 'coverage') {
+                    coverage = 'COVER_1';
+                }
+                
+                return {
+                    front: front,
+                    coverage: coverage,
+                    pressure: pressure,
+                    runFit: 'GAP_SOUND'
+                };
+            }
+        }
+        
+        // ============================================================================
+        // PHYSICS ENGINE
+        // ============================================================================
+        
+        class PhysicsEngine {
+            static resolveContact(actor_a, actor_b, contactType, contactHeight) {
+                const v_rel_n = Math.abs(actor_a.velocity - actor_b.velocity);
+                const v_rel_t = Math.random() * 2.0; // Simplified tangential
+                
+                const m_eff_a = actor_a.mass * (0.7 + Math.random() * 0.3);
+                const m_eff_b = actor_b.mass * (0.7 + Math.random() * 0.3);
+                
+                // Normal impulse
+                const e = PHYSICS.contactE;
+                const J_n = -(1 + e) * v_rel_n / (1/m_eff_a + 1/m_eff_b);
+                
+                // Tangential impulse (wrap quality)
+                const mu = PHYSICS.contactMu * (actor_b.technique / 100);
+                const J_t = Math.min(v_rel_t / (1/m_eff_a + 1/m_eff_b), mu * Math.abs(J_n));
+                
+                const J_total = Math.sqrt(J_n * J_n + J_t * J_t);
+                const F_avg = J_total / 0.055; // 55ms contact time
+                const F_peak = F_avg * 1.57; // Assume half-sine pulse
+                
+                // Tackle success probability
+                const leverageBonus = contactHeight < 0.5 ? 1.2 : 0.9;
+                const S = 0.3 * Math.log(Math.abs(J_n) / 100) + 
+                         0.4 * leverageBonus + 
+                         0.3 * (actor_b.technique - actor_a.agility) / 100;
+                
+                const tackleProb = 1 / (1 + Math.exp(-S));
+                
+                // YAC calculation
+                const v_fwd_residual = Math.max(0, actor_a.velocity - J_n / m_eff_a);
+                const yac = v_fwd_residual * (0.3 + Math.random() * 0.5);
+                
+                return {
+                    contactType,
+                    J_n,
+                    J_t,
+                    J_total,
+                    F_avg,
+                    F_peak,
+                    tackleSuccess: Math.random() < tackleProb,
+                    yac: yac,
+                    contactHeight,
+                    balanceBreak: tackleProb > 0.6
+                };
+            }
+            
+            static simulatePassRush(offensiveLine, defensiveLine, protectionScheme) {
+                let pressureTime = null;
+                let pressureType = 'NONE';
+                let rushWinner = null;
+                
+                // Simplified: pick a rusher vs blocker matchup
+                const rusher = defensiveLine[Math.floor(Math.random() * defensiveLine.length)];
+                const blocker = offensiveLine[Math.floor(Math.random() * offensiveLine.length)];
+                
+                const rusherAdvantage = (rusher.speed + rusher.technique) - (blocker.strength + blocker.technique);
+                const winProb = 1 / (1 + Math.exp(-rusherAdvantage / 20));
+                
+                if (Math.random() < winProb) {
+                    pressureTime = 1500 + Math.random() * 1000; // 1.5-2.5s
+                    pressureType = Math.random() < 0.3 ? 'SACK' : Math.random() < 0.6 ? 'HIT' : 'HURRY';
+                    rushWinner = rusher;
+                }
+                
+                return { pressureTime, pressureType, rushWinner };
+            }
+            
+            static simulateRouteCoverage(receiver, defender, routeType) {
+                const receiverAdvantage = (receiver.speed + receiver.agility) - (defender.speed + defender.technique);
+                const baseSepar = 1.0 + receiverAdvantage / 50;
+                const separation = Math.max(0, baseSepar + (Math.random() - 0.5) * 1.5);
+                
+                return {
+                    separation,
+                    openWindow: separation > 1.5,
+                    contested: separation < 1.0
+                };
+            }
+        }
+        
+        // ============================================================================
+        // PLAY SIMULATION ENGINE
+        // ============================================================================
+        
+        class PlaySimulator {
+            static simulatePlay(gameState, offensiveCall, defensiveCall) {
+                const playLedger = {
+                    play_id: ++gameState.playId,
+                    down_pre: gameState.down,
+                    distance_pre: gameState.distance,
+                    yardline100_pre: gameState.yardline100,
+                    off_call: offensiveCall,
+                    def_call: defensiveCall,
+                    events: []
+                };
+                
+                let result;
+                
+                if (offensiveCall.family === 'RUN') {
+                    result = this.simulateRun(offensiveCall, defensiveCall, gameState);
+                } else if (offensiveCall.family === 'PASS' || offensiveCall.family === 'RPO') {
+                    result = this.simulatePass(offensiveCall, defensiveCall, gameState);
+                }
+                
+                // Update game state
+                this.applyResult(gameState, result);
+                
+                playLedger.result = result;
+                playLedger.yards_gained = result.yards;
+                
+                return playLedger;
+            }
+            
+            static simulateRun(offensiveCall, defensiveCall, gameState) {
+                const rb = { ...PLAYER_TEMPLATES.RB, velocity: 8.5 };
+                const lb = { ...PLAYER_TEMPLATES.LB, velocity: 7.5 };
+                
+                // Determine run success
+                const blockingSuccess = Math.random() > 0.4; // 60% run block success
+                const holeQuality = blockingSuccess ? (0.5 + Math.random() * 0.5) : (Math.random() * 0.4);
+                
+                // Base yards from hole quality
+                let yards = -2 + holeQuality * 12;
+                
+                // Contact simulation
+                const contactHeight = 0.3 + Math.random() * 0.5;
+                const contact = PhysicsEngine.resolveContact(rb, lb, 'TACKLE_ATTEMPT', contactHeight);
+                
+                if (!contact.tackleSuccess) {
+                    yards += contact.yac;
+                }
+                
+                yards = Math.round(yards);
+                
+                // Fumble check (rare)
+                const fumble = Math.random() < 0.01;
+                const fumbleLost = fumble && Math.random() < 0.5;
+                
+                return {
+                    playType: 'RUSH',
+                    yards: fumbleLost ? 0 : yards,
+                    turnover: fumbleLost ? 'FUMBLE_LOST' : 'NONE',
+                    contact: contact,
+                    description: this.generateRunDescription(offensiveCall, yards, contact, fumbleLost)
+                };
+            }
+            
+            static simulatePass(offensiveCall, defensiveCall, gameState) {
+                const qb = { ...PLAYER_TEMPLATES.QB, velocity: 0 };
+                const wr = { ...PLAYER_TEMPLATES.WR, velocity: 9.0 };
+                const cb = { ...PLAYER_TEMPLATES.CB, velocity: 9.2 };
+                const ol = Array(5).fill({ ...PLAYER_TEMPLATES.OL });
+                const dl = Array(4).fill({ ...PLAYER_TEMPLATES.DL });
+                
+                // Pass rush
+                const rushResult = PhysicsEngine.simulatePassRush(ol, dl, offensiveCall.protection);
+                
+                // Route vs coverage
+                const routeResult = PhysicsEngine.simulateRouteCoverage(wr, cb, offensiveCall.concept);
+                
+                // QB decision time
+                const dropTime = 1200 + Math.random() * 800;
+                const timeToThrow = dropTime + 200 + Math.random() * 600;
+                
+                // Check if sacked
+                if (rushResult.pressureTime && rushResult.pressureTime < timeToThrow && rushResult.pressureType === 'SACK') {
+                    const sackYards = -(3 + Math.floor(Math.random() * 5));
+                    return {
+                        playType: 'SACK',
+                        yards: sackYards,
+                        turnover: 'NONE',
+                        description: `Sack! QB taken down for a loss of ${Math.abs(sackYards)} yards.`
+                    };
+                }
+                
+                // Throw accuracy affected by pressure
+                let accuracy = 0.65;
+                if (rushResult.pressureTime && rushResult.pressureTime < timeToThrow) {
+                    accuracy -= 0.20;
+                }
+                
+                // Determine completion
+                const throwQuality = Math.random();
+                const catchDifficulty = routeResult.contested ? 0.7 : 0.9;
+                
+                let yards = 0;
+                let turnover = 'NONE';
+                let playType = 'PASS';
+                let description = '';
+                
+                if (throwQuality > accuracy) {
+                    // Incomplete
+                    description = `Pass incomplete. ${routeResult.contested ? 'Tight coverage.' : 'Overthrown.'}`;
+                    yards = 0;
+                } else if (Math.random() < 0.05 && routeResult.contested) {
+                    // Interception
+                    turnover = 'INT';
+                    description = `INTERCEPTION! Defender makes the play in tight coverage.`;
+                    yards = 0;
+                } else {
+                    // Completion
+                    const airYards = 5 + Math.floor(Math.random() * 15);
+                    const yac = routeResult.contested ? (Math.random() * 3) : (Math.random() * 8);
+                    yards = Math.round(airYards + yac);
+                    
+                    description = `Pass complete for ${yards} yards. ${routeResult.contested ? 'Contested catch!' : 'Open receiver.'}`;
+                }
+                
+                return { playType, yards, turnover, description };
+            }
+            
+            static generateRunDescription(offensiveCall, yards, contact, fumble) {
+                if (fumble) return `Fumble! Ball is lost on the exchange.`;
+                
+                const direction = ['left', 'right', 'middle'][Math.floor(Math.random() * 3)];
+                
+                if (yards <= 0) {
+                    return `Run ${direction} stopped at the line. ${contact.tackleSuccess ? 'Solid tackle.' : 'Fight for yards.'}`;
+                } else if (yards < 3) {
+                    return `Short gain of ${yards} yard${yards > 1 ? 's' : ''} on the run ${direction}.`;
+                } else if (yards < 7) {
+                    return `Good run ${direction} for ${yards} yards. ${!contact.tackleSuccess ? 'Broken tackle!' : ''}`;
+                } else {
+                    return `BIG RUN ${direction}! Gains ${yards} yards! ${!contact.tackleSuccess ? 'Multiple broken tackles!' : ''}`;
+                }
+            }
+            
+            static applyResult(gameState, result) {
+                const oldYardline = gameState.yardline100;
+                
+                // Handle turnovers
+                if (result.turnover === 'INT' || result.turnover === 'FUMBLE_LOST') {
+                    gameState.possession = gameState.possession === 'home' ? 'away' : 'home';
+                    gameState.down = 1;
+                    gameState.distance = 10;
+                    gameState.yardline100 = 100 - oldYardline; // Flip field position
+                    gameState.stats[gameState.possession === 'home' ? 'away' : 'home'].turnovers++;
+                    gameState.currentDrive.turnovers[result.turnover === 'INT' ? 'interceptions' : 'fumbles']++;
+                    return;
+                }
+                
+                // Update yardline
+                gameState.yardline100 = Math.max(0, Math.min(100, gameState.yardline100 - result.yards));
+                
+                // Check for TD
+                if (gameState.yardline100 <= 0) {
+                    gameState[gameState.possession + 'Score'] += 7; // TD + XP
+                    this.resetAfterScore(gameState);
+                    result.touchdown = true;
+                    return;
+                }
+                
+                // Update stats
+                const team = gameState.possession;
+                gameState.stats[team].totalYards += Math.max(0, result.yards);
+                if (result.playType === 'PASS') {
+                    gameState.stats[team].passYards += Math.max(0, result.yards);
+                } else if (result.playType === 'RUSH') {
+                    gameState.stats[team].rushYards += Math.max(0, result.yards);
+                }
+                
+                gameState.currentDrive.plays++;
+                gameState.currentDrive.yards += result.yards;
+                
+                // Check for first down
+                if (result.yards >= gameState.distance) {
+                    gameState.down = 1;
+                    gameState.distance = 10;
+                    gameState.stats[team].firstDowns++;
+                    result.firstDown = true;
+                } else {
+                    gameState.down++;
+                    gameState.distance -= result.yards;
+                    
+                    // Check for turnover on downs
+                    if (gameState.down > 4) {
+                        gameState.possession = gameState.possession === 'home' ? 'away' : 'home';
+                        gameState.down = 1;
+                        gameState.distance = 10;
+                        gameState.yardline100 = 100 - gameState.yardline100;
+                        result.turnoverOnDowns = true;
+                    }
+                }
+                
+                // Clock management (simplified)
+                const runoff = result.playType === 'PASS' && result.yards === 0 ? 5000 : 
+                              35000 + Math.random() * 10000;
+                gameState.clockMs = Math.max(0, gameState.clockMs - runoff);
+            }
+            
+            static resetAfterScore(gameState) {
+                gameState.possession = gameState.possession === 'home' ? 'away' : 'home';
+                gameState.down = 1;
+                gameState.distance = 10;
+                gameState.yardline100 = 75; // Kickoff to 25
+                gameState.currentDrive = {
+                    plays: 0,
+                    yards: 0,
+                    startTime: gameState.clockMs,
+                    turnovers: { interceptions: 0, fumbles: 0 }
+                };
+            }
+        }
+        
+        // ============================================================================
+        // UI CONTROLLER
+        // ============================================================================
+        
+        class GameUI {
+            constructor() {
+                this.gameState = new GameState();
+                this.autoPlayInterval = null;
+                this.autoPlaySpeed = 1000;
+                this.setupEventListeners();
+                this.updateUI();
+            }
+            
+            setupEventListeners() {
+                document.getElementById('newGameBtn').addEventListener('click', () => this.newGame());
+                document.getElementById('playBtn').addEventListener('click', () => this.runPlay());
+                document.getElementById('autoPlayBtn').addEventListener('click', () => this.toggleAutoPlay());
+                document.getElementById('pauseBtn').addEventListener('click', () => this.pauseAutoPlay());
+                document.getElementById('speedSlider').addEventListener('input', (e) => {
+                    this.autoPlaySpeed = 2100 - parseInt(e.target.value);
+                    const speed = (2000 / this.autoPlaySpeed).toFixed(1);
+                    document.getElementById('speedValue').textContent = speed + 'x';
+                });
+            }
+            
+            newGame() {
+                this.pauseAutoPlay();
+                this.gameState.reset();
+                document.getElementById('playLog').innerHTML = '';
+                this.updateUI();
+                this.addPlayToLog('🏈 Game Started! Opening kickoff...', 'system');
+            }
+            
+            runPlay() {
+                if (this.gameState.clockMs <= 0 && this.gameState.quarter >= 4) {
+                    this.addPlayToLog('Game Over!', 'system');
+                    return;
+                }
+                
+                const offStrategy = document.getElementById('offStrategy').value;
+                const defStrategy = document.getElementById('defStrategy').value;
+                
+                const offensiveCall = PlayCaller.selectOffensivePlay(this.gameState, offStrategy);
+                const defensiveCall = PlayCaller.selectDefensivePlay(this.gameState, defStrategy, offensiveCall);
+                
+                const playResult = PlaySimulator.simulatePlay(this.gameState, offensiveCall, defensiveCall);
+                
+                this.addPlayToLog(playResult.result.description, playResult.result);
+                this.updateUI();
+                
+                // Check quarter/game end
+                if (this.gameState.clockMs <= 0) {
+                    if (this.gameState.quarter < 4) {
+                        this.gameState.quarter++;
+                        this.gameState.clockMs = 15 * 60 * 1000;
+                        this.addPlayToLog(`End of Q${this.gameState.quarter - 1}`, 'system');
+                    } else {
+                        this.addPlayToLog('🏁 Final! Game Over!', 'system');
+                        this.pauseAutoPlay();
+                    }
+                }
+            }
+            
+            toggleAutoPlay() {
+                if (this.autoPlayInterval) {
+                    this.pauseAutoPlay();
+                } else {
+                    this.autoPlayInterval = setInterval(() => this.runPlay(), this.autoPlaySpeed);
+                    document.getElementById('autoPlayBtn').textContent = 'Auto Playing...';
+                    document.getElementById('pauseBtn').disabled = false;
+                    document.getElementById('playBtn').disabled = true;
+                }
+            }
+            
+            pauseAutoPlay() {
+                if (this.autoPlayInterval) {
+                    clearInterval(this.autoPlayInterval);
+                    this.autoPlayInterval = null;
+                    document.getElementById('autoPlayBtn').textContent = 'Auto Play';
+                    document.getElementById('pauseBtn').disabled = true;
+                    document.getElementById('playBtn').disabled = false;
+                }
+            }
+            
+            addPlayToLog(description, result) {
+                const playLog = document.getElementById('playLog');
+                const entry = document.createElement('div');
+                entry.className = 'play-entry';
+                
+                if (result && result.touchdown) entry.classList.add('touchdown');
+                if (result && result.turnover !== 'NONE') entry.classList.add('turnover');
+                if (result && result.firstDown) entry.classList.add('first-down');
+                
+                const meta = result && result !== 'system' ? 
+                    `Q${this.gameState.quarter} ${this.formatClock(this.gameState.clockMs)} - ${this.getDownDistance()} at ${this.getFieldPosition()}` : '';
+                
+                entry.innerHTML = `
+                    ${meta ? `<div class="play-meta">${meta}</div>` : ''}
+                    <div class="play-description">${description}</div>
+                `;
+                
+                playLog.insertBefore(entry, playLog.firstChild);
+                
+                // Keep log from growing too large
+                while (playLog.children.length > 100) {
+                    playLog.removeChild(playLog.lastChild);
+                }
+            }
+            
+            updateUI() {
+                // Scoreboard
+                document.getElementById('homeScore').textContent = this.gameState.homeScore;
+                document.getElementById('awayScore').textContent = this.gameState.awayScore;
+                document.getElementById('quarter').textContent = `Q${this.gameState.quarter}`;
+                document.getElementById('clock').textContent = this.formatClock(this.gameState.clockMs);
+                document.getElementById('downDistance').textContent = this.getDownDistance();
+                document.getElementById('fieldPos').textContent = this.getFieldPosition();
+                
+                // Possession indicator
+                document.getElementById('homePossession').style.display = 
+                    this.gameState.possession === 'home' ? 'inline-block' : 'none';
+                document.getElementById('awayPossession').style.display = 
+                    this.gameState.possession === 'away' ? 'inline-block' : 'none';
+                
+                // Stats
+                const team = this.gameState.possession;
+                const stats = this.gameState.stats[team];
+                document.getElementById('totalYards').textContent = stats.totalYards;
+                document.getElementById('passYards').textContent = stats.passYards;
+                document.getElementById('rushYards').textContent = stats.rushYards;
+                document.getElementById('firstDowns').textContent = stats.firstDowns;
+                
+                // Drive stats
+                document.getElementById('drivePlays').textContent = this.gameState.currentDrive.plays;
+                document.getElementById('driveYards').textContent = this.gameState.currentDrive.yards;
+                const driveTimeMs = this.gameState.currentDrive.startTime - this.gameState.clockMs;
+                document.getElementById('driveTime').textContent = this.formatClock(driveTimeMs);
+                
+                // Turnovers
+                document.getElementById('interceptions').textContent = this.gameState.currentDrive.turnovers.interceptions;
+                document.getElementById('fumblesLost').textContent = this.gameState.currentDrive.turnovers.fumbles;
+            }
+            
+            formatClock(ms) {
+                const totalSeconds = Math.floor(ms / 1000);
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            getDownDistance() {
+                const downs = ['1st', '2nd', '3rd', '4th'];
+                return `${downs[this.gameState.down - 1]} & ${this.gameState.distance}`;
+            }
+            
+            getFieldPosition() {
+                const yardline = 100 - this.gameState.yardline100;
+                if (yardline === 50) return '50';
+                const side = yardline < 50 ? 'Own' : 'Opp';
+                const line = yardline < 50 ? yardline : 100 - yardline;
+                return `${side} ${line}`;
+            }
+        }
+        
+        // Initialize the game
+        const game = new GameUI();
+    </script>
+</body>
+</html>
