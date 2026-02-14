@@ -13,14 +13,14 @@ import { INTERVIEW_SCRIPTS } from "@/data/interviewScripts";
 import { deriveGmProfile } from "@/data/gmDerivation";
 import { OWNER_PROFILES } from "@/data/ownerProfiles";
 import { getOwnerProfile } from "@/data/owners";
-import { normalizeExcelTeamKey } from "@/data/teamMap";
+import { getUgfTeamByExcelKey, normalizeExcelTeamKey } from "@/data/teamMap";
 import { deriveOfferTerms } from "@/engine/offers";
 import { FRANCHISES, resolveFranchiseLike } from "@/ui/data/franchises";
 import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
 import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, OpeningPath, SaveData, UIAction, UIController, UIState } from "@/ui/types";
 import { getLeagueDbHash, loadLeagueRosterForTeam } from "@/services/rosterImport";
 import { validateLeagueDb } from "@/services/validateLeagueDb";
-import { getCurrentSeason, getTeamSummaryProjectionRows } from "@/data/leagueDb";
+import { getCurrentSeason, getTeamSummaryProjectionRows } from "@/data/LeagueDB";
 import { buildFreeAgentPool, buildTeamRosterRows, calculateCapSummary } from "@/ui/freeAgency/freeAgency";
 import { ROSTER_CAP_LIMIT, calculateRosterCap, loadRosterPlayersForTeam } from "@/ui/roster/rosterAdapter";
 import { buildCharacterRegistry } from "@/engine/characters";
@@ -425,8 +425,8 @@ type ChoiceId = "A" | "B" | "C";
 type InterviewDelta = { owner: number; gm: number; risk: number };
 
 function getScriptForTeam(teamLookup: string) {
-  const teamKey = resolveTeamKey(teamLookup);
-  return INTERVIEW_SCRIPTS[teamKey] ?? INTERVIEW_SCRIPTS.ATLANTA_APEX;
+  const resolved = resolveTeamKey(teamLookup);
+  return INTERVIEW_SCRIPTS[teamLookup] ?? INTERVIEW_SCRIPTS[resolved] ?? INTERVIEW_SCRIPTS.ATLANTA_APEX;
 }
 
 function sumChoiceTraitMods(
@@ -640,8 +640,9 @@ function generateFixedTriadInvitesWithFallback(
     const metricsByTeamKey = buildTeamInviteMetricsByTeamKey(leagueSeed);
 
     const invites: InterviewInvite[] = FIXED_TRIAD.map(({ teamKey, tier, legendRetiredOpening }) => {
-      const franchiseId = resolveTeamKey(teamKey);
-      const metrics = metricsByTeamKey.get(franchiseId);
+      let franchiseId = resolveTeamKey(teamKey);
+      if (franchiseId === "UNKNOWN_TEAM") franchiseId = teamKey;
+      const metrics = metricsByTeamKey.get(franchiseId) ?? metricsByTeamKey.get(teamKey);
       if (!metrics) throw new Error(`Missing metrics for fixed triad team: ${franchiseId}`);
 
       const base = buildSummaryLine(franchiseId, tier, metrics.capSpace ?? null);
@@ -659,11 +660,21 @@ function generateFixedTriadInvitesWithFallback(
 
     return { invites, usedFallback: false };
   } catch (err) {
-    console.warn("[runtime] fixed triad generation failed; falling back to dynamic invites", err);
-    return {
-      invites: generateInterviewInvites(fallbackHometownTeamKey, leagueSeed),
-      usedFallback: true,
-    };
+    console.warn("[runtime] fixed triad generation failed; falling back to fixed triad keys for display", err);
+    const metricsByTeamKey = buildTeamInviteMetricsByTeamKey(leagueSeed);
+    const fallbackInvites: InterviewInvite[] = FIXED_TRIAD.map(({ teamKey, tier, legendRetiredOpening }) => {
+      const franchiseId = teamKey;
+      const metrics = metricsByTeamKey.get(teamKey) ?? metricsByTeamKey.get(resolveTeamKey(teamKey)) ?? { overall: 75, capSpace: null };
+      const base = buildSummaryLine(franchiseId, tier, metrics.capSpace ?? null);
+      return {
+        franchiseId,
+        tier,
+        overall: metrics.overall ?? 0,
+        summaryLine: legendRetiredOpening ? `${base} • Legend retired opening` : base,
+        legendRetiredOpening,
+      };
+    });
+    return { invites: fallbackInvites, usedFallback: true };
   }
 }
 
@@ -796,6 +807,9 @@ function createCandidate(role: StaffRole, id: number) {
 
 export async function createUIRuntime(onChange: () => void): Promise<UIController> {
   const { save, corrupted } = loadSave();
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/bd08a75b-7810-4f27-940e-692196e40e09',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ui/runtime.ts:createUIRuntime',message:'loadSave result',data:{hasSave:!!save,corrupted,timestamp:Date.now()},timestamp:Date.now(),hypothesisId:'runtime-load'})}).catch(()=>{});
+  // #endregion
   const loadedGameStateRaw = save?.gameState
     ? reduceGameState(createNewGameState(), gameActions.loadState(save.gameState))
     : null;
@@ -1149,6 +1163,9 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               ? generateFixedTriadInvitesWithFallback(opening.leagueSeed, opening.hometownTeamKey)
               : { invites: generateInterviewInvites(opening.hometownTeamKey, opening.leagueSeed), usedFallback: false };
 
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/bd08a75b-7810-4f27-940e-692196e40e09',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ui/runtime.ts:RUN_INTERVIEWS',message:'invites generated',data:{openingPath:opening.openingPath,usedFallback,franchiseIds:invites.map((i)=>i.franchiseId)},timestamp:Date.now(),hypothesisId:'interview-invites'})}).catch(()=>{});
+          // #endregion
           const interviewInvites = invites;
 
           const interviewResults = Object.fromEntries(
@@ -1184,8 +1201,11 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "OPENING_START_INTERVIEW": {
-          const franchiseId = resolveTeamKey(String(action.franchiseId ?? ""));
-          const invite = state.ui.opening.interviewInvites.find((item) => item.franchiseId === franchiseId);
+          const rawId = String(action.franchiseId ?? "");
+          const invite =
+            state.ui.opening.interviewInvites.find((item) => item.franchiseId === rawId) ??
+            state.ui.opening.interviewInvites.find((item) => item.franchiseId === resolveTeamKey(rawId));
+          const franchiseId = invite?.franchiseId ?? resolveTeamKey(rawId);
           if (!invite) {
             if (import.meta.env.DEV) {
               console.error("[runtime] OPENING_START_INTERVIEW invite not found", {
@@ -1233,10 +1253,13 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "OPENING_ANSWER_INTERVIEW": {
-          const franchiseId = resolveTeamKey(String(action.franchiseId ?? ""));
+          const rawId = String(action.franchiseId ?? "");
+          const invite =
+            state.ui.opening.interviewInvites.find((item) => item.franchiseId === rawId) ??
+            state.ui.opening.interviewInvites.find((item) => item.franchiseId === resolveTeamKey(rawId));
+          const franchiseId = invite?.franchiseId ?? resolveTeamKey(rawId);
           const answerIndex = Number(action.answerIndex ?? -1);
           const current = state.ui.opening.interviewResults[franchiseId];
-          const invite = state.ui.opening.interviewInvites.find((item) => item.franchiseId === franchiseId);
           if (!invite || !current || current.completed) {
             setState({
               ...state,
@@ -1337,23 +1360,23 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           return;
         }
         case "ACCEPT_OFFER": {
-          const franchiseId = resolveTeamKey(String(action.franchiseId));
+          const rawId = String(action.franchiseId ?? "");
+          const offeredInvite =
+            state.ui.opening.offers.find((o) => o.franchiseId === rawId) ??
+            state.ui.opening.offers.find((o) => o.franchiseId === resolveTeamKey(rawId));
+          const franchiseId = offeredInvite?.franchiseId ?? resolveTeamKey(rawId);
           const offeredTeamKey = String(action.excelTeamKey ?? "");
           const franchise = resolveFranchiseLike(franchiseId);
-          const offeredInvite = franchise
-            ? state.ui.opening.offers.find((offer) => {
-                const offeredFranchise = resolveFranchiseLike(offer.franchiseId);
-                return offeredFranchise?.teamKey === franchise.teamKey;
-              })
-            : state.ui.opening.offers.find((offer) => offer.franchiseId === franchiseId);
           const isOffered = Boolean(offeredInvite);
-          if (!franchise || !isOffered) {
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/bd08a75b-7810-4f27-940e-692196e40e09',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ui/runtime.ts:ACCEPT_OFFER',message:'dispatch',data:{franchiseId,hasFranchise:!!franchise,isOffered,offerCount:state.ui.opening.offers?.length},timestamp:Date.now(),hypothesisId:'accept-dispatch'})}).catch(()=>{});
+          // #endregion
+          if (!isOffered) {
             if (import.meta.env.DEV) {
               console.error("[runtime] ACCEPT_OFFER rejected before flow", {
                 franchiseId,
-                franchiseFullName: franchise?.fullName,
                 offeredFranchiseIds: state.ui.opening.offers.map((offer) => offer.franchiseId),
-                reason: !franchise ? "franchise_not_found" : "franchise_not_in_offers",
+                reason: "offer_not_found",
               });
             }
             setState({
@@ -1369,7 +1392,8 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             });
             return;
           }
-          const excelTeamKey = normalizeExcelTeamKey(franchise.fullName);
+          const fullName = franchise?.fullName ?? getUgfTeamByExcelKey(franchiseId)?.team ?? franchiseId;
+          const excelTeamKey = normalizeExcelTeamKey(fullName);
           if (offeredTeamKey && offeredTeamKey !== excelTeamKey) {
             setState({
               ...state,
@@ -1386,6 +1410,9 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
           }
 
           const runAcceptOfferFlow = async () => {
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/bd08a75b-7810-4f27-940e-692196e40e09',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ui/runtime.ts:runAcceptOfferFlow',message:'flow started',data:{franchiseId},timestamp:Date.now(),hypothesisId:'accept-flow-start'})}).catch(()=>{});
+            // #endregion
             let gameState = reduceGameState(createNewGameState(), gameActions.startNew());
             gameState = reduceGameState(
               gameState,
@@ -1440,6 +1467,9 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             hydrateLeagueStaffFromPersonnel(save.gameState);
             hydrateUserStaffFromTeamBucket(save.gameState, franchiseId);
             persistLocalSave(save);
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/bd08a75b-7810-4f27-940e-692196e40e09',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ui/runtime.ts:runAcceptOfferFlow',message:'flow success',data:{franchiseId,route:'HireCoordinators'},timestamp:Date.now(),hypothesisId:'accept-flow-ok'})}).catch(()=>{});
+            // #endregion
             setState({
               ...state,
               // Offers looked dead when errors interrupted flow before route/save updates.
@@ -1463,9 +1493,12 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
 
           void runAcceptOfferFlow().catch((error: unknown) => {
             const stack = error instanceof Error ? error.stack : undefined;
+            // #region agent log
+            fetch('http://127.0.0.1:7243/ingest/bd08a75b-7810-4f27-940e-692196e40e09',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ui/runtime.ts:ACCEPT_OFFER',message:'flow failed',data:{franchiseId,error: String(error)},timestamp:Date.now(),hypothesisId:'accept-flow-fail'})}).catch(()=>{});
+            // #endregion
             console.error("[runtime] ACCEPT_OFFER failed", {
               franchiseId,
-              franchiseFullName: franchise.fullName,
+              franchiseFullName: fullName,
               excelTeamKey,
               error,
               stack,
@@ -1477,7 +1510,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
                 ...state.ui,
                 opening: {
                   ...state.ui.opening,
-                  lastOfferError: `Could not accept ${franchise.fullName}. Please try again.`,
+                  lastOfferError: `Could not accept ${fullName}. Please try again.`,
                 },
               },
             });
@@ -1992,6 +2025,9 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
     },
   };
 
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/bd08a75b-7810-4f27-940e-692196e40e09',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ui/runtime.ts:createUIRuntime',message:'controller built',data:{route:state.route?.key,hasSave:!!state.save},timestamp:Date.now(),hypothesisId:'runtime-ready'})}).catch(()=>{});
+  // #endregion
   return controller;
 }
 
@@ -2083,6 +2119,41 @@ function candidatesForRoleFromFreeAgents(role: StaffRole, leagueSeed: number): R
   return mapped;
 }
 
+function fallbackCandidatesForCoordinatorRole(role: StaffRole, leagueSeed: number): ReturnType<typeof createCandidate>[] {
+  if (role !== "OC" && role !== "DC" && role !== "STC") return [];
+  const names =
+    role === "OC"
+      ? ["Lori Reardon", "Devlin Britton", "Donnie Chu", "Katya Beasley", "Yulissa Broussard", "Orion Firth"]
+      : role === "DC"
+        ? ["Marcus Webb", "Elena Vasquez", "James Chen", "Dakota Reed", "Sam Foster", "Jordan Blake"]
+        : ["Alex Rivera", "Jordan Tate", "Casey Morgan", "Riley Hayes", "Quinn Davis", "Avery Brooks"];
+  const count = 6;
+  const out: ReturnType<typeof createCandidate>[] = [];
+  for (let i = 0; i < count; i++) {
+    const rating = 65 + (Number((leagueSeed + i * 7 + role.charCodeAt(0)) % 31) % 25);
+    const demand = salaryFor(role, rating);
+    out.push({
+      id: `fallback-${role}-${i + 1}`,
+      name: names[i] ?? `${role} Candidate ${i + 1}`,
+      rating,
+      role,
+      primaryRole: role,
+      traits: ["Staffer"],
+      philosophy: "Balanced",
+      fitLabel: fitLabelForRating(rating),
+      salaryDemand: demand,
+      recommendedOffer: Math.round(demand * 1.08),
+      availability: "FREE_AGENT" as const,
+      standardsNote: "Standard",
+      perceivedRisk: Math.max(5, Math.min(70, 95 - rating)),
+      defaultContractYears: role === "OC" || role === "DC" ? 3 : 2,
+      requirement: {},
+    });
+  }
+  out.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  return out;
+}
+
 function recomputeStaffBudgetUsed(save: SaveData): void {
   const gameState = save.gameState as GameState & { staff: GameState["staff"] & { coachContractsById?: Record<string, CoachContract> } };
   const season = Number(gameState.time?.season ?? 2026);
@@ -2149,6 +2220,10 @@ export function buildMarketForRole(role: StaffRole) {
   for (const c of fromFreeAgents) {
     if (candidates.length >= 6) break;
     candidates.push(c);
+  }
+
+  if (candidates.length === 0 && (role === "OC" || role === "DC" || role === "STC")) {
+    candidates.push(...fallbackCandidatesForCoordinatorRole(role, leagueSeed));
   }
 
   candidates.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
