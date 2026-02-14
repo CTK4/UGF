@@ -141,12 +141,12 @@ export async function dispatchAction(ctx: DispatchContext, action: UIAction): Pr
     switch (action.type) {
       
     case "RESET_BUNDLE_CACHE": {
-      ui.setState({
-        ...state,
-        tables: {},
-        style: undefined,
-      });
-      await ui.dispatch({ type: "LOAD_BUNDLE_ASSETS" });
+      // Fix undefined variables: use DispatchContext and current state
+      // Reset tables and style, then reload assets
+      const currentState = ctx.getState();
+      const nextState = { ...currentState, tables: {}, style: undefined } as UIState;
+      ctx.setState(nextState);
+      await dispatchAction(ctx, { type: "LOAD_BUNDLE_ASSETS" });
       return;
     }
 case "APP_BOOT":
