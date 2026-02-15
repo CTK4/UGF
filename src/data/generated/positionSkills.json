@@ -1,0 +1,62 @@
+[
+  {
+    "Position":"QB",
+    "Key_Skills":"Accuracy, Arm_Strength, Touch, Mechanics, Pocket_Presence, Release",
+    "Skill_Count":6
+  },
+  {
+    "Position":"HB",
+    "Key_Skills":"Vision, Balance, Elusiveness, Hands, Pass_Protection, Footwork",
+    "Skill_Count":6
+  },
+  {
+    "Position":"WR",
+    "Key_Skills":"Route_Running, Hands, Release, YAC_Ability, Body_Control, Contested_Catch",
+    "Skill_Count":6
+  },
+  {
+    "Position":"TE",
+    "Key_Skills":"Route_Running, Hands, Blocking, YAC_Ability, Release, Body_Control",
+    "Skill_Count":6
+  },
+  {
+    "Position":"OT",
+    "Key_Skills":"Pass_Blocking, Run_Blocking, Footwork, Hand_Technique, Anchor, Mirror_Ability",
+    "Skill_Count":6
+  },
+  {
+    "Position":"OG",
+    "Key_Skills":"Pass_Blocking, Run_Blocking, Power, Hand_Technique, Anchor, Lateral_Movement",
+    "Skill_Count":6
+  },
+  {
+    "Position":"C",
+    "Key_Skills":"Pass_Blocking, Run_Blocking, Snap_Mechanics, Line_Calls, Anchor, Lateral_Movement",
+    "Skill_Count":6
+  },
+  {
+    "Position":"DT",
+    "Key_Skills":"Pass_Rush, Run_Defense, Hand_Technique, Leverage, Gap_Discipline, Motor",
+    "Skill_Count":6
+  },
+  {
+    "Position":"EDGE",
+    "Key_Skills":"Pass_Rush, Run_Defense, Hand_Technique, Bend, Speed_to_Power, Pursuit",
+    "Skill_Count":6
+  },
+  {
+    "Position":"LB",
+    "Key_Skills":"Tackling, Coverage, Run_Defense, Blitz_Ability, Shed_Blocks, Gap_Discipline",
+    "Skill_Count":6
+  },
+  {
+    "Position":"CB",
+    "Key_Skills":"Man_Coverage, Zone_Coverage, Press_Technique, Ball_Skills, Tackling, Backpedal",
+    "Skill_Count":6
+  },
+  {
+    "Position":"S",
+    "Key_Skills":"Coverage, Tackling, Run_Support, Ball_Skills, Range, Angles",
+    "Skill_Count":6
+  }
+]
