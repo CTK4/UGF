@@ -20,7 +20,7 @@ import { resolveTeamKey } from "@/ui/data/teamKeyResolver";
 import type { InterviewInvite, InterviewInviteTier, OpeningInterviewResult, OpeningPath, SaveData, UIAction, UIController, UIState } from "@/ui/types";
 import { getLeagueDbHash, loadLeagueRosterForTeam } from "@/services/rosterImport";
 import { validateLeagueDb } from "@/services/validateLeagueDb";
-import { getCurrentSeason, getTeamSummaryProjectionRows } from "@/data/LeagueDb";
+import { getCurrentSeason, getTeamSummaryProjectionRows } from "@/data/leagueDb";
 import { buildFreeAgentPool, buildTeamRosterRows, calculateCapSummary } from "@/ui/freeAgency/freeAgency";
 import { ROSTER_CAP_LIMIT, calculateRosterCap, loadRosterPlayersForTeam } from "@/ui/roster/rosterAdapter";
 import { buildCharacterRegistry } from "@/engine/characters";
