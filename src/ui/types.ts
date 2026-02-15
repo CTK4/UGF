@@ -4,7 +4,12 @@ import type { Route } from "@/ui/routes";
 
 export type SaveData = {
   version: 1;
+  meta?: {
+    schemaVersion: number;
+    [key: string]: unknown;
+  };
   gameState: GameState;
+  [key: string]: unknown;
 };
 
 export type InterviewInviteTier = "REBUILD" | "FRINGE" | "CONTENDER";

@@ -88,7 +88,7 @@ export function FigmaHubScreen({ ui }: ScreenProps) {
             <h2 className="ugf-card__title" style={{ margin: 0 }}>
               Hub
             </h2>
-            <div style={{ opacity: 0.85, fontSize: 13 }} data-ui="hub.teamName">
+            <div style={{ opacity: 0.85, fontSize: 13 }} data-ui={UI_ID.hub.teamName}>
               {teamName}
             </div>
           </div>
@@ -96,7 +96,7 @@ export function FigmaHubScreen({ ui }: ScreenProps) {
 
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 12, opacity: 0.8 }}>Cap Space</div>
-          <div style={{ fontWeight: 700 }} data-ui="hub.capSpace">
+          <div style={{ fontWeight: 700 }} data-ui={UI_ID.hub.capSpace}>
             {formatMoney(capSpace)}
           </div>
         </div>
@@ -113,13 +113,13 @@ export function FigmaHubScreen({ ui }: ScreenProps) {
               <div style={{ fontWeight: 700 }}>Action Required</div>
               <div style={{ opacity: 0.85 }}>Complete weekly staff meeting to advance</div>
             </div>
-            <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffMeeting" } })} data-ui="hub.staffMeetingButton">
+            <button type="button" onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "StaffMeeting" } })} data-ui={UI_ID.hub.staffMeetingButton}>
               Go
             </button>
           </div>
         ) : null}
 
-        <div style={{ display: "grid", gap: 10 }} data-ui="hub.quickLinks">
+        <div style={{ display: "grid", gap: 10 }} data-ui={UI_ID.hub.quickLinks}>
           {quickLinks.map((q) => (
             <button
               key={q.id}
@@ -127,7 +127,7 @@ export function FigmaHubScreen({ ui }: ScreenProps) {
               onClick={q.route}
               className="ugf-pill"
               style={{ textAlign: "left", display: "grid", gap: 2, cursor: "pointer" }}
-              data-ui={`hub.quickLink.${q.id}`}
+              data-ui={q.id === "roster" ? UI_ID.hub.quickLinkRoster : q.id === "staff" ? UI_ID.hub.quickLinkStaff : q.id === "freeAgency" ? UI_ID.hub.quickLinkFreeAgency : q.id === "phone" ? UI_ID.hub.quickLinkPhone : UI_ID.hub.quickLinkStaffMeeting}
             >
               <div style={{ fontWeight: 700 }}>{q.label}</div>
               <div style={{ opacity: 0.85, fontSize: 13 }}>{q.description}</div>
@@ -135,7 +135,7 @@ export function FigmaHubScreen({ ui }: ScreenProps) {
           ))}
         </div>
 
-        <div className="ugf-pill" data-ui="hub.newsPlaceholder">
+        <div className="ugf-pill" data-ui={UI_ID.hub.newsPlaceholder}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>News</div>
           <div style={{ opacity: 0.85, fontSize: 13 }}>
             Hook this to your in-game events feed. For now, this is a placeholder so the Figma-style Hub layout is functional.

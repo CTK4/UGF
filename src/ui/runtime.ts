@@ -1466,6 +1466,7 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
             const save = { version: 1 as const, gameState };
             hydrateLeagueStaffFromPersonnel(save.gameState);
             hydrateUserStaffFromTeamBucket(save.gameState, franchiseId);
+            if (warning) console.warn("[runtime] Roster import warning", warning);
             persistLocalSave(save);
             // #region agent log
             fetch('http://127.0.0.1:7243/ingest/bd08a75b-7810-4f27-940e-692196e40e09',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ui/runtime.ts:runAcceptOfferFlow',message:'flow success',data:{franchiseId,route:'HireCoordinators'},timestamp:Date.now(),hypothesisId:'accept-flow-ok'})}).catch(()=>{});
@@ -1479,14 +1480,8 @@ export async function createUIRuntime(onChange: () => void): Promise<UIControlle
               ui: {
                 ...state.ui,
                 opening: { ...state.ui.opening, lastOfferError: undefined },
-                activeModal: warning
-                  ? {
-                      title: "Roster import warning",
-                      message: warning,
-                      warning,
-                      actions: [{ label: "Continue", action: { type: "CLOSE_MODAL" } }],
-                    }
-                  : null,
+                notifications: warning ? [...state.ui.notifications, warning] : state.ui.notifications,
+                activeModal: null,
               },
             });
           };

@@ -18,27 +18,6 @@ function isPosRole(role: string): role is (typeof POS_ROLES)[number] {
   return (POS_ROLES as readonly string[]).includes(role);
 }
 
-function chipStyle(active: boolean): React.CSSProperties {
-  return {
-    padding: "8px 10px",
-    borderRadius: 999,
-    border: "1px solid rgba(255,255,255,0.18)",
-    background: active ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)",
-    fontWeight: 600,
-    lineHeight: 1,
-  };
-}
-
-function miniTabStyle(active: boolean): React.CSSProperties {
-  return {
-    padding: "6px 10px",
-    borderRadius: 999,
-    border: "1px solid rgba(255,255,255,0.16)",
-    background: active ? "rgba(255,255,255,0.10)" : "transparent",
-    fontVariantNumeric: "tabular-nums",
-  };
-}
-
 export function HireMarketScreen({ ui }: ScreenProps) {
   const state = ui.getState();
   const save = state.save;
@@ -47,38 +26,22 @@ export function HireMarketScreen({ ui }: ScreenProps) {
   const initialRole = state.route.role;
   if (initialRole === "HC") return null;
 
-  const initialGroup: Group = isCoordRole(initialRole) ? "COORD" : "POS";
-
-  const [group, setGroup] = useState<Group>(initialGroup);
+  const [group, setGroup] = useState<Group>(isCoordRole(initialRole) ? "COORD" : "POS");
   const [selectedRole, setSelectedRole] = useState<string>(initialRole);
   const [sortMode, setSortMode] = useState<SortMode>("RATING");
 
   const rolesForGroup = group === "COORD" ? COORD_ROLES : POS_ROLES;
+  const effectiveRole = (rolesForGroup as readonly string[]).includes(selectedRole) ? selectedRole : group === "COORD" ? "OC" : "QB";
 
-  const effectiveRole = useMemo(() => {
-    if ((rolesForGroup as readonly string[]).includes(selectedRole)) return selectedRole;
-    return group === "COORD" ? "OC" : "QB";
-  }, [group, rolesForGroup, selectedRole]);
-
-  const marketRole = effectiveRole;
-  const sessionKey = `${save.gameState.time.season}-${save.gameState.time.week}:${marketRole}`;
+  const sessionKey = `${save.gameState.time.season}-${save.gameState.time.week}:${effectiveRole}`;
   const session = marketByWeekFor(save.gameState)[sessionKey];
 
   const candidates = useMemo(() => {
     const list = [...(session?.candidates ?? [])];
-    const valueScore = (c: any) => {
-      const rating = Number(c.rating ?? 0);
-      const salary = Math.max(1, Number(c.salaryDemand ?? 1));
-      return rating / (salary / 1_000_000);
-    };
-    list.sort((a: any, b: any) => {
-      if (sortMode === "VALUE") return valueScore(b) - valueScore(a);
-      return Number(b.rating ?? 0) - Number(a.rating ?? 0);
-    });
+    const valueScore = (c: any) => Number(c.rating ?? 0) / (Math.max(1, Number(c.salaryDemand ?? 1)) / 1_000_000);
+    list.sort((a: any, b: any) => (sortMode === "VALUE" ? valueScore(b) - valueScore(a) : Number(b.rating ?? 0) - Number(a.rating ?? 0)));
     return list;
   }, [session, sortMode]);
-
-  const title = effectiveRole === "RB" ? "RB Coach" : effectiveRole === "WR" ? "WR Coach" : (STAFF_ROLE_LABELS as any)[effectiveRole] ?? effectiveRole;
 
   const onSetGroup = (next: Group) => {
     setGroup(next);
@@ -88,56 +51,40 @@ export function HireMarketScreen({ ui }: ScreenProps) {
 
   return (
     <div className="ugf-card" data-ui={UI_ID.hireMarket.root}>
-      <div className="ugf-card__header"><h2 className="ugf-card__title">Hire Market / {title}</h2></div>
-      <div className="ugf-card__body" style={{ display: "grid", gap: 10 }}>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <button style={chipStyle(group === "COORD")} data-ui={UI_ID.hireMarket.groupTab} onClick={() => onSetGroup("COORD")}>Coordinator</button>
-          <button style={chipStyle(group === "POS")} data-ui={UI_ID.hireMarket.groupTab} onClick={() => onSetGroup("POS")}>Position Coaches</button>
-          <button
-            style={chipStyle(sortMode === "VALUE")}
-            data-ui={UI_ID.hireMarket.sortTab} onClick={() => setSortMode((m) => (m === "VALUE" ? "RATING" : "VALUE"))}
-            title="Sort by rating per $M"
-          >
-            Best Value
-          </button>
+      <div className="ugf-card__header"><h2 className="ugf-card__title">Hire Market</h2></div>
+      <div className="ugf-card__body figma-shell">
+        <div className="figma-chip-row" role="tablist" aria-label="Role group">
+          <button className={`figma-chip ${group === "COORD" ? "is-active" : ""}`} data-ui={UI_ID.hireMarket.groupTab} onClick={() => onSetGroup("COORD")}>Coordinators</button>
+          <button className={`figma-chip ${group === "POS" ? "is-active" : ""}`} data-ui={UI_ID.hireMarket.groupTab} onClick={() => onSetGroup("POS")}>Position Coaches</button>
+          <button className={`figma-chip ${sortMode === "VALUE" ? "is-active" : ""}`} data-ui={UI_ID.hireMarket.sortTab} onClick={() => setSortMode((m) => (m === "VALUE" ? "RATING" : "VALUE"))}>Best Value</button>
         </div>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {(rolesForGroup as readonly string[]).map((r) => (
-            <button key={r} style={miniTabStyle(r === effectiveRole)} data-ui={UI_ID.hireMarket.roleTab} onClick={() => setSelectedRole(r)}>
-              {r === "RB" ? "RB Coach" : r === "WR" ? "WR Coach" : (STAFF_ROLE_LABELS as any)[r] ?? r}
+        <div className="figma-chip-row" role="tablist" aria-label="Roles">
+          {(rolesForGroup as readonly string[]).map((role) => (
+            <button key={role} className={`figma-chip ${effectiveRole === role ? "is-active" : ""}`} data-ui={UI_ID.hireMarket.roleTab} onClick={() => setSelectedRole(role)}>
+              {(STAFF_ROLE_LABELS as Record<string, string>)[role] ?? role}
             </button>
           ))}
         </div>
 
-        <div style={{ display: "grid", gap: 8 }}>
-          {candidates.map((c: any) => (
+        <div className="figma-scroll" style={{ display: "grid", gap: 8 }}>
+          {candidates.map((candidate: any) => (
             <button
-              key={c.id}
+              key={candidate.id}
+              className="figma-candidate-card"
               data-ui={UI_ID.hireMarket.candidateRow}
-              onClick={() =>
-                ui.dispatch({ type: "NAVIGATE", route: { key: "CandidateDetail", role: marketRole, candidateId: c.id } })
-              }
-              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}
+              onClick={() => ui.dispatch({ type: "NAVIGATE", route: { key: "CandidateDetail", role: effectiveRole, candidateId: candidate.id } })}
             >
-              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    minWidth: 44,
-                    justifyContent: "center",
-                    padding: "2px 8px",
-                    borderRadius: 999,
-                    border: "1px solid rgba(255,255,255,0.18)",
-                    background: "rgba(255,255,255,0.06)",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {c.rating ?? "--"}
+              <span className="ugf-card__body" style={{ display: "grid", gap: 6 }}>
+                <span style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                  <b>{candidate.name}</b>
+                  <span className="ugf-pill">{candidate.rating ?? "--"}</span>
                 </span>
-                <span>{c.name}</span>
+                <span className="figma-candidate-card__meta">
+                  <span>{(STAFF_ROLE_LABELS as Record<string, string>)[effectiveRole] ?? effectiveRole}</span>
+                  <span>${Number(candidate.salaryDemand ?? 0).toLocaleString()}</span>
+                </span>
               </span>
-              <span style={{ fontVariantNumeric: "tabular-nums" }}>${Number(c.salaryDemand ?? 0).toLocaleString()}</span>
             </button>
           ))}
         </div>
