@@ -1,0 +1,87 @@
+import type { ReactNode } from "react";
+import type { GameState } from "@/engine/gameState";
+import type { Route } from "@/ui/routes";
+
+export type SaveData = {
+  version: 1;
+  gameState: GameState;
+};
+
+export type InterviewInviteTier = "REBUILD" | "FRINGE" | "CONTENDER";
+
+export type OpeningPath = "FIXED_TRIAD" | "DYNAMIC";
+
+export type InterviewInvite = {
+  franchiseId: string;
+  tier: InterviewInviteTier;
+  overall: number;
+  summaryLine: string;
+  /** True when the job opened because a franchise legend retired. */
+  legendRetiredOpening?: boolean;
+};
+
+export type OpeningInterviewResult = {
+  franchiseId: string;
+  ownerOpinion: number;
+  gmOpinion: number;
+  risk: number;
+  answers: { questionId: string; choiceId: "A" | "B" | "C" }[];
+  completed: boolean;
+  lastToneFeedback: string;
+};
+
+export type ModalState = {
+  title: string;
+  message: ReactNode;
+  lines?: string[];
+  warning?: string;
+  actions?: Array<{ label: string; action: UIAction }>;
+};
+
+export type UIState = {
+  route: Route;
+  save: SaveData | null;
+  corruptedSave: boolean;
+  ui: {
+    activeModal: ModalState | null;
+    notifications: string[];
+    opening: {
+      openingPath: OpeningPath;
+      coachName: string;
+      coachAge: number;
+      coachPersonality: string;
+      background: string;
+      hometownId: string;
+      hometownLabel: string;
+      hometownTeamKey: string;
+      interviewInvites: InterviewInvite[];
+      interviewResults: Record<string, OpeningInterviewResult>;
+      offers: InterviewInvite[];
+      lastOfferError?: string;
+      lastInterviewError?: string;
+      coordinatorChoices: Partial<Record<"OC" | "DC" | "STC", string>>;
+    };
+  };
+};
+
+export type GateFailure = { gateId: string; message: string; route: Route };
+
+export type UIAction = { type: string; [key: string]: unknown };
+
+export type AdvanceAvailability = {
+  canAdvance: boolean;
+  message?: string;
+  route?: Route;
+};
+
+export type UIController = {
+  getState: () => UIState;
+  dispatch: (action: UIAction) => void;
+  selectors: {
+    routeLabel: () => string;
+    table: (name: string) => Array<Record<string, unknown>>;
+    canAdvance: () => AdvanceAvailability;
+  };
+};
+
+export type ScreenProps = { ui: UIController };
