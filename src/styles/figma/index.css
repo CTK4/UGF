@@ -1,0 +1,55 @@
+:root {
+  --figma-bg: #070b12;
+  --figma-surface: rgba(17, 25, 38, 0.82);
+  --figma-surface-strong: rgba(23, 33, 50, 0.94);
+  --figma-border: rgba(184, 210, 255, 0.26);
+  --figma-border-strong: rgba(255, 255, 255, 0.36);
+  --figma-text: #f6f8ff;
+  --figma-muted: rgba(226, 233, 255, 0.75);
+  --figma-accent: #89a8ff;
+}
+
+body {
+  background: radial-gradient(120% 100% at 50% -10%, #18263f 0%, var(--figma-bg) 62%);
+  color: var(--figma-text);
+}
+
+.ugf-card,
+.card {
+  border-radius: 18px;
+  border: 1px solid var(--figma-border);
+  background: linear-gradient(180deg, rgba(30, 42, 64, 0.9), var(--figma-surface));
+  box-shadow: 0 12px 32px rgba(5, 10, 20, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+}
+
+.ugf-card__header {
+  border-bottom: 1px solid rgba(183, 201, 255, 0.2);
+  background: linear-gradient(90deg, rgba(130, 160, 255, 0.26), rgba(130, 160, 255, 0));
+}
+
+.ugf-card__title {
+  font-family: "Rajdhani", "Inter", sans-serif;
+  font-size: 15px;
+  letter-spacing: 0.11em;
+}
+
+.ugf-pill {
+  border-radius: 999px;
+  border: 1px solid var(--figma-border-strong);
+  background: linear-gradient(180deg, rgba(150, 179, 255, 0.3), rgba(95, 124, 197, 0.25));
+  color: var(--figma-text);
+  backdrop-filter: blur(9px);
+}
+
+button {
+  min-height: 44px;
+}
+
+.figma-shell { display: grid; gap: 12px; }
+.figma-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.figma-chip { min-height: 44px; border-radius: 999px; border: 1px solid var(--figma-border); background: rgba(120, 146, 220, 0.18); }
+.figma-chip.is-active { border-color: #d8e3ff; background: rgba(152, 180, 255, 0.32); }
+.figma-candidate-card { width: 100%; text-align: left; border-radius: 16px; border: 1px solid rgba(206, 220, 255, 0.28); background: linear-gradient(180deg, rgba(41,55,84,0.92), rgba(27,37,58,0.92)); }
+.figma-candidate-card__meta { display:flex; gap:8px; flex-wrap:wrap; color: var(--figma-muted); font-size:12px; }
+.figma-scroll { max-height: min(58vh, 560px); overflow-y: auto; padding-right: 2px; }

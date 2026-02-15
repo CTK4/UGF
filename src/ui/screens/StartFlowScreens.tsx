@@ -332,44 +332,51 @@ export function OffersScreen({ ui }: ScreenProps) {
 
 export function HireCoordinatorsScreen({ ui }: ScreenProps) {
   const picks = ui.getState().ui.opening.coordinatorChoices;
+  const [activeRole, setActiveRole] = React.useState<"OC" | "DC" | "STC">("OC");
   const roles: Array<"OC" | "DC" | "STC"> = ["OC", "DC", "STC"];
 
   return (
-    <div className="ugf-card">
-      <div className="ugf-card__body" style={{ display: "grid", gap: 8 }}>
-        {roles.map((role) => (
-          <div key={role} style={{ display: "grid", gap: 8 }}>
-            <b>{role}</b>
-            {rolePool(role).map((c) => {
-              const meta = coordinatorCandidateMeta({ role: role as CoordinatorRole, name: c.displayName, scheme: c.scheme });
-              const selected = picks[role] === c.displayName;
-              return (
-                <button
-                  type="button"
-                  key={c.personId}
-                  onClick={() => ui.dispatch({ type: "SET_COORDINATOR_CHOICE", role, candidateName: c.displayName })}
-                  className="ugf-card"
-                  style={{ textAlign: "left", borderColor: selected ? "#ffbf47" : undefined, boxShadow: selected ? "0 0 0 1px rgba(255,191,71,0.6)" : undefined }}
-                >
-                  <span className="ugf-card__body" style={{ display: "grid", gap: 6 }}>
-                    <span style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                      <b>{selected ? "✓ " : ""}{c.displayName}</b>
-                      <span className="ugf-pill">{c.role}</span>
-                    </span>
-                    <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <span className="ugf-pill">Rep: {c.reputation}</span>
-                      <span className="ugf-pill">Scheme: {meta.schemeTag}</span>
-                      <span className="ugf-pill">Style: {meta.styleTag}</span>
-                      <span className="ugf-pill">Fit: {meta.fitScore}</span>
-                      <span className="ugf-pill">${meta.salary.toLocaleString()} • {meta.years}y</span>
-                    </span>
-                    {selected ? <small>{meta.whyFit}</small> : null}
+    <div className="ugf-card" data-ui={UI_ID.staff.root}>
+      <div className="ugf-card__header"><h2 className="ugf-card__title">Hire Coordinators</h2></div>
+      <div className="ugf-card__body figma-shell">
+        <div className="figma-chip-row" aria-label="Coordinator roles">
+          {roles.map((role) => (
+            <button key={role} className={`figma-chip ${activeRole === role ? "is-active" : ""}`} onClick={() => setActiveRole(role)}>
+              {role}
+            </button>
+          ))}
+        </div>
+
+        <div className="figma-scroll" style={{ display: "grid", gap: 8 }}>
+          {rolePool(activeRole).map((candidate) => {
+            const meta = coordinatorCandidateMeta({ role: activeRole as CoordinatorRole, name: candidate.displayName, scheme: candidate.scheme });
+            const selected = picks[activeRole] === candidate.displayName;
+            return (
+              <button
+                type="button"
+                key={candidate.personId}
+                data-ui={UI_ID.staff.roleRow}
+                className="figma-candidate-card"
+                onClick={() => ui.dispatch({ type: "SET_COORDINATOR_CHOICE", role: activeRole, candidateName: candidate.displayName })}
+                style={selected ? { borderColor: "#d7e5ff" } : undefined}
+              >
+                <span className="ugf-card__body" style={{ display: "grid", gap: 6 }}>
+                  <span style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                    <b>{selected ? "✓ " : ""}{candidate.displayName}</b>
+                    <span className="ugf-pill">Rep {candidate.reputation}</span>
                   </span>
-                </button>
-              );
-            })}
-          </div>
-        ))}
+                  <span className="figma-candidate-card__meta">
+                    <span>{meta.schemeTag}</span>
+                    <span>{meta.styleTag}</span>
+                    <span>Fit {meta.fitScore}</span>
+                    <span>${meta.salary.toLocaleString()} • {meta.years}y</span>
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
         <button type="button" disabled={!picks.OC || !picks.DC || !picks.STC} onClick={() => ui.dispatch({ type: "FINALIZE_NEW_SAVE" })}>Finalize and Enter Hub</button>
       </div>
     </div>

@@ -18,7 +18,8 @@
     "smoke": "bash scripts/smoke.sh",
     "smoke:test": "node scripts/smoke.mjs",
     "typecheck:ci": "tsc -p tsconfig.ci.json --noEmit",
-    "guard:persistence": "bash scripts/guard-persistence-writers.sh src"
+    "guard:persistence": "bash scripts/guard-persistence-writers.sh src",
+    "test": "vitest run"
   },
   "keywords": [],
   "author": "",
